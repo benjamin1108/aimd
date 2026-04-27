@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 600 240">
+  <defs>
+    <linearGradient id="g" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#3b82f6"/>
+      <stop offset="100%" stop-color="#8b5cf6"/>
+    </linearGradient>
+  </defs>
+  <rect width="600" height="240" fill="url(#g)"/>
+  <text x="300" y="130" text-anchor="middle" font-family="-apple-system, sans-serif"
+        font-size="42" font-weight="700" fill="white">AIMD</text>
+  <text x="300" y="170" text-anchor="middle" font-family="-apple-system, sans-serif"
+        font-size="16" fill="rgba(255,255,255,0.85)">AI Markdown Document · v0.1</text>
+</svg>

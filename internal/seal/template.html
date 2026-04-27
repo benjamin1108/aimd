@@ -1,0 +1,93 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>__AIMD_TITLE__</title>
+<style>
+:root {
+  --fg: #1f2328; --muted: #59636e; --bg: #ffffff;
+  --border: #d1d9e0; --code-bg: #f6f8fa; --link: #0969da;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --fg: #e6edf3; --muted: #9198a1; --bg: #0d1117;
+    --border: #30363d; --code-bg: #161b22; --link: #4493f8;
+  }
+}
+* { box-sizing: border-box; }
+html, body { margin: 0; padding: 0; background: var(--bg); color: var(--fg); }
+body { font: 16px/1.6 -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif; }
+main.aimd { max-width: 860px; margin: 0 auto; padding: 48px 24px 96px; }
+main.aimd h1, main.aimd h2, main.aimd h3, main.aimd h4 { line-height: 1.25; margin-top: 1.6em; margin-bottom: 0.6em; }
+main.aimd h1 { font-size: 2em; border-bottom: 1px solid var(--border); padding-bottom: 0.3em; }
+main.aimd h2 { font-size: 1.5em; border-bottom: 1px solid var(--border); padding-bottom: 0.3em; }
+main.aimd p { margin: 0.8em 0; }
+main.aimd a { color: var(--link); text-decoration: none; }
+main.aimd a:hover { text-decoration: underline; }
+main.aimd img { max-width: 100%; height: auto; border-radius: 6px; }
+main.aimd code { background: var(--code-bg); padding: 0.15em 0.4em; border-radius: 4px; font-size: 0.92em; font-family: SFMono-Regular, Menlo, Consolas, monospace; }
+main.aimd pre { background: var(--code-bg); padding: 16px; border-radius: 6px; overflow-x: auto; }
+main.aimd pre code { background: transparent; padding: 0; }
+main.aimd blockquote { border-left: 4px solid var(--border); margin: 1em 0; padding: 0 1em; color: var(--muted); }
+main.aimd table { border-collapse: collapse; margin: 1em 0; }
+main.aimd th, main.aimd td { border: 1px solid var(--border); padding: 6px 12px; }
+main.aimd th { background: var(--code-bg); }
+main.aimd hr { border: 0; border-top: 1px solid var(--border); margin: 2em 0; }
+.aimd-loading, .aimd-error { padding: 48px 24px; text-align: center; color: var(--muted); }
+.aimd-error { color: #d1242f; }
+</style>
+</head>
+<body>
+<main class="aimd"><div class="aimd-loading">Loading AIMD…</div></main>
+
+<script id="aimd-payload" type="application/octet-stream">__AIMD_ZIP_BASE64__</script>
+<script>/* fflate */
+__AIMD_FFLATE__
+</script>
+<script>/* marked */
+__AIMD_MARKED__
+</script>
+<script>
+(function () {
+  var rootEl = document.querySelector('main.aimd');
+  function fail(msg) {
+    rootEl.innerHTML = '<div class="aimd-error">AIMD render failed: ' + msg + '</div>';
+  }
+  try {
+    var b64 = document.getElementById('aimd-payload').textContent.trim();
+    var bin = atob(b64);
+    var bytes = new Uint8Array(bin.length);
+    for (var i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+
+    var entries = fflate.unzipSync(bytes);
+    var manifestRaw = entries['manifest.json'];
+    if (!manifestRaw) throw new Error('manifest.json missing');
+    var manifest = JSON.parse(new TextDecoder().decode(manifestRaw));
+
+    var entryName = manifest.entry || 'main.md';
+    var mdBytes = entries[entryName];
+    if (!mdBytes) throw new Error(entryName + ' missing');
+    var md = new TextDecoder().decode(mdBytes);
+
+    var assetURL = {};
+    (manifest.assets || []).forEach(function (a) {
+      var data = entries[a.path];
+      if (!data) return;
+      var blob = new Blob([data], { type: a.mime || 'application/octet-stream' });
+      assetURL[a.id] = URL.createObjectURL(blob);
+    });
+
+    md = md.replace(/asset:\/\/([A-Za-z0-9\-_.]+)/g, function (_m, id) {
+      return assetURL[id] || ('asset://' + id);
+    });
+
+    if (manifest.title) document.title = manifest.title;
+    rootEl.innerHTML = marked.parse(md);
+  } catch (err) {
+    fail((err && err.message) || String(err));
+  }
+})();
+</script>
+</body>
+</html>

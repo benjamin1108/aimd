@@ -1,0 +1,17 @@
+# Build artifacts
+/bin/
+/dist/
+
+# Generated rendered outputs (sealed/exported); source templates under internal/ are kept
+*.html
+!internal/**/*.html
+
+# .aimd packed files — except canonical samples in examples/
+*.aimd
+!examples/**/*.aimd
+
+# macOS
+.DS_Store
+
+# Local Claude Code settings (user-specific permissions, not for repo)
+.claude/settings.local.json
