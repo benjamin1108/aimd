@@ -1,0 +1,47 @@
+{
+  "$schema": "https://schema.tauri.app/config/2",
+  "productName": "AIMD Desktop",
+  "version": "0.1.0",
+  "identifier": "org.aimd.desktop",
+  "build": {
+    "beforeDevCommand": "npm run dev:web",
+    "beforeBuildCommand": "npm run build:web",
+    "devUrl": "http://127.0.0.1:1420",
+    "frontendDist": "../dist"
+  },
+  "app": {
+    "windows": [
+      {
+        "title": "AIMD Desktop",
+        "width": 1180,
+        "height": 820,
+        "minWidth": 860,
+        "minHeight": 620
+      }
+    ],
+    "security": {
+      "csp": null
+    }
+  },
+  "bundle": {
+    "active": true,
+    "targets": ["app", "dmg"],
+    "resources": {
+      "../../../bin/aimd": "aimd"
+    },
+    "fileAssociations": [
+      {
+        "ext": ["aimd"],
+        "name": "AIMD Document",
+        "description": "AIMD document",
+        "role": "Editor",
+        "mimeType": "application/vnd.aimd",
+        "rank": "Owner",
+        "exportedType": {
+          "identifier": "org.aimd.document",
+          "conformsTo": ["public.data"]
+        }
+      }
+    ]
+  }
+}

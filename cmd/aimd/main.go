@@ -10,6 +10,7 @@ import (
 	"strings"
 	"syscall"
 
+	"github.com/aimd-org/aimd/internal/desktop"
 	"github.com/aimd-org/aimd/internal/export"
 	"github.com/aimd-org/aimd/internal/inspect"
 	"github.com/aimd-org/aimd/internal/manifest"
@@ -36,6 +37,7 @@ Commands:
   preview    Serve a .aimd file locally in your browser
   seal       Produce a self-rendering single .html that needs no aimd CLI
   export     Export a .aimd to another format (html for v0.1)
+  desktop    JSON sidecar API for AIMD Desktop
   version    Print the aimd version
   help       Show this help
 
@@ -64,6 +66,8 @@ func main() {
 		err = runSeal(args)
 	case "export":
 		err = runExport(args)
+	case "desktop":
+		err = desktop.Run(args, os.Stdout, os.Stderr, os.Stdin)
 	case "version", "--version", "-v":
 		fmt.Printf("aimd %s (spec %s v%s)\n", version, manifest.FormatName, manifest.FormatVersion)
 	case "help", "-h", "--help":

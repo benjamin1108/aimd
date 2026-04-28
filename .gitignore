@@ -1,10 +1,19 @@
 # Build artifacts
 /bin/
 /dist/
+.gocache/
+node_modules/
+target/
+apps/desktop-tauri/dist/
+apps/desktop-tauri/src-tauri/target/
+apps/desktop-tauri/src-tauri/gen/
+apps/desktop-tauri/playwright-report/
+apps/desktop-tauri/test-results/
 
 # Generated rendered outputs (sealed/exported); source templates under internal/ are kept
 *.html
 !internal/**/*.html
+!apps/**/*.html
 
 # .aimd packed files — except canonical samples in examples/
 *.aimd
