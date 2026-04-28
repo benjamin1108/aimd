@@ -6,7 +6,7 @@ AIMD 是面向 AI 生成内容时代的**单文件 Markdown 文档格式**，把
 
 `.aimd` 本质是 ZIP，普通解压工具就能打开检查；AIMD CLI + 系统集成让"创建 → 双击查看 → 分享"全程不用操心命令行。
 
-完整规格见 [`docs/aimd_mrd_v_0_1.md`](docs/aimd_mrd_v_0_1.md)。
+文档索引见 [`docs/README.md`](docs/README.md)，产品背景见 [`docs/aimd_mrd_v_0_1.md`](docs/aimd_mrd_v_0_1.md)。
 
 ## 三种使用方式
 

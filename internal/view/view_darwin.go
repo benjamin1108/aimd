@@ -42,6 +42,16 @@ func Run(opt Options) error {
 		height = 820
 	}
 	w.SetSize(width, height, webview.HintNone)
+	if err := w.Bind("aimdPasteImagePaths", func() []string {
+		return pasteboardImagePaths()
+	}); err != nil {
+		return err
+	}
+	if err := w.Bind("aimdChooseImagePaths", func() []string {
+		return chooseImagePaths()
+	}); err != nil {
+		return err
+	}
 	w.Navigate(s.URL)
 	w.Run()
 	return nil
