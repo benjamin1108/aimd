@@ -43,7 +43,7 @@ test.describe("Empty state — running outside Tauri", () => {
     await expect(page.locator(".brand-mark")).toHaveText("A");
     await expect(page.locator("#empty-new")).toContainText("新建文档");
     await expect(page.locator("#empty-open")).toContainText("打开文件");
-    await expect(page.locator("#empty-import")).toContainText("导入 Markdown");
+    await expect(page.locator("#empty-import")).toContainText("打开 Markdown");
   });
 
   test("status pill is in idle tone on first paint", async ({ page }) => {

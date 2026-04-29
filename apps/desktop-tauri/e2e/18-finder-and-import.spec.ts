@@ -88,6 +88,8 @@ async function installTauriMock(page: Page) {
       },
       list_aimd_assets: () => [],
       confirm_discard_changes: () => "discard",
+      save_markdown: () => undefined,
+      confirm_upgrade_to_aimd: () => false,
     };
 
     (window as any).__TAURI_INTERNALS__ = {
@@ -232,8 +234,8 @@ test.describe("1. Finder context menu", () => {
   });
 });
 
-test.describe("2. Import Markdown as draft", () => {
-  test("import markdown loads draft without prompting save path", async ({
+test.describe("2. Open Markdown as document", () => {
+  test("open markdown loads as formal document (not draft), shows .md path", async ({
     page,
   }) => {
     await installTauriMock(page);
@@ -246,25 +248,36 @@ test.describe("2. Import Markdown as draft", () => {
 
     const saveLabel = page.locator("#save-label");
     await expect(saveLabel).toHaveText("保存");
-    await expect(page.locator("#doc-path")).toContainText("未保存草稿");
+    await expect(page.locator("#doc-path")).toContainText("/mock/report.md");
+    await expect(page.locator("#doc-path")).not.toContainText("未保存草稿");
   });
 
-  test("after import, ⌘S triggers save-as dialog (isDraft=true path)", async ({
+  test("after open, ⌘S saves back to .md (save_markdown path)", async ({
     page,
   }) => {
     await installTauriMock(page);
     await page.goto("/");
 
     await page.locator("#empty-import").click();
-    await expect(page.locator("#doc-path")).toContainText("未保存草稿");
+    await expect(page.locator("#doc-path")).toContainText("/mock/report.md");
+
+    // 切换到编辑模式，输入内容使 dirty
+    await page.locator("#mode-edit").click();
+    await page.locator("#inline-editor").click();
+    await page.keyboard.type("x");
+    await page.waitForFunction(() => {
+      const pill = document.querySelector("#status-pill");
+      return pill && pill.getAttribute("data-tone") === "warn";
+    }, { timeout: 3000 });
 
     await page.locator("#save").click();
 
-    await expect(page.locator("#doc-path")).toContainText("/mock/");
+    // doc-path 仍是 .md（未升级）
+    await expect(page.locator("#doc-path")).toContainText("/mock/report.md");
     await expect(page.locator("#save-label")).toHaveText("保存");
   });
 
-  test("import draft can be closed without forced save prompt", async ({
+  test("open markdown doc can be closed without forced save prompt", async ({
     page,
   }) => {
     await installTauriMock(page);
@@ -279,7 +292,7 @@ test.describe("2. Import Markdown as draft", () => {
     await expect(page.locator("#doc-actions")).toBeHidden();
   });
 
-  test("drop .md file loads as draft without save dialog", async ({ page }) => {
+  test("drop .md file opens as formal document, shows .md path", async ({ page }) => {
     await installTauriMock(page);
     await page.addInitScript(() => {
       window.localStorage.setItem("aimd.desktop.recents", JSON.stringify([]));
@@ -299,6 +312,7 @@ test.describe("2. Import Markdown as draft", () => {
     });
 
     await expect(page.locator("#doc-title")).toHaveText("测试报告");
+    await expect(page.locator("#doc-path")).toContainText("/mock/report.md");
     await expect(page.locator("#save-label")).toHaveText("保存");
   });
 });

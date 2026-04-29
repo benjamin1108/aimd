@@ -7,6 +7,7 @@
 | 文件 | 类型 | 主要回答 | 更新时机 |
 |---|---|---|---|
 | `aimd_mrd_v_0_1.md` | MRD | 为什么需要 AIMD、面向谁、解决什么市场和产品问题 | 产品定位、目标用户、路线图发生变化时 |
+| `product_expansion_and_diagnosis.md` | Product Diagnosis | AI 时代编辑器功能扩展方向、现有功能缺口和优先级诊断 | 产品路线、功能优先级、Beta 后规划变化时 |
 | `aimd_desktop_tauri_spec.md` | Technical SPEC | 长期桌面架构如何演进，Tauri、VS Code、SDK、Agent 如何接入 | 桌面端、插件、SDK、工程架构变化时 |
 | `current_stage.md` | Stage Note | 当前阶段做到哪里、下一步做什么、哪些事情暂缓 | 每个阶段开始/结束，或迭代方向变化时 |
 

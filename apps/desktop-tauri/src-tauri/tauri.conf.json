@@ -54,6 +54,14 @@
           "identifier": "org.aimd.document",
           "conformsTo": ["public.data"]
         }
+      },
+      {
+        "ext": ["md", "markdown", "mdx"],
+        "name": "Markdown Document",
+        "description": "Markdown document",
+        "role": "Editor",
+        "mimeType": "text/markdown",
+        "rank": "Default"
       }
     ]
   }

@@ -85,9 +85,19 @@ fn confirm_discard_changes(message: String) -> DiscardChoice {
     }
 }
 
+fn is_supported_doc_extension(path: &std::path::Path) -> bool {
+    match path.extension().and_then(|e| e.to_str()).map(|e| e.to_lowercase()).as_deref() {
+        Some("aimd") | Some("md") | Some("markdown") | Some("mdx") => true,
+        _ => false,
+    }
+}
+
 #[tauri::command]
 fn initial_open_path(pending: State<'_, PendingOpenPaths>) -> Option<String> {
-    if let Some(path) = std::env::args().skip(1).find(|arg| arg.ends_with(".aimd")) {
+    if let Some(path) = std::env::args()
+        .skip(1)
+        .find(|arg| is_supported_doc_extension(std::path::Path::new(arg)))
+    {
         return Some(path);
     }
     pending.0.lock().ok()?.pop()
@@ -171,6 +181,32 @@ fn reveal_in_finder(path: String) -> Result<(), String> {
 #[tauri::command]
 fn convert_md_to_draft(app: AppHandle, markdown_path: String) -> Result<Value, String> {
     run_aimd_json(&app, &["desktop", "read-markdown", &markdown_path], None)
+}
+
+#[tauri::command]
+fn save_markdown(path: String, markdown: String) -> Result<(), String> {
+    let path_ref: &std::path::Path = path.as_ref();
+    let tmp_name = format!(
+        ".{}.tmp",
+        path_ref.file_name().and_then(|s| s.to_str()).unwrap_or("md")
+    );
+    let tmp = path_ref.with_file_name(tmp_name);
+    fs::write(&tmp, markdown.as_bytes()).map_err(|e| format!("save_markdown write tmp: {e}"))?;
+    fs::rename(&tmp, path_ref).map_err(|e| {
+        let _ = fs::remove_file(&tmp);
+        format!("save_markdown rename: {e}")
+    })
+}
+
+#[tauri::command]
+fn confirm_upgrade_to_aimd(message: String) -> bool {
+    let result = rfd::MessageDialog::new()
+        .set_title("AIMD Desktop")
+        .set_description(&message)
+        .set_level(rfd::MessageLevel::Info)
+        .set_buttons(rfd::MessageButtons::YesNo)
+        .show();
+    matches!(result, rfd::MessageDialogResult::Yes)
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -442,7 +478,9 @@ pub fn run() {
             read_aimd_asset,
             replace_aimd_asset,
             reveal_in_finder,
-            convert_md_to_draft
+            convert_md_to_draft,
+            save_markdown,
+            confirm_upgrade_to_aimd
         ])
         .build(tauri::generate_context!())
         .expect("error while building AIMD Desktop");
@@ -451,7 +489,7 @@ pub fn run() {
         if let RunEvent::Opened { urls } = event {
             for url in urls {
                 if let Ok(path) = url.to_file_path() {
-                    if path.extension().is_some_and(|ext| ext == "aimd") {
+                    if is_supported_doc_extension(&path) {
                         let path = path.to_string_lossy().to_string();
                         if let Some(pending) = app_handle.try_state::<PendingOpenPaths>() {
                             if let Ok(mut paths) = pending.0.lock() {
@@ -471,8 +509,8 @@ fn self_register_aimd_handler() {}
 
 #[cfg(target_os = "macos")]
 fn self_register_aimd_handler() {
-    if let Err(err) = macos_file_association::register_aimd_handler() {
-        eprintln!("failed to register AIMD file association: {err}");
+    if let Err(err) = macos_file_association::register_default_handlers() {
+        eprintln!("failed to register file association: {err}");
     }
 }
 
@@ -486,6 +524,7 @@ mod macos_file_association {
     const AIMD_BUNDLE_ID: &str = "org.aimd.desktop";
     const AIMD_UTI: &str = "org.aimd.document";
     const AIMD_EXTENSION: &str = "aimd";
+    const MD_EXTENSIONS: &[&str] = &["md", "markdown", "mdx"];
     const LS_ROLES_ALL: u32 = u32::MAX;
 
     #[link(name = "CoreServices", kind = "framework")]
@@ -505,7 +544,7 @@ mod macos_file_association {
         ) -> CFStringRef;
     }
 
-    pub fn register_aimd_handler() -> Result<(), String> {
+    pub fn register_default_handlers() -> Result<(), String> {
         if let Some(bundle) = current_app_bundle() {
             register_bundle(&bundle)?;
         }
@@ -516,6 +555,14 @@ mod macos_file_association {
 
         if let Some(extension_uti) = preferred_uti_for_extension(AIMD_EXTENSION) {
             set_default_handler(&extension_uti, &bundle_id)?;
+        }
+
+        for ext in MD_EXTENSIONS {
+            if let Some(extension_uti) = preferred_uti_for_extension(ext) {
+                if let Err(err) = set_default_handler(&extension_uti, &bundle_id) {
+                    eprintln!("failed to register .{ext} association: {err}");
+                }
+            }
         }
 
         Ok(())

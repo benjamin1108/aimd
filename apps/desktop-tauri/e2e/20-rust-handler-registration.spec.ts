@@ -10,6 +10,8 @@
  *   - 不依赖 cargo，不引入新依赖
  *   - 能咬住"命令名从 generate_handler! 列表里被误删"的最大风险场景
  *   - 无法咬住"注册了但实现错"，但那是单元测试的职责，这里只做注册校验
+ *
+ * 同时校验 md 关联相关配置（tauri.conf.json / Info.plist / lib.rs 扩展名标识符）。
  */
 
 import { test, expect } from "@playwright/test";
@@ -24,6 +26,9 @@ const LIB_RS = path.resolve(
   __dirname,
   "../src-tauri/src/lib.rs",
 );
+
+const TAURI_CONF = path.resolve(__dirname, "../src-tauri/tauri.conf.json");
+const INFO_PLIST = path.resolve(__dirname, "../src-tauri/Info.plist");
 
 function readLibRs(): string {
   return fs.readFileSync(LIB_RS, "utf-8");
@@ -79,6 +84,8 @@ test.describe("Rust invoke_handler 命令注册校验", () => {
     "replace_aimd_asset",
     "reveal_in_finder",
     "convert_md_to_draft",
+    "save_markdown",
+    "confirm_upgrade_to_aimd",
   ];
 
   test("lib.rs 包含 tauri::generate_handler! 宏调用", () => {
@@ -96,4 +103,25 @@ test.describe("Rust invoke_handler 命令注册校验", () => {
       ).toContain(cmd);
     });
   }
+});
+
+test.describe("MD 文件关联源码校验", () => {
+  test('lib.rs 包含 md / markdown / mdx 扩展名标识符', () => {
+    const src = fs.readFileSync(LIB_RS, "utf-8");
+    expect(src, 'lib.rs 缺少 "md" 扩展名标识符').toContain('"md"');
+    expect(src, 'lib.rs 缺少 "markdown" 扩展名标识符').toContain('"markdown"');
+    expect(src, 'lib.rs 缺少 "mdx" 扩展名标识符').toContain('"mdx"');
+  });
+
+  test('tauri.conf.json 包含 Markdown Document 文件关联', () => {
+    const src = fs.readFileSync(TAURI_CONF, "utf-8");
+    expect(src, 'tauri.conf.json 缺少 "Markdown Document"').toContain('"Markdown Document"');
+  });
+
+  test('Info.plist 包含 Markdown Document CFBundleTypeName', () => {
+    const src = fs.readFileSync(INFO_PLIST, "utf-8");
+    expect(src, 'Info.plist 缺少 CFBundleTypeName>Markdown Document').toContain(
+      "<string>Markdown Document</string>",
+    );
+  });
 });

@@ -135,12 +135,14 @@ test.describe("Format toolbar — every button", () => {
     await expect(page.locator("#inline-editor code")).toHaveCount(1);
   });
 
-  test("link prompt creates an <a href>", async ({ page }) => {
+  test("link popover creates an <a href>", async ({ page }) => {
     await enterEditMode(page);
     await selectParagraph(page, 3);
 
-    page.on("dialog", (dlg) => void dlg.accept("https://example.com"));
     await page.locator('[data-cmd="link"]').click();
+    await expect(page.locator("#link-popover")).toBeVisible();
+    await page.locator("#link-popover-input").fill("https://example.com");
+    await page.locator("#link-popover-confirm").click();
 
     await expect(page.locator('#inline-editor a[href="https://example.com"]')).toHaveCount(1);
   });

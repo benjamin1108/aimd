@@ -25,3 +25,4 @@ bug-screen/
 
 # Local Claude Code settings (user-specific permissions, not for repo)
 .claude/settings.local.json
+.claude/scheduled_tasks.lock

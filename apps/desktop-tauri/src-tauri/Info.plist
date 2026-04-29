@@ -18,6 +18,22 @@
       <key>CFBundleTypeIconFile</key>
       <string>icon</string>
     </dict>
+    <dict>
+      <key>CFBundleTypeExtensions</key>
+      <array>
+        <string>md</string>
+        <string>markdown</string>
+        <string>mdx</string>
+      </array>
+      <key>CFBundleTypeName</key>
+      <string>Markdown Document</string>
+      <key>CFBundleTypeRole</key>
+      <string>Editor</string>
+      <key>LSHandlerRank</key>
+      <string>Default</string>
+      <key>CFBundleTypeIconFile</key>
+      <string>icon</string>
+    </dict>
   </array>
 </dict>
 </plist>

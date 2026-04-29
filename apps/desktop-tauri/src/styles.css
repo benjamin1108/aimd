@@ -1304,9 +1304,36 @@ body.resizing-v * {
   height: 26px;
   border-radius: 6px;
   color: var(--ink-muted);
+  position: relative;
   transition: background var(--t-fast) var(--ease),
               color var(--t-fast) var(--ease),
               transform var(--t-fast) var(--ease);
+}
+
+/* BUG-015: WKWebView 不渲染 title tooltip，用 CSS ::after 实现自定义 tooltip */
+.ft-btn[title]::after {
+  content: attr(title);
+  position: absolute;
+  bottom: calc(100% + 6px);
+  left: 50%;
+  transform: translateX(-50%);
+  white-space: nowrap;
+  background: var(--ink-strong);
+  color: var(--ink-on-accent);
+  font-size: 11px;
+  font-weight: 500;
+  line-height: 1;
+  padding: 4px 7px;
+  border-radius: 5px;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 80ms var(--ease);
+  z-index: 200;
+}
+
+.ft-btn[title]:hover::after {
+  opacity: 1;
+  transition-delay: 400ms;
 }
 
 .ft-btn svg { width: 14px; height: 14px; }
@@ -1536,4 +1563,74 @@ body.resizing-v * {
 
 .file-ctx-item:hover {
   background: var(--bg-sidebar-hover, #ece4d2);
+}
+
+/* ============================================================
+   Link popover (BUG-013: 替代 WKWebView 屏蔽的 window.prompt)
+   ============================================================ */
+
+.link-popover {
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  z-index: 9000;
+  background: var(--bg-panel);
+  border: 1px solid var(--hairline-strong);
+  border-radius: 10px;
+  box-shadow: var(--shadow-panel);
+  padding: 16px 18px 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  min-width: 320px;
+}
+
+.link-popover[hidden] { display: none; }
+
+.link-popover-label {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--ink-muted);
+  letter-spacing: 0.02em;
+}
+
+.link-popover-input {
+  width: 100%;
+  box-sizing: border-box;
+  padding: 7px 10px;
+  border: 1px solid var(--hairline-strong);
+  border-radius: 6px;
+  background: var(--bg-soft);
+  font-size: 13px;
+  color: var(--ink);
+  outline: none;
+}
+
+.link-popover-input:focus {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 2px rgba(31, 22, 11, 0.1);
+}
+
+.link-popover-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.link-popover-actions .danger-btn {
+  margin-right: auto;
+  color: var(--danger, #c0392b);
+  border-color: var(--danger, #c0392b);
+}
+
+.link-popover-actions .danger-btn:hover {
+  background: rgba(192, 57, 43, 0.08);
+}
+
+.primary-btn.sm,
+.secondary-btn.sm {
+  padding: 5px 14px;
+  font-size: 12.5px;
+  height: auto;
 }

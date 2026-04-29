@@ -25,7 +25,7 @@ model: sonnet
 
 按以下顺序执行，每轮都要做完才能写报告。
 
-### 1. 跑现有 e2e（回归）
+### 1. 跑现有 e2e（回归）—— 只跑一次
 
 ```bash
 cd apps/desktop-tauri && npm run test:e2e
@@ -33,16 +33,15 @@ cd apps/desktop-tauri && npm run test:e2e
 
 记录通过/失败数。失败的 spec 必须读 `test-results/<spec-name>/` 下的 `error-context.md` 和 `test-failed-1.png`。**不要靠想象推断失败原因。**
 
+**重要：全量 e2e 单次 5-10 分钟，本轮只跑 2 次——第 1 次是这里的回归基线，第 2 次是新增 spec 写完后整体复测。中间调试新 spec 时只跑那一条 spec（`npm run test:e2e -- e2e/<file>.spec.ts`），不要反复全量跑。**
+
 ### 2. 跑静态校验
 
 ```bash
-cd apps/desktop-tauri && npm run typecheck
-cd apps/desktop-tauri && npm run build:web
-go vet ./...
-go build ./...
+cd apps/desktop-tauri && npm run typecheck && npm run build:web && go vet ./... && go build ./...
 ```
 
-任何非零退出码都是 P0 或 P1。
+串联跑节省时间。任何非零退出码都是 P0 或 P1。
 
 ### 3. 扩展 e2e 覆盖
 

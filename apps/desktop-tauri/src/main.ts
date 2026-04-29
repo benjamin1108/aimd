@@ -23,6 +23,7 @@ type AimdDocument = {
   assets: AimdAsset[];
   dirty: boolean;
   isDraft?: boolean;
+  format: "aimd" | "markdown";
 };
 
 type RenderResult = {
@@ -37,6 +38,7 @@ type SessionSnapshot = {
   assets: AimdAsset[];
   dirty: boolean;
   isDraft: boolean;
+  format: "aimd" | "markdown";
   mode: Mode;
 };
 
@@ -234,7 +236,7 @@ document.querySelector<HTMLDivElement>("#app")!.innerHTML = `
             </button>
             <button id="head-import" class="secondary-btn" type="button">
               <span class="secondary-btn-icon">${ICONS.document}</span>
-              <span>导入 Markdown</span>
+              <span>打开 Markdown</span>
             </button>
           </div>
 
@@ -298,6 +300,17 @@ document.querySelector<HTMLDivElement>("#app")!.innerHTML = `
           </div>
         </div>
 
+        <!-- BUG-013: 自定义链接输入浮层，替代 WKWebView 不支持的 window.prompt -->
+        <div id="link-popover" class="link-popover" hidden>
+          <label class="link-popover-label" for="link-popover-input" id="link-popover-title">链接地址</label>
+          <input id="link-popover-input" class="link-popover-input" type="url" placeholder="https://" />
+          <div class="link-popover-actions">
+            <button id="link-popover-unlink" class="secondary-btn sm danger-btn" type="button" hidden>删除链接</button>
+            <button id="link-popover-cancel" class="secondary-btn sm" type="button">取消</button>
+            <button id="link-popover-confirm" class="primary-btn sm" type="button">确定</button>
+          </div>
+        </div>
+
         <section class="workspace-body">
           <article id="empty" class="empty-state">
             <div class="launch-hero">
@@ -316,7 +329,7 @@ document.querySelector<HTMLDivElement>("#app")!.innerHTML = `
                 </button>
                 <button id="empty-import" class="secondary-btn lg" type="button">
                   <span class="secondary-btn-icon">${ICONS.document}</span>
-                  <span>导入 Markdown</span>
+                  <span>打开 Markdown</span>
                 </button>
               </div>
               <div class="empty-hint">⌘N 新建 · ⌘O 打开 · ⇧⌘S 另存为 · 拖入 .aimd 可直接打开</div>
@@ -400,6 +413,12 @@ const closeEl = $("#close") as HTMLButtonElement;
 const modeReadEl = $("#mode-read") as HTMLButtonElement;
 const modeEditEl = $("#mode-edit") as HTMLButtonElement;
 const modeSourceEl = $("#mode-source") as HTMLButtonElement;
+const linkPopoverEl = $("#link-popover");
+const linkPopoverInputEl = $("#link-popover-input") as HTMLInputElement;
+const linkPopoverTitleEl = $("#link-popover-title");
+const linkPopoverConfirmEl = $("#link-popover-confirm") as HTMLButtonElement;
+const linkPopoverCancelEl = $("#link-popover-cancel") as HTMLButtonElement;
+const linkPopoverUnlinkEl = $("#link-popover-unlink") as HTMLButtonElement;
 
 const STORAGE_RECENTS = "aimd.desktop.recents";
 const STORAGE_LAST = "aimd.desktop.last";
@@ -579,7 +598,7 @@ window.addEventListener("DOMContentLoaded", async () => {
   updateChrome();
   try {
     await listen<string>("aimd-open-file", (event) => {
-      void openDocument(event.payload);
+      void routeOpenedPath(event.payload, { skipConfirm: false });
     });
   } catch {
     // Ignore event binding failures outside the Tauri shell.
@@ -592,7 +611,7 @@ window.addEventListener("DOMContentLoaded", async () => {
   }
   try {
     if (initialPath) {
-      await openDocument(initialPath, { skipConfirm: true });
+      await routeOpenedPath(initialPath, { skipConfirm: true });
       return;
     }
     await restoreSession();
@@ -613,29 +632,46 @@ async function chooseAndOpen() {
 
 type MarkdownDraft = { markdown: string; title: string; html: string };
 
-async function chooseAndImportMarkdown() {
-  const markdownPath = await invoke<string | null>("choose_markdown_file");
-  if (!markdownPath) return;
-  if (!await ensureCanDiscardChanges("导入另一个文档")) return;
-  setStatus("正在读取 Markdown", "loading");
+async function openMarkdownDocument(markdownPath: string, opts?: { skipConfirm?: boolean }) {
+  if (!opts?.skipConfirm && !await ensureCanDiscardChanges("打开另一个文档")) return;
+  setStatus("正在打开", "loading");
   try {
     const draft = await invoke<MarkdownDraft>("convert_md_to_draft", { markdownPath });
     const stem = fileStem(markdownPath) || "未命名文档";
     const doc: AimdDocument = {
-      path: "",
+      path: markdownPath,
       title: draft.title || stem,
       markdown: draft.markdown,
       html: draft.html,
       assets: [],
       dirty: false,
-      isDraft: true,
+      isDraft: false,
+      format: "markdown",
     };
     applyDocument(doc, "read");
-    setStatus(`已导入"${stem}"，请按 ⌘S 保存为 .aimd 文件`, "info");
+    rememberOpenedPath(markdownPath);
+    setStatus("已打开（Markdown）", "success");
   } catch (err) {
     console.error(err);
-    setStatus("导入失败", "warn");
+    setStatus("打开失败", "warn");
   }
+}
+
+async function routeOpenedPath(path: string, opts?: { skipConfirm?: boolean }) {
+  const lower = path.toLowerCase();
+  if (lower.endsWith(".aimd")) {
+    await openDocument(path, { skipConfirm: opts?.skipConfirm });
+  } else if (lower.endsWith(".md") || lower.endsWith(".markdown") || lower.endsWith(".mdx")) {
+    await openMarkdownDocument(path, opts);
+  } else {
+    setStatus("不支持的文件类型", "warn");
+  }
+}
+
+async function chooseAndImportMarkdown() {
+  const markdownPath = await invoke<string | null>("choose_markdown_file");
+  if (!markdownPath) return;
+  await openMarkdownDocument(markdownPath);
 }
 
 async function newDocument() {
@@ -649,6 +685,7 @@ async function newDocument() {
     assets: [],
     dirty: true,
     isDraft: true,
+    format: "aimd",
   };
   state.doc = doc;
   markdownEl.value = markdown;
@@ -661,6 +698,19 @@ async function newDocument() {
   setMode("edit");
   updateChrome();
   setStatus("已创建草稿，先保存为 .aimd 文件", "info");
+  // BUG-008: 显式将焦点和光标设到编辑区第一个可编辑节点开头
+  inlineEditorEl.focus();
+  const firstBlock = inlineEditorEl.firstElementChild;
+  if (firstBlock) {
+    const r = document.createRange();
+    r.setStart(firstBlock, 0);
+    r.collapse(true);
+    const sel = window.getSelection();
+    if (sel) {
+      sel.removeAllRanges();
+      sel.addRange(r);
+    }
+  }
 }
 
 async function openDocument(path: string, options: { skipConfirm?: boolean } = {}) {
@@ -668,7 +718,7 @@ async function openDocument(path: string, options: { skipConfirm?: boolean } = {
   setStatus("正在打开", "loading");
   try {
     const doc = await invoke<AimdDocument>("open_aimd", { path });
-    applyDocument({ ...doc, isDraft: false }, "read");
+    applyDocument({ ...doc, isDraft: false, format: "aimd" }, "read");
     rememberOpenedPath(doc.path);
     setStatus("已打开", "success");
     void triggerOptimizeOnOpen(doc.path);
@@ -763,13 +813,35 @@ async function closeDocument() {
 
 async function saveDocument() {
   if (!state.doc) return;
-  // Flush any pending in-memory edits before saving.
   if (state.mode === "edit") flushInline();
   if (state.doc.isDraft || !state.doc.path) {
     await saveDocumentAs();
     return;
   }
   if (!state.doc.dirty) return;
+
+  if (state.doc.format === "markdown") {
+    if (state.doc.assets.length > 0) {
+      await upgradeMarkdownToAimd();
+      return;
+    }
+    setStatus("正在保存", "loading");
+    saveEl.disabled = true;
+    try {
+      await invoke("save_markdown", { path: state.doc.path, markdown: state.doc.markdown });
+      state.doc.dirty = false;
+      updateChrome();
+      rememberOpenedPath(state.doc.path);
+      setStatus("已保存（Markdown）", "success");
+    } catch (err) {
+      console.error(err);
+      setStatus("保存失败", "warn");
+    } finally {
+      saveEl.disabled = false;
+    }
+    return;
+  }
+
   setStatus("正在保存", "loading");
   saveEl.disabled = true;
   try {
@@ -777,20 +849,25 @@ async function saveDocument() {
       path: state.doc.path,
       markdown: state.doc.markdown,
     });
-    applyDocument({ ...doc, isDraft: false }, state.mode);
+    applyDocument({ ...doc, isDraft: false, format: "aimd" }, state.mode);
     rememberOpenedPath(doc.path);
     setStatus("已保存", "success");
   } catch (err) {
     console.error(err);
     setStatus("保存失败", "warn");
+  } finally {
+    saveEl.disabled = false;
   }
 }
 
 async function saveDocumentAs() {
   if (!state.doc) return;
   if (state.mode === "edit") flushInline();
+  const isMarkdownDoc = state.doc.format === "markdown" && Boolean(state.doc.path);
   const wasDraft = Boolean(state.doc.isDraft || !state.doc.path);
-  const suggestedName = suggestAimdFilename(state.doc.path || `${displayDocTitle(state.doc)}.aimd`);
+  const suggestedName = isMarkdownDoc
+    ? `${fileStem(state.doc.path)}.aimd`
+    : suggestAimdFilename(state.doc.path || `${displayDocTitle(state.doc)}.aimd`);
   const savePath = await invoke<string | null>("choose_save_aimd_file", { suggestedName });
   if (!savePath) return;
   setStatus(wasDraft ? "正在创建文件" : "正在另存为", "loading");
@@ -802,17 +879,72 @@ async function saveDocumentAs() {
       markdown: state.doc.markdown,
       title: displayDocTitle(state.doc),
     });
-    applyDocument({ ...doc, isDraft: false }, state.mode);
-    rememberOpenedPath(doc.path);
-    setStatus(wasDraft ? "文件已创建" : "已另存为", "success");
+    if (isMarkdownDoc) {
+      applyDocument({ ...doc, isDraft: false, format: "aimd" }, state.mode);
+      rememberOpenedPath(doc.path);
+      setStatus("已转换为 .aimd", "success");
+    } else {
+      applyDocument({ ...doc, isDraft: false, format: "aimd" }, state.mode);
+      rememberOpenedPath(doc.path);
+      setStatus(wasDraft ? "文件已创建" : "已另存为", "success");
+    }
   } catch (err) {
     console.error(err);
     setStatus("另存为失败", "warn");
+  } finally {
+    saveAsEl.disabled = false;
   }
 }
 
+async function upgradeMarkdownToAimd(): Promise<boolean> {
+  if (!state.doc || state.doc.format !== "markdown") return false;
+  let confirmed = false;
+  try {
+    confirmed = await invoke<boolean>("confirm_upgrade_to_aimd", {
+      message: "文档包含图片资源，需要升级为 .aimd 格式才能保存。是否现在升级？",
+    });
+  } catch {
+    confirmed = window.confirm("文档包含图片资源，需要升级为 .aimd 格式才能保存。是否现在升级？");
+  }
+  if (!confirmed) {
+    setStatus("升级取消", "info");
+    return false;
+  }
+  const stem = fileStem(state.doc.path) || displayDocTitle(state.doc);
+  const suggestedName = `${stem}.aimd`;
+  const savePath = await invoke<string | null>("choose_save_aimd_file", { suggestedName });
+  if (!savePath) {
+    setStatus("升级取消", "info");
+    return false;
+  }
+  try {
+    const doc = await invoke<AimdDocument>("create_aimd", {
+      path: savePath,
+      markdown: state.doc.markdown,
+      title: displayDocTitle(state.doc),
+    });
+    applyDocument({ ...doc, isDraft: false, format: "aimd" }, state.mode);
+    rememberOpenedPath(savePath);
+    setStatus("已升级为 .aimd", "success");
+    return true;
+  } catch (err) {
+    console.error(err);
+    setStatus("升级失败", "warn");
+    return false;
+  }
+}
+
+function inferFormat(doc: AimdDocument): "aimd" | "markdown" {
+  if (doc.format) return doc.format;
+  if (!doc.path) return "aimd";
+  const lower = doc.path.toLowerCase();
+  if (lower.endsWith(".md") || lower.endsWith(".markdown") || lower.endsWith(".mdx")) return "markdown";
+  return "aimd";
+}
+
 function applyDocument(doc: AimdDocument, mode: Mode) {
-  const normalized = normalizeDocument(doc);
+  const withFormat: AimdDocument = { ...doc, format: inferFormat(doc) };
+  const normalized = normalizeDocument(withFormat);
   state.doc = normalized;
   markdownEl.value = normalized.markdown;
   applyHTML(normalized.html);
@@ -822,6 +954,10 @@ function applyDocument(doc: AimdDocument, mode: Mode) {
 
 async function insertImage() {
   if (!state.doc) return;
+  if (state.doc.format === "markdown") {
+    const upgraded = await upgradeMarkdownToAimd();
+    if (!upgraded) return;
+  }
   if (state.doc.isDraft || !state.doc.path) {
     await saveDocumentAs();
     if (!state.doc?.path) return;
@@ -1073,6 +1209,10 @@ function collectClipboardImages(data: DataTransfer): File[] {
 
 async function pasteImageFiles(files: File[], target: "edit" | "source") {
   if (!state.doc) return;
+  if (state.doc.format === "markdown") {
+    const upgraded = await upgradeMarkdownToAimd();
+    if (!upgraded) return;
+  }
   if (state.doc.isDraft || !state.doc.path) {
     const confirmed = window.confirm(
       "图片需要先保存到文件系统，是否现在创建 .aimd 文件？\n取消后可继续编辑，图片将在保存后再粘贴。",
@@ -1152,8 +1292,16 @@ function onInlineKeydown(event: KeyboardEvent) {
       const block = closestBlock(range.startContainer);
       if (block && /^H[1-6]$/.test(block.tagName)) {
         event.preventDefault();
+        // Extract content from cursor to end of heading into the new paragraph.
+        const afterRange = range.cloneRange();
+        afterRange.setEnd(block, block.childNodes.length);
+        const fragment = afterRange.extractContents();
         const p = document.createElement("p");
-        p.appendChild(document.createElement("br"));
+        if (fragment.textContent && fragment.textContent.length > 0) {
+          p.appendChild(fragment);
+        } else {
+          p.appendChild(document.createElement("br"));
+        }
         block.after(p);
         const r = document.createRange();
         r.setStart(p, 0);
@@ -1274,9 +1422,17 @@ function runFormatCommand(cmd: string) {
     case "quote":     toggleBlockquote(); break;
     case "code":      wrapSelectionInTag("code"); break;
     case "link": {
-      const url = window.prompt("链接地址（http/https）", "https://");
-      if (url && url.trim()) document.execCommand("createLink", false, url.trim());
-      break;
+      // BUG-013: window.prompt 在 WKWebView 下被静默屏蔽，改用自定义 HTML 浮层。
+      // 先保存 selection，浮层关闭后恢复再执行 createLink（在 showLinkPopover 内部完成）。
+      const selBeforePopover = document.getSelection();
+      const savedRange = (selBeforePopover && selBeforePopover.rangeCount > 0)
+        ? selBeforePopover.getRangeAt(0).cloneRange()
+        : null;
+      // 检测光标是否在已有 <a> 内——若是，走编辑模式
+      const anchorNode = selBeforePopover ? selBeforePopover.anchorNode : null;
+      const existingAnchor = closestAncestor(anchorNode, "a") as HTMLAnchorElement | null;
+      void showLinkPopover(savedRange, existingAnchor);
+      return; // showLinkPopover 内部自行 dispatchEvent("input")，不需要外层再 dispatch
     }
     case "image":     void insertImage(); return; // insertImage handles its own dirty
   }
@@ -1322,7 +1478,9 @@ function replaceBlockTag(block: HTMLElement, newTag: string) {
     r.selectNodeContents(replacement);
     r.collapse(false);
     sel.removeAllRanges();
-    sel.addRange(r);
+    // BUG-010: WKWebView 下 addRange 在 replaceWith 后可能静默失败，
+    // 用 try/catch 兜底确保焦点回到编辑器而不是飞出去。
+    try { sel.addRange(r); } catch { inlineEditorEl.focus(); }
   }
 }
 
@@ -1343,6 +1501,9 @@ function applyBlockFormat(targetTag: string) {
   }
   if (block.tagName === target) {
     if (target !== "P") replaceBlockTag(block, "P");
+    // BUG-011: target 已是 P 时直接 return，WKWebView 下 selection 可能已偏移，
+    // 显式 focus 确保焦点仍在编辑器内
+    else inlineEditorEl.focus();
     return;
   }
   replaceBlockTag(block, targetTag);
@@ -1359,8 +1520,23 @@ function toggleBlockquote() {
   if (bq) {
     const parent = bq.parentNode;
     if (!parent) return;
+    // 记住第一个要被 unwrap 的子节点，用于恢复 selection
+    const firstMoved = bq.firstChild as Node | null;
     while (bq.firstChild) parent.insertBefore(bq.firstChild, bq);
     parent.removeChild(bq);
+    // BUG-010: WKWebView 下 removeChild 后 selection 可能飞出编辑区，手动恢复
+    if (firstMoved) {
+      const targetNode = firstMoved.nodeType === Node.ELEMENT_NODE
+        ? (firstMoved as HTMLElement)
+        : firstMoved.parentElement;
+      if (targetNode) {
+        const r2 = document.createRange();
+        r2.selectNodeContents(targetNode);
+        r2.collapse(false);
+        sel.removeAllRanges();
+        try { sel.addRange(r2); } catch { inlineEditorEl.focus(); }
+      }
+    }
     return;
   }
   const block = closestBlock(range.startContainer);
@@ -1382,13 +1558,50 @@ function wrapSelectionInTag(tag: string) {
   const sel = document.getSelection();
   if (!sel || sel.rangeCount === 0 || sel.isCollapsed) return;
   const range = sel.getRangeAt(0);
-  // If selection is already inside a <code>, unwrap.
-  const parent = range.commonAncestorContainer.parentElement;
-  if (parent && parent.tagName.toLowerCase() === tag) {
-    const text = parent.textContent || "";
-    parent.replaceWith(document.createTextNode(text));
+
+  // Determine the effective ancestor element: if commonAncestorContainer is
+  // already an Element (e.g. the <code> node itself when all its content is
+  // selected), use it directly; otherwise use its parentElement.
+  const container = range.commonAncestorContainer;
+  const ancestor: HTMLElement | null =
+    container.nodeType === Node.ELEMENT_NODE
+      ? (container as HTMLElement)
+      : (container as Node).parentElement;
+
+  // Check 1: walk up the ancestor chain to find the nearest matching tag,
+  // staying within the inline editor.
+  let existing: HTMLElement | null = ancestor;
+  while (existing && existing !== inlineEditorEl) {
+    if (existing.tagName.toLowerCase() === tag) break;
+    existing = existing.parentElement;
+  }
+
+  // Check 2: if ancestor itself is not the tag, check whether the ancestor's
+  // meaningful children are all a single target tag (covers the case where the
+  // user selects the entire content of a <p> that contains a lone <code>).
+  if (!existing || existing === inlineEditorEl) {
+    if (ancestor && ancestor !== inlineEditorEl) {
+      const significant = Array.from(ancestor.childNodes).filter(
+        (n) => !(n.nodeType === Node.TEXT_NODE && n.textContent?.trim() === ""),
+      );
+      if (
+        significant.length === 1 &&
+        significant[0].nodeType === Node.ELEMENT_NODE &&
+        (significant[0] as HTMLElement).tagName.toLowerCase() === tag
+      ) {
+        existing = significant[0] as HTMLElement;
+      }
+    }
+  }
+
+  if (existing && existing !== inlineEditorEl && existing.tagName.toLowerCase() === tag) {
+    // Unwrap: replace the wrapper element with a text node of its content.
+    const text = existing.textContent || "";
+    existing.replaceWith(document.createTextNode(text));
+    inlineEditorEl.focus();
     return;
   }
+
   const wrapper = document.createElement(tag);
   try {
     wrapper.appendChild(range.extractContents());
@@ -1397,8 +1610,113 @@ function wrapSelectionInTag(tag: string) {
     sel.removeAllRanges();
     sel.addRange(range);
   } catch {
-    /* ignore selection errors */
+    inlineEditorEl.focus();
   }
+}
+
+/* ============================================================
+   Link popover (BUG-013: 替代 WKWebView 屏蔽的 window.prompt)
+   ============================================================ */
+
+let _linkPopoverResolve: ((url: string | null) => void) | null = null;
+
+function showLinkPopover(savedRange: Range | null, existingAnchor?: HTMLAnchorElement | null): Promise<string | null> {
+  return new Promise((resolve) => {
+    _linkPopoverResolve = resolve;
+    const isEdit = !!existingAnchor;
+
+    // 编辑模式：预填现有 href，更新标题和确认按钮文案，显示"删除链接"按钮
+    if (isEdit) {
+      linkPopoverInputEl.value = existingAnchor!.getAttribute("href") ?? "";
+      linkPopoverTitleEl.textContent = "编辑链接";
+      linkPopoverConfirmEl.textContent = "更新";
+      linkPopoverUnlinkEl.removeAttribute("hidden");
+    } else {
+      linkPopoverInputEl.value = "https://";
+      linkPopoverTitleEl.textContent = "链接地址";
+      linkPopoverConfirmEl.textContent = "确定";
+      linkPopoverUnlinkEl.setAttribute("hidden", "");
+    }
+
+    linkPopoverEl.removeAttribute("hidden");
+    linkPopoverInputEl.focus();
+    linkPopoverInputEl.select();
+
+    const closePopover = () => {
+      linkPopoverEl.setAttribute("hidden", "");
+      _linkPopoverResolve = null;
+    };
+
+    const applyLink = (url: string) => {
+      inlineEditorEl.focus();
+      if (isEdit) {
+        // 编辑模式：直接更新 href，不走 execCommand（避免选区漂移或嵌套）
+        existingAnchor!.setAttribute("href", url);
+      } else {
+        if (savedRange) {
+          const s = document.getSelection();
+          if (s) {
+            s.removeAllRanges();
+            s.addRange(savedRange);
+          }
+        }
+        document.execCommand("createLink", false, url);
+      }
+      inlineEditorEl.dispatchEvent(new Event("input"));
+    };
+
+    const unlinkAnchor = () => {
+      if (!existingAnchor) return;
+      inlineEditorEl.focus();
+      // 把 a 的所有子节点移到 a 前面，再移除 a
+      const parent = existingAnchor.parentNode;
+      if (parent) {
+        while (existingAnchor.firstChild) {
+          parent.insertBefore(existingAnchor.firstChild, existingAnchor);
+        }
+        existingAnchor.remove();
+      }
+      inlineEditorEl.dispatchEvent(new Event("input"));
+    };
+
+    const finish = (action: "confirm" | "cancel" | "unlink") => {
+      closePopover();
+      if (action === "confirm") {
+        const url = linkPopoverInputEl.value.trim();
+        if (url) {
+          applyLink(url);
+        } else if (isEdit) {
+          // 编辑模式下清空 URL 确认 = 解链接
+          unlinkAnchor();
+        }
+        resolve(url || null);
+      } else if (action === "unlink") {
+        unlinkAnchor();
+        resolve(null);
+      } else {
+        resolve(null);
+      }
+    };
+
+    const onConfirm = () => { finish("confirm"); cleanup(); };
+    const onCancel = () => { finish("cancel"); cleanup(); };
+    const onUnlink = () => { finish("unlink"); cleanup(); };
+    const onKeydown = (e: KeyboardEvent) => {
+      if (e.key === "Enter") { e.preventDefault(); onConfirm(); }
+      if (e.key === "Escape") { e.preventDefault(); onCancel(); }
+    };
+    const cleanup = () => {
+      linkPopoverConfirmEl.removeEventListener("click", onConfirm);
+      linkPopoverCancelEl.removeEventListener("click", onCancel);
+      linkPopoverUnlinkEl.removeEventListener("click", onUnlink);
+      linkPopoverInputEl.removeEventListener("keydown", onKeydown);
+    };
+
+    linkPopoverConfirmEl.addEventListener("click", onConfirm);
+    linkPopoverCancelEl.addEventListener("click", onCancel);
+    linkPopoverUnlinkEl.addEventListener("click", onUnlink);
+    linkPopoverInputEl.addEventListener("keydown", onKeydown);
+  });
 }
 
 /* ============================================================
@@ -1537,7 +1855,7 @@ function scheduleRender() {
 async function renderPreview() {
   if (!state.doc) return;
   try {
-    const out = state.doc.path && !state.doc.isDraft
+    const out = state.doc.path && !state.doc.isDraft && state.doc.format !== "markdown"
       ? await invoke<RenderResult>("render_markdown", {
         path: state.doc.path,
         markdown: state.doc.markdown,
@@ -1732,6 +2050,7 @@ function loadSessionSnapshot(): SessionSnapshot | null {
       assets,
       dirty: Boolean(parsed.dirty),
       isDraft: Boolean(parsed.isDraft),
+      format: parsed.format === "markdown" ? "markdown" : "aimd",
       mode: parsed.mode === "edit" || parsed.mode === "source" ? parsed.mode : "read",
     };
   } catch {
@@ -1760,6 +2079,7 @@ function persistSessionSnapshot() {
     assets: state.doc.assets,
     dirty: state.doc.dirty,
     isDraft: Boolean(state.doc.isDraft),
+    format: state.doc.format,
     mode: state.mode,
   };
   window.localStorage.setItem(STORAGE_SESSION, JSON.stringify(snapshot));
@@ -1795,7 +2115,7 @@ async function restoreSession() {
   if (!path) return;
   try {
     const doc = await invoke<AimdDocument>("open_aimd", { path });
-    applyDocument({ ...doc, isDraft: false }, "read");
+    applyDocument({ ...doc, isDraft: false, format: "aimd" }, "read");
     rememberOpenedPath(doc.path);
     setStatus("已恢复上次文档", "info");
   } catch {
@@ -1805,12 +2125,12 @@ async function restoreSession() {
 }
 
 async function restoreSnapshot(snapshot: SessionSnapshot): Promise<{ doc: AimdDocument; mode: Mode; message: string } | null> {
-  if (snapshot.path && !snapshot.isDraft) {
+  if (snapshot.path && !snapshot.isDraft && snapshot.format !== "markdown") {
     try {
       const diskDoc = await invoke<AimdDocument>("open_aimd", { path: snapshot.path });
       if (!snapshot.dirty && snapshot.markdown === diskDoc.markdown) {
         return {
-          doc: { ...diskDoc, isDraft: false },
+          doc: { ...diskDoc, isDraft: false, format: "aimd" },
           mode: snapshot.mode,
           message: "已恢复上次文档",
         };
@@ -1830,6 +2150,7 @@ async function restoreSnapshot(snapshot: SessionSnapshot): Promise<{ doc: AimdDo
           assets: diskDoc.assets,
           dirty: true,
           isDraft: false,
+          format: "aimd",
         },
         mode: snapshot.mode,
         message: "已恢复未保存修改",
@@ -1849,6 +2170,7 @@ async function restoreSnapshot(snapshot: SessionSnapshot): Promise<{ doc: AimdDo
       assets: snapshot.assets,
       dirty: snapshot.dirty,
       isDraft: snapshot.isDraft,
+      format: snapshot.format,
     },
     mode: snapshot.mode,
     message: snapshot.dirty || snapshot.isDraft ? "已恢复未保存草稿" : "已恢复上次会话",
@@ -1857,7 +2179,7 @@ async function restoreSnapshot(snapshot: SessionSnapshot): Promise<{ doc: AimdDo
 
 async function renderSnapshotHTML(snapshot: SessionSnapshot): Promise<string> {
   try {
-    if (snapshot.path && !snapshot.isDraft) {
+    if (snapshot.path && !snapshot.isDraft && snapshot.format !== "markdown") {
       const out = await invoke<RenderResult>("render_markdown", {
         path: snapshot.path,
         markdown: snapshot.markdown,
@@ -1936,27 +2258,8 @@ async function onWindowDrop(event: DragEvent) {
     await openDocument(droppedPath);
     return;
   }
-  if (/\.md|\.markdown|\.mdx$/i.test(droppedPath)) {
-    if (!await ensureCanDiscardChanges("导入另一个文档")) return;
-    setStatus("正在读取 Markdown", "loading");
-    try {
-      const draft = await invoke<MarkdownDraft>("convert_md_to_draft", { markdownPath: droppedPath });
-      const stem = fileStem(droppedPath) || "未命名文档";
-      const doc: AimdDocument = {
-        path: "",
-        title: draft.title || stem,
-        markdown: draft.markdown,
-        html: draft.html,
-        assets: [],
-        dirty: false,
-        isDraft: true,
-      };
-      applyDocument(doc, "read");
-      setStatus(`已导入"${stem}"，请按 ⌘S 保存为 .aimd 文件`, "info");
-    } catch (err) {
-      console.error(err);
-      setStatus("导入失败", "warn");
-    }
+  if (/\.(md|markdown|mdx)$/i.test(droppedPath)) {
+    await openMarkdownDocument(droppedPath);
   }
 }
 

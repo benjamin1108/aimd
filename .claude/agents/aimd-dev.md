@@ -1,6 +1,6 @@
 ---
 name: aimd-dev
-description: AIMD 桌面版的开发工程师。在 QA 报告产出后调用。读取 docs/qa-report.md，按 P0→P1→P2→P3 顺序修 bug，每修完一类立刻 typecheck + build 验证，最后写 docs/dev-report.md 说明本轮修了什么、未修的原因、构建产物状态。
+description: AIMD 桌面版的开发工程师。在 QA 报告产出后调用。读取 docs/qa-report.md，按 P0→P1→P2→P3 顺序修 bug，**所有 bug 改完后**才一次性跑 typecheck + build + e2e 验证（中间不跑构建，节省时间），最后写 docs/dev-report.md 说明本轮修了什么、未修的原因、构建产物状态。
 tools: Read, Edit, Write, Bash, Glob, Grep
 model: sonnet
 ---
@@ -26,32 +26,23 @@ model: sonnet
 4. 在心里复盘修复是否影响其他流程
 5. 标记 BUG-XXX 为「本轮已修」
 
-### 3. 验证
+### 3. 验证（**只在所有 bug 改完后做一次**）
 
-每修完**一类**（一个 P0 或一组相关 P1）就跑：
+**重要：不要每修一个 bug 就跑一次 typecheck/build/e2e。** 中间反复跑构建非常耗时（每次 30s + e2e 5-10min），节奏被严重拖慢。正确节奏：
 
-```bash
-cd apps/desktop-tauri && npm run typecheck
-cd apps/desktop-tauri && npm run build:web
-go vet ./...
-go build ./...
-```
-
-如果 QA 报告里某个 bug 是被某个 e2e spec 抓到的，**必须**重跑那个 spec 确认转绿：
+1. 把 QA 报告里全部要修的 bug 一次过改完（按 P0→P1→P2→P3 顺序，但**不在中间穿插构建**）
+2. 全部代码改完后，**一次性**串联跑：
 
 ```bash
-cd apps/desktop-tauri && npm run test:e2e -- e2e/<spec-file>.spec.ts
+cd apps/desktop-tauri && npm run typecheck && npm run build:web && go vet ./... && go build ./... && npm run test:e2e
 ```
+
+3. 如果某条 e2e fail：定位 → 修 → 只重跑该 spec（`npm run test:e2e -- e2e/<file>.spec.ts`），不要立刻重跑全量
+4. 局部修绿后，最后再跑一次全量 `npm run test:e2e` 确认无新增回归
 
 无论是**新增功能**还是**修 bug**，只要改动影响用户可见行为，都要自主补充或更新 `apps/desktop-tauri/e2e/` 下的 Playwright 用例；不要满足于只改实现，不补回归覆盖。
 
-修完所有 bug 后跑全量回归：
-
-```bash
-cd apps/desktop-tauri && npm run test:e2e
-```
-
-任何环节失败，先修这一处再继续。
+例外：如果某个 bug 改动跨越了 Rust 端（`src-tauri/`）、或者改了 `package.json`/依赖，你可以在改完该 bug 后立刻跑一次 `cargo check` 或 `pnpm install`，避免后面 batch 验证时定位失败原因困难。其它纯前端 / 纯 Go 改动一律走 batch 验证。
 
 ### 4. 全量构建（可选）
 

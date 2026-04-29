@@ -100,6 +100,8 @@ async function installTauriMock(
       reveal_in_finder: () => null,
       list_aimd_assets: () => [],
       confirm_discard_changes: () => "discard",
+      save_markdown: () => undefined,
+      confirm_upgrade_to_aimd: () => false,
     };
 
     (window as any).__TAURI_INTERNALS__ = {
@@ -236,7 +238,7 @@ test.describe("Launchpad and document lifecycle", () => {
     await expect(page.locator("#markdown")).toHaveValue("# 草稿标题\n\ndraft reload\n");
   });
 
-  test("import markdown loads as draft (no immediate save dialog)", async ({ page }) => {
+  test("open markdown loads as formal document (no immediate save dialog)", async ({ page }) => {
     await installTauriMock(page);
     await page.goto("/");
 
@@ -245,7 +247,8 @@ test.describe("Launchpad and document lifecycle", () => {
     await expect(page.locator("#doc-title")).toHaveText("report");
     await expect(page.locator("#reader h1")).toHaveText("report");
     await expect(page.locator("#save-label")).toHaveText("保存");
-    await expect(page.locator("#doc-path")).toContainText("未保存草稿");
+    await expect(page.locator("#doc-path")).toContainText("/mock/report.md");
+    await expect(page.locator("#doc-path")).not.toContainText("未保存草稿");
   });
 
   test("dropping an .aimd file opens it from the launchpad", async ({ page }) => {

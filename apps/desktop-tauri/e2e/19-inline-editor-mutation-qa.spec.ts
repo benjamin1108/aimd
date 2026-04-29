@@ -71,6 +71,8 @@ async function installTauriMock(page: Page) {
       list_aimd_assets: () => [],
       // 默认 discard，单独的用例会覆盖 invoke 改成 cancel/save 来断言
       confirm_discard_changes: () => "discard",
+      save_markdown: () => undefined,
+      confirm_upgrade_to_aimd: () => false,
     };
     (window as any).__TAURI_INTERNALS__ = {
       invoke: async (cmd: string, a?: Args) => {
@@ -237,14 +239,14 @@ test.describe("B. 列表和引用块 Enter/Backspace（浏览器默认行为，d
   });
 });
 
-test.describe("C. draft close 行为边界", () => {
-  test("unedited draft closes without confirm dialog", async ({ page }) => {
+test.describe("C. 打开 markdown 文档关闭行为边界", () => {
+  test("unedited markdown doc closes without confirm dialog", async ({ page }) => {
     await installTauriMock(page);
     await page.goto("/");
     await page.locator("#empty-import").click();
-    await expect(page.locator("#doc-path")).toContainText("未保存草稿");
+    await expect(page.locator("#doc-path")).toContainText("/mock/report.md");
 
-    // 未编辑 draft，dirty=false，关闭不应触发 confirm_discard_changes invoke
+    // 未编辑，dirty=false，关闭不应触发 confirm_discard_changes invoke
     await page.evaluate(() => {
       const w = window as any;
       w.__discardCalled = 0;
@@ -264,15 +266,15 @@ test.describe("C. draft close 行为边界", () => {
     expect(calls).toBe(0);
   });
 
-  test("edited draft (dirty=true) triggers confirm on close", async ({ page }) => {
+  test("edited markdown doc (dirty=true) triggers confirm on close", async ({ page }) => {
     await installTauriMock(page);
     await page.goto("/");
     await page.locator("#empty-import").click();
-    await expect(page.locator("#doc-path")).toContainText("未保存草稿");
+    await expect(page.locator("#doc-path")).toContainText("/mock/report.md");
 
     // 切到 source 模式编辑，触发 dirty=true
     await page.locator("#mode-source").click();
-    await page.locator("#markdown").fill("# 已编辑草稿\n\n修改内容\n");
+    await page.locator("#markdown").fill("# 已编辑\n\n修改内容\n");
     await expect(page.locator("#mode-source")).toHaveClass(/active/);
 
     await page.evaluate(() => {
@@ -293,7 +295,7 @@ test.describe("C. draft close 行为边界", () => {
     const calls = await page.evaluate(() => (window as any).__discardCalled);
     expect(calls).toBe(1);
     // 选 cancel，文档保留
-    await expect(page.locator("#doc-path")).toContainText("未保存草稿");
+    await expect(page.locator("#doc-path")).toContainText("/mock/report.md");
   });
 });
 
@@ -304,7 +306,7 @@ test.describe("D. 已知边界：ensureCanDiscardChanges 只检 dirty，不检 i
     await installTauriMock(page);
     await page.goto("/");
     await page.locator("#empty-import").click();
-    await expect(page.locator("#doc-path")).toContainText("未保存草稿");
+    await expect(page.locator("#doc-path")).toContainText("/mock/report.md");
 
     // 用计数器替换 invoke 中的 confirm_discard_changes，dirty=false 时不应被调用
     await page.evaluate(() => {

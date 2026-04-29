@@ -1,24 +1,62 @@
 # AIMD — AI Markdown Document
 
-> Markdown 负责写内容，AIMD 负责让内容成为完整文档。
+> Turn AI-generated Markdown into a complete, portable, editable document.
 
-AIMD 是面向 AI 生成内容时代的**单文件 Markdown 文档格式**，把正文、图片、元数据封装进一个 `.aimd` 文件。文档移到任何目录、发给任何人，图片都不会再丢。
+AIMD is a single-file document format for the AI generation era. It packages Markdown, images, assets, and metadata into one open `.aimd` file, so reports, tutorials, research notes, technical docs, and agent outputs can be moved, archived, edited, inspected, and shared without broken image paths.
 
-`.aimd` 本质是 ZIP，普通解压工具就能打开检查；AIMD CLI + 系统集成让"创建 → 双击查看 → 分享"全程不用操心命令行。
+```text
+Markdown is the content layer.
+AIMD is the document container.
+```
 
-文档索引见 [`docs/README.md`](docs/README.md)，产品背景见 [`docs/aimd_mrd_v_0_1.md`](docs/aimd_mrd_v_0_1.md)。
+![AIMD Desktop: a complete Markdown document package with outline, rendered content, and bundled assets](docs/assets/readme/hero-desktop.png)
 
-## 三种使用方式
+## Why AIMD
 
-| 场景 | 用法 | 体验 |
-|---|---|---|
-| **本机日常使用** | 双击 `.aimd` 文件 | 弹出原生 macOS 窗口（WKWebView） |
-| **命令行 / Agent** | `aimd pack/view/preview/...` | 自动化、批处理、CI 集成 |
-| **分享给没装 aimd 的人** | `aimd seal a.aimd` | 单文件 `.html`，对方双击就能看 |
+AI tools are making Markdown the default output format for structured content. ChatGPT, Claude, Gemini, Cursor, Perplexity, agents, notebooks, and internal automation all produce Markdown-like documents.
 
-## 安装
+But Markdown alone is not a complete document:
 
-### macOS：一键安装 + 注册双击关联（推荐）
+- Images live outside the file and break when the document is moved.
+- Screenshots, charts, diagrams, and generated images are part of the meaning, but are stored as loose files.
+- AI-generated reports need source, model, prompt, and provenance metadata.
+- Sharing a `.md` file plus an `images/` folder is fragile for normal users.
+- PDF is portable, but it is not a good editable intermediate format for AI workflows.
+
+AIMD keeps the simplicity of Markdown and adds the missing document container.
+
+## What You Can Do
+
+| You want to... | AIMD gives you... |
+|---|---|
+| Save an AI-generated report | One `.aimd` file with Markdown and images bundled together |
+| Share with someone else | A portable document that will not lose images when moved |
+| Send to someone without AIMD | A sealed self-rendering `.html` file |
+| Keep developer workflows | Pack, unpack, inspect, preview, and export from CLI |
+| Archive agent outputs | A stable container for Markdown, assets, hashes, and future provenance |
+| Recover the original content | Unpack back to plain Markdown + assets at any time |
+
+## Who It Is For
+
+### AI Content Creators
+
+Use AIMD when an AI tool gives you a useful report, tutorial, lesson, proposal, or visual document and you want to keep it as one editable file.
+
+### Developers and Technical Writers
+
+Use AIMD for README-like documents, architecture notes, API guides, design docs, and technical reports that contain diagrams, screenshots, or generated charts.
+
+### Agent and Automation Builders
+
+Use AIMD as the output format for weekly reports, research digests, meeting summaries, QA reports, build reports, and other generated deliverables.
+
+## Product Experience
+
+Start from Markdown, package it as `.aimd`, open it in AIMD Desktop, and keep the document readable, editable, inspectable, and shareable as one file.
+
+## Quick Start
+
+### macOS: Install and Register `.aimd`
 
 ```bash
 git clone https://github.com/aimd-org/aimd.git
@@ -26,116 +64,158 @@ cd aimd
 ./scripts/install-mac.sh
 ```
 
-脚本会：
-1. 编译 `aimd` 二进制 → `~/.local/bin/aimd`
-2. 在 `~/Applications/` 放一个 AppleScript .app，注册 `.aimd` 扩展名给 Launch Services
-3. 之后**任何 `.aimd` 文件双击即弹原生窗口**，零命令行
+The installer:
 
-无 `sudo`，无 `/usr/local`，全部用户态可逆（`rm -rf ~/Applications/AIMD\ Viewer.app ~/.local/bin/aimd`）。
+1. Builds the `aimd` binary into `~/.local/bin/aimd`.
+2. Installs a user-level macOS app wrapper in `~/Applications/`.
+3. Registers `.aimd` so files can be opened from Finder.
 
-### 通用：从源码构建（Go ≥ 1.22）
+No `sudo`, no `/usr/local`, and fully reversible.
+
+### Build from Source
+
+Requires Go 1.22 or newer.
 
 ```bash
-go env -w GOPROXY=https://goproxy.cn,direct   # 国内加速
 go install github.com/aimd-org/aimd/cmd/aimd@latest
 ```
 
-## 快速开始
+For users in mainland China:
 
 ```bash
-# 打包：扫描 markdown 中的图片引用，生成单文件 .aimd
+go env -w GOPROXY=https://goproxy.cn,direct
+go install github.com/aimd-org/aimd/cmd/aimd@latest
+```
+
+## CLI Examples
+
+```bash
+# Package Markdown and local images into one .aimd file
 aimd pack report.md -o report.aimd
 
-# 双击查看（macOS，需先跑过 install-mac.sh）
-open report.aimd
+# Open in a native macOS window
+aimd view report.aimd
 
-# 命令行查看
-aimd view    report.aimd     # 原生窗口（macOS）
-aimd preview report.aimd     # 本地 HTTP，浏览器打开
+# Preview in a browser through a local server
+aimd preview report.aimd
 
-# 看清单 / 校验完整性
+# Inspect manifest, assets, and SHA-256 integrity
 aimd inspect report.aimd
+aimd inspect report.aimd --json
 
-# 解包成普通 markdown 项目（图片路径自动还原）
+# Unpack back to a normal Markdown project
 aimd unpack report.aimd -o report-out/
 
-# 封成离线自渲染 HTML，发给没装 aimd 的人
+# Create a self-rendering HTML file for people without AIMD
 aimd seal report.aimd -o report.html
+
+# Export static HTML with images inlined
+aimd export html report.aimd -o report-static.html
 ```
 
-仓库自带样例：`examples/report/`。运行 `./scripts/smoke.sh` 一键跑通 pack / inspect / unpack / export / preview 全链路。
+The repository includes a sample in [`examples/report/`](examples/report/). Run the full smoke flow:
 
-## 命令一览
+```bash
+./scripts/smoke.sh
+```
 
-| 命令 | 说明 |
+## Commands
+
+| Command | Purpose |
 |---|---|
-| `aimd pack <md> [-o out.aimd] [--title T]` | 扫描本地图片引用，复制到 `assets/` 并打包 |
-| `aimd unpack <aimd> [-o dir] [--keep-asset-uri]` | 解包为普通 markdown 项目 |
-| `aimd inspect <aimd> [--json]` | 打印 manifest、资源清单、SHA-256 校验状态 |
-| `aimd view <aimd> [--width W --height H]` | macOS 原生 WKWebView 窗口（推荐） |
-| `aimd preview <aimd> [--port N] [--no-open]` | 启 loopback HTTP，浏览器看 |
-| `aimd seal <aimd> [-o out.html]` | 单文件自渲染 HTML（嵌入 ZIP + JS 解析器） |
-| `aimd export html <aimd> [-o out.html]` | 静态 HTML，图片以 base64 内嵌（不推荐大图） |
-| `aimd version` | 版本与规范号 |
+| `aimd pack <md> [-o out.aimd] [--title T]` | Bundle Markdown and local image references into one `.aimd` |
+| `aimd unpack <aimd> [-o dir] [--keep-asset-uri]` | Recover plain Markdown and assets |
+| `aimd inspect <aimd> [--json]` | Print manifest, assets, sizes, and hash status |
+| `aimd view <aimd> [--width W --height H]` | Open a native macOS viewer/editor |
+| `aimd preview <aimd> [--port N] [--no-open]` | Serve a local browser preview |
+| `aimd seal <aimd> [-o out.html]` | Produce a self-rendering standalone HTML file |
+| `aimd export html <aimd> [-o out.html]` | Export static HTML with base64-inlined assets |
+| `aimd version` | Print binary and format version |
 
-flag 可置于位置参数前或后，CLI 自动 permute。
+Flags may be placed before or after positional arguments.
 
-## `.aimd` 文件结构
+## File Format
 
-```
-report.aimd                (ZIP 容器)
-├── manifest.json          文档元数据 + 资源清单 + SHA-256
-├── main.md                Markdown 正文，图片用 asset://<id> 引用
-└── assets/                打包进来的资源
+An `.aimd` file is a ZIP container with a small, inspectable structure:
+
+```text
+report.aimd
+├── manifest.json          document metadata, assets, hashes
+├── main.md                Markdown content
+└── assets/                bundled images and resources
     ├── cover.svg
     └── trend.png
 ```
 
-`main.md` 中所有 `![](本地路径.png)` 在 `pack` 时会被改写为 AIMD 内部 URI：
+Markdown image references are rewritten into stable asset URIs:
 
 ```markdown
-![封面](asset://cover-001)
+![Cover](asset://cover-001)
 ```
 
-`aimd unpack` 默认反向改写成 `assets/cover.svg` 之类的相对路径，普通 Markdown 编辑器无障碍打开。
+When unpacked, AIMD rewrites those references back into ordinary relative paths, so the result can still be opened by standard Markdown editors.
 
-## 三种"渲染"方式的内部差异
+## How AIMD Is Different
 
-| | view | preview | seal |
-|---|---|---|---|
-| 形态 | 原生窗口 | 浏览器标签页 | 独立 .html 文件 |
-| 资源传输 | loopback HTTP，**流式** | loopback HTTP，**流式** | base64 嵌 ZIP，JS 运行时解 |
-| 大图（10×100MB）友好度 | ✅ 浏览器层懒加载 + 流式 | ✅ 同上 | ⚠️ HTML 体积 ~1.33×ZIP，浏览器解析压力大 |
-| 离线分发 | ❌ 需 aimd 二进制 | ❌ 需 aimd 二进制 | ✅ 任何浏览器双击即看 |
-| 临时文件 | 无 | 无 | 一个独立 .html |
+| Format | Good at | Missing for AI-generated documents |
+|---|---|---|
+| Markdown + assets folder | Simple, readable, Git-friendly | Images break when moved or shared |
+| PDF | Portable final output | Hard to edit, poor as an AI intermediate format |
+| DOCX | Office workflows | Complex for automation and developer tooling |
+| Single HTML | Browser-friendly | Source content and presentation are mixed |
+| AIMD | Portable Markdown document package | Early format, ecosystem still growing |
 
-## 开发
+## Rendering and Sharing Modes
+
+| Mode | Best for | How assets are delivered |
+|---|---|---|
+| `view` | Local reading/editing | Native window + local streaming |
+| `preview` | Browser preview | Local HTTP streaming |
+| `seal` | Sharing with anyone | One standalone HTML file with embedded ZIP |
+| `export html` | Static publishing | HTML with inlined assets |
+
+## Roadmap
+
+Implemented:
+
+- `.aimd` ZIP container with `manifest.json`, `main.md`, and `assets/`.
+- `pack`, `unpack`, `inspect`, `preview`, `view`, `seal`, and `export html`.
+- macOS open flow and desktop editor MVP.
+- Markdown import, image insertion, image paste, and image compression in Desktop.
+
+Next:
+
+- AI metadata and provenance: model, prompt, source references, review status.
+- Document health check: missing assets, broken links, oversized files, structure issues.
+- Better share/export UI: `.aimd`, sealed HTML, PDF, DOCX, Markdown project.
+- VS Code / Cursor integration for developer workflows.
+- Open file format spec, manifest schema, SDK, and signing/verification.
+
+See:
+
+- [MRD](docs/aimd_mrd_v_0_1.md)
+- [Product expansion and diagnosis](docs/product_expansion_and_diagnosis.md)
+- [Desktop architecture spec](docs/aimd_desktop_tauri_spec.md)
+- [Docs index](docs/README.md)
+
+## Development
 
 ```bash
-go test ./...                       # 单元测试
+go test ./...
 go build -o bin/aimd ./cmd/aimd
-./scripts/smoke.sh                  # 端到端冒烟测试
-./scripts/install-mac.sh            # 重装 macOS .app（更新二进制时跑一次）
+./scripts/smoke.sh
 ```
 
-依赖：
-- `github.com/yuin/goldmark` —— Markdown → HTML 渲染
-- `github.com/webview/webview_go` —— macOS 原生 WKWebView 封装（cgo）
-- `internal/seal/vendor/` —— 内嵌的 `marked.min.js` 与 `fflate.min.js`，用于 sealed HTML 在浏览器内自渲染
+Desktop app:
 
-## 实现状态
+```bash
+cd apps/desktop-tauri
+npm install
+npm run typecheck
+npm run build:web
+npm run test:e2e
+```
 
-- ✅ **v0.1 MVP**：pack / unpack / inspect / preview / export html
-- ✅ **超出 v0.1 范围已实现**：
-  - `seal` —— 单文件自渲染 HTML（原 v0.4 计划）
-  - `view` —— macOS 原生窗口（部分 v2.0 自渲染体验）
-  - `install-mac.sh` —— `.aimd` 系统级双击关联
-- ⏳ **v0.2**：AI metadata 层（model、prompt、来源追踪、provenance）
-- ⏳ **v0.3**：VS Code 插件
-- ⏳ **v1.0**：开放规范 + 多语言 SDK + 签名校验
+## License
 
-完整路线图见 MRD 第 16 节。
-
-## 协议
-
-待定。
+TBD.
