@@ -9,7 +9,8 @@ apps/desktop-tauri/src-tauri/target/
 apps/desktop-tauri/src-tauri/gen/
 apps/desktop-tauri/playwright-report/
 apps/desktop-tauri/test-results/
-
+bugscreen/
+bug-screen/
 # Generated rendered outputs (sealed/exported); source templates under internal/ are kept
 *.html
 !internal/**/*.html
