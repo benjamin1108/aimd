@@ -201,6 +201,10 @@ document.querySelector<HTMLDivElement>("#app")!.innerHTML = `
         </nav>
 
         <footer class="sidebar-foot" id="sidebar-foot">
+          <button id="sidebar-save" class="secondary-btn" type="button" hidden>
+            <span class="secondary-btn-icon">${ICONS.save}</span>
+            <span>保存</span>
+          </button>
           <button id="sidebar-new" class="secondary-btn" type="button">
             <span class="secondary-btn-icon">${ICONS.plus}</span>
             <span>新建</span>
@@ -387,6 +391,8 @@ const docActionsEl = $("#doc-actions");
 const recentSectionEl = $("#recent-section");
 const recentListEl = $("#recent-list");
 const sidebarFootEl = $("#sidebar-foot");
+const sidebarNewEl = $("#sidebar-new") as HTMLButtonElement;
+const sidebarSaveEl = $("#sidebar-save") as HTMLButtonElement;
 const saveEl = $("#save") as HTMLButtonElement;
 const saveLabelEl = $("#save-label");
 const saveAsEl = $("#save-as") as HTMLButtonElement;
@@ -483,6 +489,7 @@ $("#empty-open").addEventListener("click", chooseAndOpen);
 $("#empty-new").addEventListener("click", () => { void newDocument(); });
 $("#empty-import").addEventListener("click", () => { void chooseAndImportMarkdown(); });
 $("#sidebar-new").addEventListener("click", () => { void newDocument(); });
+$("#sidebar-save").addEventListener("click", () => { void saveDocument(); });
 $("#sidebar-open").addEventListener("click", chooseAndOpen);
 $("#clear-recent").addEventListener("click", clearRecentDocuments);
 modeReadEl.addEventListener("click", () => setMode("read"));
@@ -1646,9 +1653,26 @@ function currentScrollPane(): HTMLElement {
   return readerEl;
 }
 
-function ensureCanDiscardChanges(action: string): Promise<boolean> | boolean {
+// Tauri 2 webview 默认吞掉 window.confirm()（无 UI、悄悄返回 false），
+// 所以"丢弃未保存内容前的确认"必须走 Rust 端的原生对话框。
+// 三按钮："保存" → 先 saveDocument 再继续；"不保存" → 直接放弃；"取消" → 留在原文档。
+async function ensureCanDiscardChanges(action: string): Promise<boolean> {
   if (!state.doc?.dirty) return true;
-  return window.confirm(`当前文档有未保存的修改，仍要${action}吗？`);
+  let choice: "save" | "discard" | "cancel";
+  try {
+    choice = await invoke<"save" | "discard" | "cancel">("confirm_discard_changes", {
+      message: `当前文档有未保存的修改，仍要${action}吗？`,
+    });
+  } catch {
+    // 退化到 window.confirm，仅用于 vite-only 开发态 / e2e 兜底（不希望在 Tauri 实跑里走到这里）
+    choice = window.confirm(`当前文档有未保存的修改，仍要${action}吗？`) ? "discard" : "cancel";
+  }
+  if (choice === "save") {
+    await saveDocument();
+    // saveDocument 内部走 saveDocumentAs；若用户在 file picker 里取消、文档仍是 draft / 仍 dirty，则视为放弃此次离开。
+    return !(state.doc?.dirty ?? false);
+  }
+  return choice === "discard";
 }
 
 function displayDocTitle(doc: AimdDocument): string {
@@ -1944,6 +1968,12 @@ function updateChrome() {
   const doc = state.doc;
   renderRecentList();
   panelEl.dataset.shell = doc ? "document" : "launch";
+  // Sidebar resizer writes an inline `grid-template-columns` (e.g.
+  // "460px minmax(0,1fr)") which beats the launch-shell CSS rule. In launch
+  // mode the sidebar is `display: none`, so the now-only workspace child
+  // collapses into the first column of that two-column track and the right
+  // side renders empty. Drop the inline override before each launch transition.
+  if (!doc) panelEl.style.gridTemplateColumns = "";
   starterActionsEl.hidden = Boolean(doc);
   docActionsEl.hidden = !doc;
   sidebarFootEl.hidden = !doc;
@@ -1955,7 +1985,9 @@ function updateChrome() {
   saveEl.disabled = !doc || (!doc.dirty && !doc.isDraft);
   saveAsEl.disabled = !doc;
   closeEl.disabled = !doc;
-  saveLabelEl.textContent = doc?.isDraft ? "创建文件" : "保存";
+  // 顶部的主按钮统一显示「保存」：草稿状态下点击仍走 saveDocumentAs 创建文件，
+  // 但视觉/语义上对用户都是"保存"动作（与 sidebar-foot 一致）。
+  saveLabelEl.textContent = "保存";
   modeReadEl.disabled = !doc;
   modeEditEl.disabled = !doc;
   modeSourceEl.disabled = !doc;
@@ -1976,6 +2008,11 @@ function updateChrome() {
   }
 
   emptyEl.hidden = true;
+  // 草稿一旦输入了内容（dirty），sidebar-foot 把 "新建" 替换成 "保存"，
+  // 把这一步的主动作放在更显眼的位置；非草稿/未脏的状态保留 "新建" 入口。
+  const draftWithContent = Boolean(doc.isDraft && doc.dirty);
+  sidebarNewEl.hidden = draftWithContent;
+  sidebarSaveEl.hidden = !draftWithContent;
   docCardEl.dataset.state = doc.dirty ? "dirty" : (doc.isDraft ? "draft" : "active");
   docCardEl.classList.add("active");
   docCardEl.querySelector<HTMLElement>(".doc-card-title")!.textContent = displayDocTitle(doc);
@@ -2098,9 +2135,9 @@ function openLightbox(src: string) {
   document.addEventListener("keydown", onKey, { capture: true });
 }
 
-function bindReaderImageLightbox() {
-  const handler = (e: MouseEvent) => {
-    if (state.mode !== "read") return;
+function bindImageLightbox() {
+  const open = (e: MouseEvent, mode: Mode) => {
+    if (state.mode !== mode) return;
     const target = e.target as HTMLElement;
     if (target.tagName !== "IMG") return;
     if (target.closest(".aimd-lightbox")) return;
@@ -2110,10 +2147,13 @@ function bindReaderImageLightbox() {
     e.preventDefault();
     openLightbox(src);
   };
-  readerEl.addEventListener("click", handler);
+  readerEl.addEventListener("click", (e) => open(e, "read"));
+  // 编辑模式下点图片也放大；preventDefault 顺手挡住 contenteditable
+  // 把光标定到图片附近的副作用，按 ESC 回编辑器即可继续编辑。
+  inlineEditorEl.addEventListener("click", (e) => open(e, "edit"));
 }
 
-bindReaderImageLightbox();
+bindImageLightbox();
 
 (window as any).__aimd_testInsertImageBytes = async (
   buf: ArrayBuffer,

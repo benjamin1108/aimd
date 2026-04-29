@@ -51,6 +51,40 @@ fn choose_save_aimd_file(suggested_name: Option<String>) -> Option<String> {
         .map(|path| path.to_string_lossy().to_string())
 }
 
+// Tauri 2 webview 默认会吞掉 window.confirm/alert（webkit 和 webkit2gtk 行为一致），
+// 所以丢弃未保存内容前的二次确认必须走原生对话框。`save | discard | cancel`
+// 三按钮：save 触发保存流程后再继续；discard 直接放弃；cancel 留在当前文档。
+#[derive(serde::Serialize)]
+#[serde(rename_all = "lowercase")]
+enum DiscardChoice {
+    Save,
+    Discard,
+    Cancel,
+}
+
+#[tauri::command]
+fn confirm_discard_changes(message: String) -> DiscardChoice {
+    let choice = rfd::MessageDialog::new()
+        .set_title("AIMD Desktop")
+        .set_description(&message)
+        .set_level(rfd::MessageLevel::Warning)
+        .set_buttons(rfd::MessageButtons::YesNoCancelCustom(
+            "保存".into(),
+            "不保存".into(),
+            "取消".into(),
+        ))
+        .show();
+    // rfd 在 macOS NSAlert 下把 YesNoCancelCustom 的三颗按钮全部以
+    // `MessageDialogResult::Custom(label)` 返回，按 label 文本分发。
+    match choice {
+        rfd::MessageDialogResult::Custom(s) if s == "保存" => DiscardChoice::Save,
+        rfd::MessageDialogResult::Custom(s) if s == "不保存" => DiscardChoice::Discard,
+        rfd::MessageDialogResult::Yes => DiscardChoice::Save,
+        rfd::MessageDialogResult::No => DiscardChoice::Discard,
+        _ => DiscardChoice::Cancel,
+    }
+}
+
 #[tauri::command]
 fn initial_open_path(pending: State<'_, PendingOpenPaths>) -> Option<String> {
     if let Some(path) = std::env::args().skip(1).find(|arg| arg.ends_with(".aimd")) {
@@ -392,6 +426,7 @@ pub fn run() {
             choose_markdown_file,
             choose_image_file,
             choose_save_aimd_file,
+            confirm_discard_changes,
             initial_open_path,
             open_aimd,
             create_aimd,

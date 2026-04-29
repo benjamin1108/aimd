@@ -62,6 +62,7 @@ test.describe("Rust invoke_handler 命令注册校验", () => {
     "choose_markdown_file",
     "choose_image_file",
     "choose_save_aimd_file",
+    "confirm_discard_changes",
     "initial_open_path",
     "open_aimd",
     "create_aimd",

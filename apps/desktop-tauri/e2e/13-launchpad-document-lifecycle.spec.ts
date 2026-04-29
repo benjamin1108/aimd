@@ -99,6 +99,7 @@ async function installTauriMock(
       }),
       reveal_in_finder: () => null,
       list_aimd_assets: () => [],
+      confirm_discard_changes: () => "discard",
     };
 
     (window as any).__TAURI_INTERNALS__ = {
@@ -123,7 +124,7 @@ test.describe("Launchpad and document lifecycle", () => {
     await page.locator("#empty-new").click();
 
     await expect(page.locator("#doc-actions")).toBeVisible();
-    await expect(page.locator("#save-label")).toHaveText("创建文件");
+    await expect(page.locator("#save-label")).toHaveText("保存");
     await expect(page.locator("#doc-path")).toContainText("未保存草稿");
 
     await page.locator("#save").click();
@@ -139,11 +140,21 @@ test.describe("Launchpad and document lifecycle", () => {
     await page.locator("#mode-source").click();
     await page.locator("#markdown").fill("# 样例文档\n\n已修改。\n");
 
-    page.once("dialog", (dialog) => dialog.dismiss());
+    // 取消：confirm_discard_changes 返回 "cancel"，文档不动
+    await page.evaluate(() => {
+      const w = window as any;
+      w.__discardChoice = "cancel";
+      const orig = w.__TAURI_INTERNALS__.invoke;
+      w.__TAURI_INTERNALS__.invoke = async (cmd: string, a: unknown) =>
+        cmd === "confirm_discard_changes" ? w.__discardChoice : orig(cmd, a);
+    });
     await page.locator("#close").click();
     await expect(page.locator("#editor-wrap")).toBeVisible();
 
-    page.once("dialog", (dialog) => dialog.accept());
+    // 放弃：返回 "discard"，文档关闭
+    await page.evaluate(() => {
+      (window as any).__discardChoice = "discard";
+    });
     await page.locator("#close").click();
     await expect(page.locator("#empty")).toBeVisible();
     await expect(page.locator("#doc-actions")).toBeHidden();
@@ -233,7 +244,7 @@ test.describe("Launchpad and document lifecycle", () => {
 
     await expect(page.locator("#doc-title")).toHaveText("report");
     await expect(page.locator("#reader h1")).toHaveText("report");
-    await expect(page.locator("#save-label")).toHaveText("创建文件");
+    await expect(page.locator("#save-label")).toHaveText("保存");
     await expect(page.locator("#doc-path")).toContainText("未保存草稿");
   });
 

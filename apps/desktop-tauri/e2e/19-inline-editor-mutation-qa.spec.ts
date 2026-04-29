@@ -69,6 +69,8 @@ async function installTauriMock(page: Page) {
       }),
       reveal_in_finder: () => null,
       list_aimd_assets: () => [],
+      // 默认 discard，单独的用例会覆盖 invoke 改成 cancel/save 来断言
+      confirm_discard_changes: () => "discard",
     };
     (window as any).__TAURI_INTERNALS__ = {
       invoke: async (cmd: string, a?: Args) => {
@@ -242,13 +244,24 @@ test.describe("C. draft close 行为边界", () => {
     await page.locator("#empty-import").click();
     await expect(page.locator("#doc-path")).toContainText("未保存草稿");
 
-    // 未编辑 draft，dirty=false，关闭不应弹 confirm
-    let dialogFired = false;
-    page.once("dialog", () => { dialogFired = true; });
+    // 未编辑 draft，dirty=false，关闭不应触发 confirm_discard_changes invoke
+    await page.evaluate(() => {
+      const w = window as any;
+      w.__discardCalled = 0;
+      const orig = w.__TAURI_INTERNALS__.invoke;
+      w.__TAURI_INTERNALS__.invoke = async (cmd: string, a: unknown) => {
+        if (cmd === "confirm_discard_changes") {
+          w.__discardCalled += 1;
+          return "cancel";
+        }
+        return orig(cmd, a);
+      };
+    });
 
     await page.locator("#close").click();
     await expect(page.locator("#empty")).toBeVisible();
-    expect(dialogFired).toBe(false);
+    const calls = await page.evaluate(() => (window as any).__discardCalled);
+    expect(calls).toBe(0);
   });
 
   test("edited draft (dirty=true) triggers confirm on close", async ({ page }) => {
@@ -262,16 +275,24 @@ test.describe("C. draft close 行为边界", () => {
     await page.locator("#markdown").fill("# 已编辑草稿\n\n修改内容\n");
     await expect(page.locator("#mode-source")).toHaveClass(/active/);
 
-    let dialogFired = false;
-    page.once("dialog", (dialog) => {
-      dialogFired = true;
-      dialog.dismiss();
+    await page.evaluate(() => {
+      const w = window as any;
+      w.__discardCalled = 0;
+      const orig = w.__TAURI_INTERNALS__.invoke;
+      w.__TAURI_INTERNALS__.invoke = async (cmd: string, a: unknown) => {
+        if (cmd === "confirm_discard_changes") {
+          w.__discardCalled += 1;
+          return "cancel";
+        }
+        return orig(cmd, a);
+      };
     });
 
     await page.locator("#close").click();
-    // 应该弹出 confirm 对话框
-    expect(dialogFired).toBe(true);
-    // 因为 dismiss，文档应仍然打开
+    // 应该走原生确认对话框（invoke 被调用一次）
+    const calls = await page.evaluate(() => (window as any).__discardCalled);
+    expect(calls).toBe(1);
+    // 选 cancel，文档保留
     await expect(page.locator("#doc-path")).toContainText("未保存草稿");
   });
 });
@@ -285,30 +306,26 @@ test.describe("D. 已知边界：ensureCanDiscardChanges 只检 dirty，不检 i
     await page.locator("#empty-import").click();
     await expect(page.locator("#doc-path")).toContainText("未保存草稿");
 
-    // 直接读取 state.doc.dirty 来验证 dirty=false，而不是通过按钮
-    const isDirty = await page.evaluate(() => (window as any).__aimd_state_dirty);
-    // 此时 dirty 应为 false（刚导入草稿，未编辑）
-    // 用 evaluate 直接调用 chooseAndOpen（需要 app 暴露这个函数）
-    // 因为 head-open 在文档打开状态下 hidden=true，改用 evaluate 注入
-    const canDiscard = await page.evaluate(() => {
-      // 访问 state (封装在闭包内，通过文档状态间接验证)
-      // 如果 ensureCanDiscardChanges 只检 dirty，则 dirty=false 时直接返回 true
-      // 用 confirm 替换来捕获是否被调用
-      const original = window.confirm;
-      let called = false;
-      window.confirm = () => { called = true; return true; };
-      // 让 head-open 可见并点击
+    // 用计数器替换 invoke 中的 confirm_discard_changes，dirty=false 时不应被调用
+    await page.evaluate(() => {
+      const w = window as any;
+      w.__discardCalled = 0;
+      const orig = w.__TAURI_INTERNALS__.invoke;
+      w.__TAURI_INTERNALS__.invoke = async (cmd: string, a: unknown) => {
+        if (cmd === "confirm_discard_changes") {
+          w.__discardCalled += 1;
+          return "discard";
+        }
+        return orig(cmd, a);
+      };
+      // head-open 在文档打开状态下 hidden=true，强制点击
       const el = document.getElementById("starter-actions");
       if (el) el.hidden = false;
-      const btn = document.getElementById("head-open") as HTMLButtonElement | null;
-      btn?.click();
-      // 恢复
-      window.confirm = original;
-      return called;
+      (document.getElementById("head-open") as HTMLButtonElement | null)?.click();
     });
 
-    // dirty=false 时不应调用 confirm
-    expect(canDiscard).toBe(false);
+    const calls = await page.evaluate(() => (window as any).__discardCalled);
+    expect(calls).toBe(0);
     // 文档应已切换
     await expect(page.locator("#doc-title")).toHaveText("样例文档");
   });

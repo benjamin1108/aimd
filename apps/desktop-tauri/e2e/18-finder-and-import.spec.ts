@@ -87,6 +87,7 @@ async function installTauriMock(page: Page) {
         return null;
       },
       list_aimd_assets: () => [],
+      confirm_discard_changes: () => "discard",
     };
 
     (window as any).__TAURI_INTERNALS__ = {
@@ -244,7 +245,7 @@ test.describe("2. Import Markdown as draft", () => {
     await expect(page.locator("#reader h1")).toHaveText("测试报告");
 
     const saveLabel = page.locator("#save-label");
-    await expect(saveLabel).toHaveText("创建文件");
+    await expect(saveLabel).toHaveText("保存");
     await expect(page.locator("#doc-path")).toContainText("未保存草稿");
   });
 
@@ -298,7 +299,7 @@ test.describe("2. Import Markdown as draft", () => {
     });
 
     await expect(page.locator("#doc-title")).toHaveText("测试报告");
-    await expect(page.locator("#save-label")).toHaveText("创建文件");
+    await expect(page.locator("#save-label")).toHaveText("保存");
   });
 });
 
