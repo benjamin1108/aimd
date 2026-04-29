@@ -253,6 +253,27 @@ test.describe("31. MD 按需升级方案", () => {
     expect(log.some((e) => e.cmd === "convert_md_to_draft")).toBe(false);
   });
 
+  test("最近列表点击 .md 走 Markdown 打开流程", async ({ page }) => {
+    await installMock(page, { initialPath: null });
+    await page.addInitScript(() => {
+      window.localStorage.setItem("aimd.desktop.recents", JSON.stringify(["/mock/report.md"]));
+    });
+    await page.goto("/");
+
+    const recentItem = page.locator(".recent-item").first();
+    await expect(recentItem).toBeVisible();
+    await expect(recentItem).toContainText("report");
+
+    await recentItem.click();
+
+    await expect(page.locator("#doc-title")).toHaveText("月度报告");
+    await expect(page.locator("#doc-path")).toContainText("/mock/report.md");
+
+    const log = await page.evaluate(() => (window as any).__aimd_call_log as Array<{ cmd: string }>);
+    expect(log.some((e) => e.cmd === "convert_md_to_draft")).toBe(true);
+    expect(log.some((e) => e.cmd === "open_aimd")).toBe(false);
+  });
+
   test(".txt 不支持：#empty 仍可见，状态条提示「不支持的文件类型」", async ({ page }) => {
     await installMock(page, { initialPath: "/mock/readme.txt" });
     await page.goto("/");

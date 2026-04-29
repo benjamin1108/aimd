@@ -1,0 +1,47 @@
+function lazyEl<T extends HTMLElement>(sel: string): () => T {
+  let cached: T | null = null;
+  return () => (cached ??= document.querySelector<T>(sel)!);
+}
+
+export const titleEl = lazyEl<HTMLElement>("#doc-title");
+export const pathEl = lazyEl<HTMLElement>("#doc-path");
+export const statusEl = lazyEl<HTMLElement>("#status");
+export const statusPillEl = lazyEl<HTMLElement>("#status-pill");
+export const panelEl = lazyEl<HTMLElement>("#panel");
+export const emptyEl = lazyEl<HTMLElement>("#empty");
+export const readerEl = lazyEl<HTMLElement>("#reader");
+export const inlineEditorEl = lazyEl<HTMLElement>("#inline-editor");
+export const editorWrapEl = lazyEl<HTMLElement>("#editor-wrap");
+export const markdownEl = lazyEl<HTMLTextAreaElement>("#markdown");
+export const previewEl = lazyEl<HTMLElement>("#preview");
+export const formatToolbarEl = lazyEl<HTMLElement>("#format-toolbar");
+export const docCardEl = lazyEl<HTMLElement>("#doc-card");
+export const outlineSectionEl = lazyEl<HTMLElement>("#outline-section");
+export const outlineListEl = lazyEl<HTMLElement>("#outline-list");
+export const outlineCountEl = lazyEl<HTMLElement>("#outline-count");
+export const assetSectionEl = lazyEl<HTMLElement>("#asset-section");
+export const assetListEl = lazyEl<HTMLElement>("#asset-list");
+export const assetCountEl = lazyEl<HTMLElement>("#asset-count");
+export const resizer1El = lazyEl<HTMLElement>("#resizer-1");
+export const resizer2El = lazyEl<HTMLElement>("#resizer-2");
+export const sidebarHrResizerEl = lazyEl<HTMLElement>("#sidebar-hr-resizer");
+export const starterActionsEl = lazyEl<HTMLElement>("#starter-actions");
+export const docActionsEl = lazyEl<HTMLElement>("#doc-actions");
+export const recentSectionEl = lazyEl<HTMLElement>("#recent-section");
+export const recentListEl = lazyEl<HTMLElement>("#recent-list");
+export const sidebarFootEl = lazyEl<HTMLElement>("#sidebar-foot");
+export const sidebarNewEl = lazyEl<HTMLButtonElement>("#sidebar-new");
+export const sidebarSaveEl = lazyEl<HTMLButtonElement>("#sidebar-save");
+export const saveEl = lazyEl<HTMLButtonElement>("#save");
+export const saveLabelEl = lazyEl<HTMLElement>("#save-label");
+export const saveAsEl = lazyEl<HTMLButtonElement>("#save-as");
+export const closeEl = lazyEl<HTMLButtonElement>("#close");
+export const modeReadEl = lazyEl<HTMLButtonElement>("#mode-read");
+export const modeEditEl = lazyEl<HTMLButtonElement>("#mode-edit");
+export const modeSourceEl = lazyEl<HTMLButtonElement>("#mode-source");
+export const linkPopoverEl = lazyEl<HTMLElement>("#link-popover");
+export const linkPopoverInputEl = lazyEl<HTMLInputElement>("#link-popover-input");
+export const linkPopoverTitleEl = lazyEl<HTMLElement>("#link-popover-title");
+export const linkPopoverConfirmEl = lazyEl<HTMLButtonElement>("#link-popover-confirm");
+export const linkPopoverCancelEl = lazyEl<HTMLButtonElement>("#link-popover-cancel");
+export const linkPopoverUnlinkEl = lazyEl<HTMLButtonElement>("#link-popover-unlink");
