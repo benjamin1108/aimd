@@ -3,21 +3,28 @@ import { test, expect, Page } from "@playwright/test";
 /**
  * asset:// references must survive an HTML→Markdown round-trip.
  *
- * The Go renderer turns `asset://<id>` into a `data:` URL for inline display,
- * but the *canonical* form on disk is the asset:// URI. The turndown rule
- * `aimdImage` is supposed to read `data-asset-id` on each <img> and emit
- * `![alt](asset://<id>)`. If that rule were broken — or if `tagAssetImages`
- * stopped tagging images that arrive via the rendered HTML — saving would
- * silently rewrite all images to their data: URLs, bloating the file and
- * decoupling them from the asset table.
+ * The desktop UI must display packed assets through a file/protocol URL rather
+ * than `data:`. The *canonical* form on disk is still the asset:// URI. The
+ * turndown rule `aimdImage` is supposed to read `data-asset-id` on each <img>
+ * and emit `![alt](asset://<id>)`. If that rule were broken — or if
+ * `tagAssetImages` stopped tagging images that arrive via the rendered HTML —
+ * saving would silently rewrite all images to their rendered URL, decoupling
+ * them from the asset table.
  *
- * This spec wires a fake document where the Go renderer (mocked) returns
- * an <img> whose src is a data: URL but whose asset id is exposed in
- * state.doc.assets, and asserts that flushInline produces asset:// markdown.
+ * This spec wires a fake document where the renderer returns an <img> whose
+ * src is the mocked desktop asset URL and whose asset id is exposed in
+ * state.doc.assets, then asserts that display never falls back to base64
+ * while flushInline/save continue to preserve asset:// markdown.
  */
 
 const ASSET_ID = "img-001.png";
-const ASSET_DATA_URL = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+ip1sAAAAASUVORK5CYII=";
+const ASSET_FILE_PATH = "/mock/assets/img-001.png";
+
+function mockConvertFileSrc(path: string, protocol = "asset") {
+  return `${protocol}://localhost${encodeURI(path)}`;
+}
+
+const ASSET_DISPLAY_URL = mockConvertFileSrc(ASSET_FILE_PATH);
 
 async function installTauriMock(page: Page) {
   const seed = {
@@ -25,17 +32,16 @@ async function installTauriMock(page: Page) {
       path: "/mock/with-image.aimd",
       title: "含图文档",
       markdown: `# 图片测试\n\n![cover](asset://${ASSET_ID})\n\n后续段落。\n`,
-      // Mirror what the Go renderer does: it materializes asset:// into a data URL.
-      html: `<h1>图片测试</h1><p><img src="${ASSET_DATA_URL}" alt="cover"></p><p>后续段落。</p>`,
+      html: `<h1>图片测试</h1><p><img src="${ASSET_DISPLAY_URL}" alt="cover"></p><p>后续段落。</p>`,
       assets: [
         {
           id: ASSET_ID,
-          path: `assets/${ASSET_ID}`,
+          path: ASSET_FILE_PATH,
           mime: "image/png",
           size: 95,
           sha256: "deadbeef",
           role: "content-image",
-          url: ASSET_DATA_URL,
+          url: ASSET_DISPLAY_URL,
         },
       ],
       dirty: false,
@@ -44,6 +50,7 @@ async function installTauriMock(page: Page) {
 
   await page.addInitScript((s: typeof seed) => {
     type Args = Record<string, unknown> | undefined;
+    const convertFileSrc = (path: string, protocol = "asset") => `${protocol}://localhost${encodeURI(path)}`;
     let lastSavedMarkdown = "";
     const handlers: Record<string, (a: Args) => unknown> = {
       initial_open_path: () => null,
@@ -57,6 +64,7 @@ async function installTauriMock(page: Page) {
       },
       render_markdown: (a) => ({ html: `<p>${String((a as any)?.markdown ?? "").slice(0, 80)}</p>` }),
       add_image: () => null,
+      list_aimd_assets: () => [],
     };
     (window as any).__TAURI_INTERNALS__ = {
       invoke: async (cmd: string, a?: Args) => {
@@ -65,6 +73,14 @@ async function installTauriMock(page: Page) {
         return fn(a);
       },
       transformCallback: (cb: Function) => cb,
+      convertFileSrc,
+    };
+    (window as any).__TAURI__ = {
+      ...(window as any).__TAURI__,
+      core: {
+        ...((window as any).__TAURI__?.core ?? {}),
+        convertFileSrc,
+      },
     };
     (window as any).__TAURI_EVENT_PLUGIN_INTERNALS__ = {
       unregisterListener: () => {},
@@ -72,7 +88,27 @@ async function installTauriMock(page: Page) {
   }, seed);
 }
 
-test.describe("asset:// references round-trip through the inline editor", () => {
+test.describe("Desktop asset display and round-trip", () => {
+  test("opening an asset-backed document renders images via asset/file URLs, never data URLs", async ({ page }) => {
+    await installTauriMock(page);
+    await page.goto("/");
+    await page.locator("#empty-open").click();
+
+    const readerImg = page.locator("#reader img");
+    await expect(readerImg).toHaveCount(1);
+    await expect(readerImg).toHaveAttribute("src", ASSET_DISPLAY_URL);
+    const readerHtml = await page.locator("#reader").innerHTML();
+    expect(readerHtml).not.toContain("data:image/");
+
+    await page.locator("#mode-edit").click();
+    const inlineImg = page.locator("#inline-editor img");
+    await expect(inlineImg).toHaveCount(1);
+    await expect(inlineImg).toHaveAttribute("src", ASSET_DISPLAY_URL);
+    await expect(inlineImg).toHaveAttribute("data-asset-id", ASSET_ID);
+    const inlineHtml = await page.locator("#inline-editor").innerHTML();
+    expect(inlineHtml).not.toContain("data:image/");
+  });
+
   test("rendered <img data-asset-id> stays asset:// after turndown", async ({ page }) => {
     await installTauriMock(page);
     await page.goto("/");
@@ -82,7 +118,7 @@ test.describe("asset:// references round-trip through the inline editor", () => 
     await expect(page.locator("#inline-editor img")).toHaveCount(1);
 
     // The image inside the inline editor must carry the asset id; tagAssetImages
-    // is responsible for that mapping. Without it turndown emits the raw data: URL.
+    // is responsible for that mapping. Without it turndown emits the rendered URL.
     const tagged = await page.locator("#inline-editor img").getAttribute("data-asset-id");
     expect(tagged).toBe(ASSET_ID);
 
@@ -100,10 +136,11 @@ test.describe("asset:// references round-trip through the inline editor", () => 
 
     const markdown = await page.evaluate(() => (document.getElementById("markdown") as HTMLTextAreaElement).value);
     expect(markdown).toContain(`asset://${ASSET_ID}`);
-    expect(markdown).not.toContain("data:image/png;base64");
+    expect(markdown).not.toContain("data:image/");
+    expect(markdown).not.toContain(ASSET_DISPLAY_URL);
   });
 
-  test("save propagates asset:// (not data:) to the backend", async ({ page }) => {
+  test("save propagates asset:// (not rendered asset URLs or data:) to the backend", async ({ page }) => {
     await installTauriMock(page);
     await page.goto("/");
     await page.locator("#empty-open").click();
@@ -124,6 +161,7 @@ test.describe("asset:// references round-trip through the inline editor", () => 
 
     const saved = await page.evaluate(() => (window as any).__lastSavedMarkdown ?? "");
     expect(saved).toContain(`asset://${ASSET_ID}`);
-    expect(saved).not.toContain("data:image/png;base64");
+    expect(saved).not.toContain("data:image/");
+    expect(saved).not.toContain(ASSET_DISPLAY_URL);
   });
 });

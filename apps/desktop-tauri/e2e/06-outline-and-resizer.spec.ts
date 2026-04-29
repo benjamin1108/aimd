@@ -37,6 +37,7 @@ async function installTauriMock(page: Page, doc = LONG_DOC) {
       save_aimd: (a) => ({ ...d, markdown: (a as any)?.markdown ?? d.markdown, dirty: false }),
       render_markdown: (a) => ({ html: `<p>${String((a as any)?.markdown ?? "").slice(0, 80)}</p>` }),
       add_image: () => null,
+      list_aimd_assets: () => [],
     };
     (window as any).__TAURI_INTERNALS__ = {
       invoke: async (cmd: string, a?: Args) => {

@@ -15,18 +15,17 @@ function trapPageErrors(page: Page): { errors: string[] } {
 }
 
 test.describe("Empty state — running outside Tauri", () => {
-  test("brand, empty hero, disabled mode tabs", async ({ page }) => {
+  test("brand, launchpad hero, hidden editor chrome", async ({ page }) => {
     const trap = trapPageErrors(page);
     await page.goto("/");
 
     await expect(page.locator(".brand-name")).toHaveText("AIMD");
     await expect(page.locator("#empty")).toBeVisible();
-    await expect(page.locator("#empty h2")).toContainText("把 .aimd 当作单文件笔记");
+    await expect(page.locator("#empty h2")).toContainText("把图文文档装进一个文件");
+    await expect(page.locator("#empty")).toContainText("发给别人，不丢图");
 
-    await expect(page.locator("#mode-read")).toBeDisabled();
-    await expect(page.locator("#mode-edit")).toBeDisabled();
-    await expect(page.locator("#mode-source")).toBeDisabled();
-    await expect(page.locator("#save")).toBeDisabled();
+    await expect(page.locator("#starter-actions")).toBeVisible();
+    await expect(page.locator("#doc-actions")).toBeHidden();
 
     await expect(page.locator("#format-toolbar")).toBeHidden();
     await expect(page.locator("#reader")).toBeHidden();
@@ -39,11 +38,12 @@ test.describe("Empty state — running outside Tauri", () => {
     expect(trap.errors).toEqual([]);
   });
 
-  test("sidebar branding and footer action are present", async ({ page }) => {
+  test("launchpad exposes new/open/import actions", async ({ page }) => {
     await page.goto("/");
     await expect(page.locator(".brand-mark")).toHaveText("A");
-    await expect(page.locator(".footer-action-title")).toContainText("打开 AIMD 文件");
-    await expect(page.locator(".footer-action-hint")).toContainText("⌘O");
+    await expect(page.locator("#empty-new")).toContainText("新建文档");
+    await expect(page.locator("#empty-open")).toContainText("打开文件");
+    await expect(page.locator("#empty-import")).toContainText("导入 Markdown");
   });
 
   test("status pill is in idle tone on first paint", async ({ page }) => {

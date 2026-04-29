@@ -41,15 +41,27 @@ async function installTauriMock(page: Page) {
 
   await page.addInitScript((s: typeof seed) => {
     type Args = Record<string, unknown> | undefined;
+    const convertFileSrc = (path: string, protocol = "asset") =>
+      `${protocol}://localhost${encodeURI(path)}`;
     const handlers: Record<string, (a: Args) => unknown> = {
       initial_open_path: () => null,
       choose_aimd_file: () => s.doc.path,
       // Return a fake image path so insertImage proceeds past the dialog.
       choose_image_file: () => "/mock/image.png",
+      // insertImage now calls read_image_bytes first, then add_image_bytes.
+      read_image_bytes: () => [137, 80, 78, 71],
+      add_image_bytes: () => ({
+        ...s.addedAsset,
+        asset: {
+          ...s.addedAsset.asset,
+          url: convertFileSrc(s.addedAsset.asset.path),
+        },
+      }),
       open_aimd: () => s.doc,
       save_aimd: (a) => ({ ...s.doc, markdown: (a as any)?.markdown ?? s.doc.markdown, dirty: false }),
       render_markdown: (a) => ({ html: `<p>${String((a as any)?.markdown ?? "").slice(0, 200)}</p>` }),
       add_image: () => s.addedAsset,
+      list_aimd_assets: () => [],
     };
     (window as any).__TAURI_INTERNALS__ = {
       invoke: async (cmd: string, a?: Args) => {
@@ -58,6 +70,14 @@ async function installTauriMock(page: Page) {
         return fn(a);
       },
       transformCallback: (cb: Function) => cb,
+      convertFileSrc,
+    };
+    (window as any).__TAURI__ = {
+      ...(window as any).__TAURI__,
+      core: {
+        ...((window as any).__TAURI__?.core ?? {}),
+        convertFileSrc,
+      },
     };
     (window as any).__TAURI_EVENT_PLUGIN_INTERNALS__ = {
       unregisterListener: () => {},

@@ -268,3 +268,6 @@ body[data-mode="edit"] > main.aimd {
   }
 }
 `
+
+// PreviewCSS returns the stylesheet used by the preview/reader pane.
+func PreviewCSS() string { return defaultCSS }

@@ -43,6 +43,8 @@ go build ./...
 cd apps/desktop-tauri && npm run test:e2e -- e2e/<spec-file>.spec.ts
 ```
 
+无论是**新增功能**还是**修 bug**，只要改动影响用户可见行为，都要自主补充或更新 `apps/desktop-tauri/e2e/` 下的 Playwright 用例；不要满足于只改实现，不补回归覆盖。
+
 修完所有 bug 后跑全量回归：
 
 ```bash
@@ -96,7 +98,9 @@ cd apps/desktop-tauri && npm run build
 - **不引入新依赖**：除非 QA 报告明确要求
 - **保留代码风格**：跟现有代码一致，不要换缩进/命名风格
 - **不写注释**：除非 why 非常不显然（与全局规则一致）
+- **桌面端资源禁止 base64/data URL**：资源显示与传输一律不用 base64 / `data:` URL；必须使用文件路径、协议 URL（如 `asset://` / Tauri asset protocol）或流式方案
 - **拒绝表面修复**：不要用 try/catch 吞错误来"消除" bug 表象，要改根因
+- **测试随改动落地**：新增功能必须新增 e2e；修 bug 必须新增或更新能稳定复现该问题的 e2e，然后再把它跑绿
 
 ## 边界
 

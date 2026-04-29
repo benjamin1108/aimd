@@ -16,16 +16,11 @@ import (
 	"strings"
 
 	"github.com/aimd-org/aimd/internal/aimd"
+	"github.com/aimd-org/aimd/internal/vendor"
 )
 
 //go:embed template.html
 var templateHTML string
-
-//go:embed vendor/marked.min.js
-var markedJS string
-
-//go:embed vendor/fflate.min.js
-var fflateJS string
 
 // Options controls a seal run.
 type Options struct {
@@ -50,8 +45,8 @@ func Run(opt Options) error {
 
 	out := templateHTML
 	out = strings.Replace(out, "__AIMD_TITLE__", html.EscapeString(title), 1)
-	out = strings.Replace(out, "__AIMD_FFLATE__", fflateJS, 1)
-	out = strings.Replace(out, "__AIMD_MARKED__", markedJS, 1)
+	out = strings.Replace(out, "__AIMD_FFLATE__", vendor.FflateJS, 1)
+	out = strings.Replace(out, "__AIMD_MARKED__", vendor.MarkedJS, 1)
 	out = strings.Replace(out, "__AIMD_ZIP_BASE64__", base64.StdEncoding.EncodeToString(zipBytes), 1)
 
 	f, err := os.Create(opt.Output)

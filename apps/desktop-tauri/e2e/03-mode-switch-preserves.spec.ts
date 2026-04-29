@@ -64,6 +64,7 @@ async function installTauriMock(page: Page) {
         return { html: blocks.join("") };
       },
       add_image: () => null,
+      list_aimd_assets: () => [],
     };
 
     (window as any).__TAURI_INTERNALS__ = {

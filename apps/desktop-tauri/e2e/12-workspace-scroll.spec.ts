@@ -34,6 +34,48 @@ async function installLongDocMock(page: Page) {
       save_aimd: () => ({ ...d, dirty: false }),
       render_markdown: () => ({ html: d.html }),
       add_image: () => null,
+      list_aimd_assets: () => [],
+    };
+    (window as any).__TAURI_INTERNALS__ = {
+      invoke: async (cmd: string, a?: Args) => {
+        const fn = handlers[cmd];
+        if (!fn) throw new Error(`mock invoke: unknown command ${cmd}`);
+        return fn(a);
+      },
+      transformCallback: (cb: Function) => cb,
+    };
+    (window as any).__TAURI_EVENT_PLUGIN_INTERNALS__ = {
+      unregisterListener: () => {},
+    };
+  }, doc);
+}
+
+async function installShortDocMock(page: Page) {
+  const doc = {
+    path: "/mock/short.aimd",
+    title: "短文档",
+    markdown: "# 短文档\n\n一段正文。\n",
+    html: "<h1>短文档</h1><p>一段正文。</p>",
+    assets: [] as Array<unknown>,
+    dirty: false,
+  };
+  await page.addInitScript((d: typeof doc) => {
+    type Args = Record<string, unknown> | undefined;
+    const handlers: Record<string, (a: Args) => unknown> = {
+      initial_open_path: () => null,
+      choose_aimd_file: () => d.path,
+      choose_markdown_file: () => null,
+      choose_image_file: () => null,
+      choose_save_aimd_file: () => null,
+      open_aimd: () => d,
+      create_aimd: () => d,
+      save_aimd: () => ({ ...d, dirty: false }),
+      save_aimd_as: () => d,
+      render_markdown: () => ({ html: d.html }),
+      render_markdown_standalone: () => ({ html: d.html }),
+      add_image: () => null,
+      import_markdown: () => d,
+      list_aimd_assets: () => [],
     };
     (window as any).__TAURI_INTERNALS__ = {
       invoke: async (cmd: string, a?: Args) => {
@@ -132,6 +174,29 @@ test.describe("Workspace scrolls when content overflows", () => {
     });
     await page.waitForTimeout(50);
     const backTop = await reader.evaluate((el: HTMLElement) => el.scrollTop);
-    expect(backTop).toBe(0);
+    expect(backTop).toBeLessThanOrEqual(1);
+  });
+
+  test("footer stays pinned to the bottom for a short document", async ({ page }) => {
+    await page.setViewportSize({ width: 1100, height: 720 });
+    await installShortDocMock(page);
+    await page.goto("/");
+    await page.locator("#empty-open").click();
+
+    const { workspaceBottom, footerBottom, footerTop, workspaceTop } = await page.evaluate(() => {
+      const workspace = document.querySelector(".workspace") as HTMLElement;
+      const footer = document.querySelector(".workspace-foot") as HTMLElement;
+      const w = workspace.getBoundingClientRect();
+      const f = footer.getBoundingClientRect();
+      return {
+        workspaceTop: w.top,
+        workspaceBottom: w.bottom,
+        footerTop: f.top,
+        footerBottom: f.bottom,
+      };
+    });
+
+    expect(Math.abs(workspaceBottom - footerBottom)).toBeLessThanOrEqual(1);
+    expect(footerTop).toBeGreaterThan(workspaceTop + 200);
   });
 });

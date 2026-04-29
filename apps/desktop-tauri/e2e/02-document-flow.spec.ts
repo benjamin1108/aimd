@@ -22,16 +22,31 @@ async function installTauriMock(page: Page, options: { initialPath?: string | nu
 
   await page.addInitScript((s: typeof seed) => {
     type Args = Record<string, unknown> | undefined;
+    const convertFileSrc = (path: string, protocol = "asset") => `${protocol}://localhost${encodeURI(path)}`;
     const handlers: Record<string, (a: Args) => unknown> = {
       initial_open_path: () => s.initialPath,
       choose_aimd_file: () => s.doc.path,
+      choose_markdown_file: () => null,
       choose_image_file: () => null,
+      choose_save_aimd_file: () => "/mock/saved.aimd",
       open_aimd: () => s.doc,
+      create_aimd: (a) => ({ ...s.doc, path: "/mock/new.aimd", markdown: String((a as any)?.markdown ?? ""), dirty: false }),
       save_aimd: (a) => ({ ...s.doc, markdown: (a as any)?.markdown ?? s.doc.markdown, dirty: false }),
+      save_aimd_as: (a) => ({
+        ...s.doc,
+        path: String((a as any)?.savePath ?? "/mock/saved.aimd"),
+        markdown: String((a as any)?.markdown ?? s.doc.markdown),
+        dirty: false,
+      }),
       render_markdown: (a) => ({
         html: `<p>${String((a as any)?.markdown ?? "").slice(0, 80)}</p>`,
       }),
+      render_markdown_standalone: (a) => ({
+        html: `<p>${String((a as any)?.markdown ?? "").slice(0, 80)}</p>`,
+      }),
       add_image: () => null,
+      import_markdown: () => s.doc,
+      list_aimd_assets: () => [],
     };
 
     (window as any).__TAURI_INTERNALS__ = {
@@ -41,6 +56,14 @@ async function installTauriMock(page: Page, options: { initialPath?: string | nu
         return fn(a);
       },
       transformCallback: (cb: Function) => cb,
+      convertFileSrc,
+    };
+    (window as any).__TAURI__ = {
+      ...(window as any).__TAURI__,
+      core: {
+        ...((window as any).__TAURI__?.core ?? {}),
+        convertFileSrc,
+      },
     };
     (window as any).__TAURI_EVENT_PLUGIN_INTERNALS__ = {
       unregisterListener: () => {},
@@ -55,7 +78,7 @@ test.describe("Document flow — mocked Tauri", () => {
 
     await page.locator("#empty-open").click();
 
-    await expect(page.locator("#doc-title")).toHaveText("样例文档");
+    await expect(page.locator("#doc-title")).toHaveText("AIMD 样例");
     await expect(page.locator("#reader h1")).toHaveText("AIMD 样例");
     await expect(page.locator("#mode-read")).toHaveClass(/active/);
     await expect(page.locator("#mode-read")).not.toBeDisabled();
