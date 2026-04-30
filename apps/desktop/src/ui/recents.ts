@@ -2,7 +2,7 @@ import { state, STORAGE_RECENTS, STORAGE_LAST, MAX_RECENTS } from "../core/state
 import { recentSectionEl, recentListEl } from "../core/dom";
 import { fileStem } from "../util/path";
 import { escapeAttr, escapeHTML } from "../util/escape";
-import { formatPathHint } from "./chrome";
+import { formatPathHint, setStatus } from "./chrome";
 import { showFileContextMenu } from "./context-menu";
 import { routeOpenedPath } from "../document/lifecycle";
 
@@ -25,6 +25,12 @@ export function rememberOpenedPath(path: string) {
   if (!path) return;
   state.recentPaths = [path, ...state.recentPaths.filter((item) => item !== path)].slice(0, MAX_RECENTS);
   window.localStorage.setItem(STORAGE_LAST, path);
+  saveRecentPaths();
+  renderRecentList();
+}
+
+export function forgetRecentPath(path: string) {
+  state.recentPaths = state.recentPaths.filter((item) => item !== path);
   saveRecentPaths();
   renderRecentList();
 }
@@ -53,9 +59,19 @@ export function renderRecentList() {
     `)
     .join("");
   recentListEl().querySelectorAll<HTMLButtonElement>(".recent-item").forEach((button) => {
-    button.addEventListener("click", () => {
+    button.addEventListener("click", async () => {
       const path = button.dataset.path;
-      if (path) void routeOpenedPath(path);
+      if (!path) return;
+      button.disabled = true;
+      try {
+        const result = await routeOpenedPath(path);
+        if (result === "failed" || result === "unsupported") {
+          forgetRecentPath(path);
+          setStatus(result === "unsupported" ? "不支持的文件，已从最近列表移除" : "文件打不开，已从最近列表移除", "warn");
+        }
+      } finally {
+        button.disabled = false;
+      }
     });
     button.addEventListener("contextmenu", (e) => {
       e.preventDefault();

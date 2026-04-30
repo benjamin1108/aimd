@@ -14,13 +14,15 @@ import { triggerOptimizeOnOpen } from "./optimize";
 import { saveDocument } from "./persist";
 import { clearSessionSnapshot, clearLastSessionPath } from "../session/snapshot";
 
+export type OpenRouteResult = "opened" | "focused" | "current" | "cancelled" | "failed" | "unsupported";
+
 export async function chooseAndOpen() {
   const path = await invoke<string | null>("choose_doc_file");
   if (path) await routeOpenedPath(path);
 }
 
-export async function openMarkdownDocument(markdownPath: string, opts?: { skipConfirm?: boolean }) {
-  if (!opts?.skipConfirm && !await ensureCanDiscardChanges("打开另一个文档")) return;
+export async function openMarkdownDocument(markdownPath: string, opts?: { skipConfirm?: boolean }): Promise<OpenRouteResult> {
+  if (!opts?.skipConfirm && !await ensureCanDiscardChanges("打开另一个文档")) return "cancelled";
   setStatus("正在打开", "loading");
   try {
     const draft = await invoke<MarkdownDraft>("convert_md_to_draft", { markdownPath });
@@ -41,17 +43,19 @@ export async function openMarkdownDocument(markdownPath: string, opts?: { skipCo
     try {
       await invoke("register_window_path", { path: markdownPath });
     } catch { /* 命令不存在时静默忽略 */ }
+    return "opened";
   } catch (err) {
     console.error(err);
     setStatus("打开失败", "warn");
+    return "failed";
   }
 }
 
-export async function routeOpenedPath(path: string, opts?: { skipConfirm?: boolean }) {
+export async function routeOpenedPath(path: string, opts?: { skipConfirm?: boolean }): Promise<OpenRouteResult> {
   // 若该路径已在另一个窗口打开，聚焦那个窗口并结束
   try {
     const label = await invoke<string | null>("focus_doc_window", { path });
-    if (label) return;
+    if (label) return "focused";
   } catch {
     // Rust 命令不可用时（如 e2e mock 未注册）继续走正常流程
   }
@@ -63,16 +67,17 @@ export async function routeOpenedPath(path: string, opts?: { skipConfirm?: boole
       await invoke("register_window_path", { path: state.doc.path });
     } catch { /* 命令不可用时忽略 */ }
     setStatus("已经是当前文档", "info");
-    return;
+    return "current";
   }
 
   const lower = path.toLowerCase();
   if (lower.endsWith(".aimd")) {
-    await openDocument(path, { skipConfirm: opts?.skipConfirm });
+    return await openDocument(path, { skipConfirm: opts?.skipConfirm });
   } else if (lower.endsWith(".md") || lower.endsWith(".markdown") || lower.endsWith(".mdx")) {
-    await openMarkdownDocument(path, opts);
+    return await openMarkdownDocument(path, opts);
   } else {
     setStatus("不支持的文件类型", "warn");
+    return "unsupported";
   }
 }
 
@@ -125,8 +130,8 @@ export async function newDocument() {
   }
 }
 
-export async function openDocument(path: string, options: { skipConfirm?: boolean } = {}) {
-  if (!options.skipConfirm && !await ensureCanDiscardChanges("打开另一个文档")) return;
+export async function openDocument(path: string, options: { skipConfirm?: boolean } = {}): Promise<OpenRouteResult> {
+  if (!options.skipConfirm && !await ensureCanDiscardChanges("打开另一个文档")) return "cancelled";
   setStatus("正在打开", "loading");
   try {
     const doc = await invoke<AimdDocument>("open_aimd", { path });
@@ -137,9 +142,11 @@ export async function openDocument(path: string, options: { skipConfirm?: boolea
       await invoke("register_window_path", { path: doc.path });
     } catch { /* 命令不存在（旧版 / e2e mock）时静默忽略 */ }
     void triggerOptimizeOnOpen(doc.path);
+    return "opened";
   } catch (err) {
     console.error(err);
     setStatus("打开失败", "warn");
+    return "failed";
   }
 }
 
