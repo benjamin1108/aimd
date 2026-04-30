@@ -81,6 +81,7 @@ AIMD Desktop 是配套的桌面应用：双击 `.aimd` 就打开，像看 Markdo
 | Windows 10/11 (x64) | [`AIMD.Desktop_0.1.0_x64-setup.exe`](https://github.com/benjamin1108/aimd/releases/download/v0.1.0/AIMD.Desktop_0.1.0_x64-setup.exe) | 双击安装 |
 
 > 当前版本为 `v0.1.0`，可在 [Releases](https://github.com/benjamin1108/aimd/releases/tag/v0.1.0) 下载。
+> macOS 版当前未经过 Apple 公证。首次打开如被系统拦截，请到 系统设置 → 隐私与安全，点击“仍要打开”。后续版本会在接入 Developer ID 签名与公证后移除此步骤。
 
 首次打开 `.aimd` 文件时，建议在系统中右键 → "打开方式" → "始终用 AIMD 打开"，之后双击即可。
 
