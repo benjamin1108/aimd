@@ -17,7 +17,9 @@ use std::fs;
 use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Mutex;
-use tauri::{Manager, RunEvent, State, WindowEvent};
+#[cfg(any(target_os = "macos", target_os = "ios"))]
+use tauri::Manager;
+use tauri::{RunEvent, State, WindowEvent};
 
 static MAIN_INITIALIZED: AtomicBool = AtomicBool::new(false);
 
