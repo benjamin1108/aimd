@@ -56,8 +56,15 @@ export async function routeOpenedPath(path: string, opts?: { skipConfirm?: boole
     // Rust 命令不可用时（如 e2e mock 未注册）继续走正常流程
   }
 
-  // 若当前窗口本身就持有该路径，直接 no-op（避免重新加载丢失未保存内容）
-  if (state.doc?.path && normPathsEqual(state.doc.path, path)) return;
+  // 若当前窗口本身就持有该路径：避免重新加载丢失未保存内容，但要给用户反馈，
+  // 并补登记一下窗口路径（会话恢复路径时不会自动登记，补一次让多窗口去重生效）。
+  if (state.doc?.path && normPathsEqual(state.doc.path, path)) {
+    try {
+      await invoke("register_window_path", { path: state.doc.path });
+    } catch { /* 命令不可用时忽略 */ }
+    setStatus("已经是当前文档", "info");
+    return;
+  }
 
   const lower = path.toLowerCase();
   if (lower.endsWith(".aimd")) {
@@ -147,6 +154,11 @@ export async function closeDocument() {
   readerEl().innerHTML = "";
   clearSessionSnapshot();
   clearLastSessionPath();
+  // 必须摘掉 OpenedWindows 表里当前窗口的路径条目，否则下次点 recents "继续" 时
+  // focus_doc_window 会命中残留条目，误判"已有窗口承载"，导致文档再也打不开。
+  try {
+    await invoke("unregister_current_window_path");
+  } catch { /* 命令不可用时静默忽略 */ }
   setMode("read");
   updateChrome();
   setStatus("已关闭文档", "info");

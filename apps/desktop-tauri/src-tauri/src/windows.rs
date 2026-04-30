@@ -28,16 +28,29 @@ pub fn normalize_path(path: &str) -> PathBuf {
     }
 }
 
-/// 查表：若 path 已有窗口承载，聚焦并返回窗口 label；否则返回 None。
+/// 查表：若 path 已有"另一个"窗口承载，聚焦并返回该窗口 label；
+/// 否则（路径未登记 / 登记的就是当前调用窗口）返回 None，让前端继续走正常打开流程。
+///
+/// 不区分调用窗口会出现这种 bug：用户在 A 窗口里关掉文档（state.doc=null，但 OpenedWindows
+/// 表里 {path→A} 残留），再点 recents 继续项，前端调 focus_doc_window 看到 path 命中
+/// 返回 Some("A")，于是 routeOpenedPath 直接 return，文档再也打不开。
 #[tauri::command]
-pub async fn focus_doc_window(app: AppHandle, path: String) -> Option<String> {
+pub async fn focus_doc_window(
+    app: AppHandle,
+    window: tauri::Window,
+    path: String,
+) -> Option<String> {
     let key = normalize_path(&path);
     let label = app.try_state::<OpenedWindows>()?.0.lock().ok()?.get(&key).cloned()?;
-    let window = app.get_webview_window(&label)?;
+    if label == window.label() {
+        // 命中的就是调用方自己，不算"另一个窗口已打开"，让前端继续走打开流程。
+        return None;
+    }
+    let target = app.get_webview_window(&label)?;
     // 已最小化先还原，再显示并聚焦
-    let _ = window.unminimize();
-    let _ = window.show();
-    let _ = window.set_focus();
+    let _ = target.unminimize();
+    let _ = target.show();
+    let _ = target.set_focus();
     Some(label)
 }
 
@@ -63,6 +76,17 @@ pub fn unregister_window_label(app: &AppHandle, label: &str) {
     }
 }
 
+/// 关闭文档时（state.doc=null 但窗口仍在），把当前窗口名下的所有路径条目摘掉。
+/// 不摘掉会出现："关掉文档 → recents 点继续 → focus_doc_window 误判已有窗口承载 → 直接返回 → 文档打不开"。
+#[tauri::command]
+pub fn unregister_current_window_path(app: AppHandle, window: tauri::Window) {
+    if let Some(ow) = app.try_state::<OpenedWindows>() {
+        if let Ok(mut map) = ow.0.lock() {
+            map.retain(|_, v| v != window.label());
+        }
+    }
+}
+
 /// 另存为成功后由前端调用，更新该窗口的路径映射（旧 path 移除，新 path 写入）。
 #[tauri::command]
 pub fn update_window_path(app: AppHandle, window: tauri::Window, new_path: String) {
@@ -76,10 +100,21 @@ pub fn update_window_path(app: AppHandle, window: tauri::Window, new_path: Strin
 
 #[tauri::command]
 pub async fn open_in_new_window(app: AppHandle, path: Option<String>) -> Result<(), String> {
-    // 有路径时先查去重表，命中则聚焦已有窗口，不再新建
+    // 有路径时先查去重表，命中则聚焦已有窗口，不再新建。
+    // 这里没有"调用方窗口"的概念（new-window 是从主窗口或菜单触发，目标本来就是另一个窗口），
+    // 所以直接复用旧的查表 + 聚焦逻辑，绕过 focus_doc_window 的 same-label 短路判断。
     if let Some(ref p) = path {
-        if let Some(_label) = focus_doc_window(app.clone(), p.clone()).await {
-            return Ok(());
+        let key = normalize_path(p);
+        if let Some(ow) = app.try_state::<OpenedWindows>() {
+            let existing_label = ow.0.lock().ok().and_then(|m| m.get(&key).cloned());
+            if let Some(label) = existing_label {
+                if let Some(target) = app.get_webview_window(&label) {
+                    let _ = target.unminimize();
+                    let _ = target.show();
+                    let _ = target.set_focus();
+                    return Ok(());
+                }
+            }
         }
     }
 

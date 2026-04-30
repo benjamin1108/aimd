@@ -72,7 +72,10 @@ export async function restoreSession() {
     const restored = await restoreSnapshot(snapshot);
     if (restored) {
       applyDocument(restored.doc, restored.mode);
-      if (restored.doc.path) rememberOpenedPath(restored.doc.path);
+      if (restored.doc.path) {
+        rememberOpenedPath(restored.doc.path);
+        await registerRestoredPath(restored.doc.path);
+      }
       setStatus(restored.message, "info");
       return;
     }
@@ -85,11 +88,20 @@ export async function restoreSession() {
     const doc = await invoke<AimdDocument>("open_aimd", { path });
     applyDocument({ ...doc, isDraft: false, format: "aimd", dirty: false }, "read");
     rememberOpenedPath(doc.path);
+    await registerRestoredPath(doc.path);
     setStatus("已恢复上次文档", "info");
   } catch {
     clearLastSessionPath();
     updateChrome();
   }
+}
+
+async function registerRestoredPath(path: string) {
+  // 会话恢复路径时，Rust 端的 OpenedWindows 表里没这条记录；不补登记的话，
+  // 多窗口同文件去重失效，且 routeOpenedPath 在另一窗口点同一路径时无法聚焦回来。
+  try {
+    await invoke("register_window_path", { path });
+  } catch { /* 命令不可用（旧版本 / e2e mock 未注册）时静默忽略 */ }
 }
 
 export async function restoreSnapshot(snapshot: SessionSnapshot): Promise<{ doc: AimdDocument; mode: Mode; message: string } | null> {

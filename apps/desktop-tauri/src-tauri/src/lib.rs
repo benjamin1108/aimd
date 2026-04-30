@@ -204,10 +204,19 @@ fn reveal_in_finder(path: String) -> Result<(), String> {
             .map_err(|e| format!("reveal_in_finder: {e}"))?;
         return Ok(());
     }
-    #[cfg(not(target_os = "macos"))]
+    #[cfg(target_os = "windows")]
+    {
+        std::process::Command::new("explorer.exe")
+            .arg(format!("/select,{}", path))
+            .spawn()
+            .map(|_| ())
+            .map_err(|e| format!("reveal_in_finder: {e}"))?;
+        return Ok(());
+    }
+    #[cfg(not(any(target_os = "macos", target_os = "windows")))]
     {
         let _ = path;
-        return Err("在 Finder 中显示仅支持 macOS，Windows/Linux 版本将在后续版本中添加".to_string());
+        return Err("Reveal in file manager is not supported on this platform yet.".to_string());
     }
 }
 
@@ -409,15 +418,23 @@ fn run_aimd_json(app: &AppHandle, args: &[&str], input: Option<Vec<u8>>) -> Resu
 
 fn run_aimd(app: &AppHandle, args: &[&str], input: Option<Vec<u8>>) -> Result<Vec<u8>, String> {
     let aimd = aimd_binary(app);
-    let mut child = Command::new(&aimd)
-        .args(args)
+    let mut cmd = Command::new(&aimd);
+    cmd.args(args)
         .stdin(if input.is_some() {
             Stdio::piped()
         } else {
             Stdio::null()
         })
         .stdout(Stdio::piped())
-        .stderr(Stdio::piped())
+        .stderr(Stdio::piped());
+    // Windows 下默认会给每次子进程弹一个 cmd 黑框，这里压掉。
+    #[cfg(target_os = "windows")]
+    {
+        use std::os::windows::process::CommandExt;
+        const CREATE_NO_WINDOW: u32 = 0x0800_0000;
+        cmd.creation_flags(CREATE_NO_WINDOW);
+    }
+    let mut child = cmd
         .spawn()
         .map_err(|err| format!("failed to launch {}: {err}", aimd.display()))?;
 
@@ -449,19 +466,24 @@ fn aimd_binary(app: &AppHandle) -> PathBuf {
         return PathBuf::from(path);
     }
     if let Ok(resource_dir) = app.path().resource_dir() {
-        let candidate = resource_dir.join("aimd");
-        if candidate.exists() {
-            return candidate;
+        for name in aimd_binary_names() {
+            let candidate = resource_dir.join(name);
+            if candidate.exists() {
+                return candidate;
+            }
         }
         if let Some(candidate) = find_resource_aimd(resource_dir, 4) {
             return candidate;
         }
     }
-    let repo_candidate = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../bin/aimd");
-    if repo_candidate.exists() {
-        return repo_candidate;
+    let repo_bin = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../bin");
+    for name in aimd_binary_names() {
+        let repo_candidate = repo_bin.join(name);
+        if repo_candidate.exists() {
+            return repo_candidate;
+        }
     }
-    PathBuf::from("aimd")
+    PathBuf::from(aimd_binary_names()[0])
 }
 
 fn find_resource_aimd(dir: PathBuf, depth: usize) -> Option<PathBuf> {
@@ -471,8 +493,12 @@ fn find_resource_aimd(dir: PathBuf, depth: usize) -> Option<PathBuf> {
     let entries = fs::read_dir(dir).ok()?;
     for entry in entries.flatten() {
         let path = entry.path();
-        if path.is_file() && path.file_name().is_some_and(|name| name == "aimd") {
-            return Some(path);
+        if path.is_file() {
+            if let Some(name) = path.file_name().and_then(|name| name.to_str()) {
+                if aimd_binary_names().contains(&name) {
+                    return Some(path);
+                }
+            }
         }
         if path.is_dir() {
             if let Some(found) = find_resource_aimd(path, depth - 1) {
@@ -483,8 +509,39 @@ fn find_resource_aimd(dir: PathBuf, depth: usize) -> Option<PathBuf> {
     None
 }
 
+#[cfg(target_os = "windows")]
+fn aimd_binary_names() -> &'static [&'static str] {
+    &["aimd.exe", "aimd"]
+}
+
+#[cfg(not(target_os = "windows"))]
+fn aimd_binary_names() -> &'static [&'static str] {
+    &["aimd", "aimd.exe"]
+}
+
 pub fn run() {
-    let app = tauri::Builder::default()
+    let mut builder = tauri::Builder::default();
+
+    // Windows / Linux 用 single-instance 插件：第二实例（双击文件触发的新进程）
+    // 把 CLI args 转发给首实例后退出，由首实例统一通过 OpenedWindows 表去重，
+    // 同一文件聚焦已有窗口，不同文件开新窗口。
+    #[cfg(any(target_os = "windows", target_os = "linux"))]
+    {
+        builder = builder.plugin(tauri_plugin_single_instance::init(|app, args, _cwd| {
+            // 第二实例的 CLI args 里通常 args[0] 是 exe 路径，剩下是文件路径。
+            // 找出第一个支持的文档扩展名作为目标文件。
+            let path = args
+                .into_iter()
+                .skip(1)
+                .find(|arg| is_supported_doc_extension(std::path::Path::new(arg)));
+            let handle = app.clone();
+            tauri::async_runtime::spawn(async move {
+                let _ = windows::open_in_new_window(handle, path).await;
+            });
+        }));
+    }
+
+    let app = builder
         .manage(PendingOpenPaths::default())
         .manage(windows::WindowPending::default())
         .manage(windows::OpenedWindows::default())
@@ -520,6 +577,7 @@ pub fn run() {
             windows::open_in_new_window,
             windows::focus_doc_window,
             windows::register_window_path,
+            windows::unregister_current_window_path,
             windows::update_window_path
         ])
         .build(tauri::generate_context!())
@@ -527,6 +585,7 @@ pub fn run() {
 
     app.run(move |app_handle, event| {
         match event {
+            #[cfg(any(target_os = "macos", target_os = "ios"))]
             RunEvent::Opened { urls } => {
                 let mut consumed_main = false;
                 for url in urls {

@@ -13,7 +13,6 @@ Markdown 是内容层。
 AIMD 是文档容器。
 ```
 
-![AIMD Desktop: a complete Markdown document package with outline, rendered content, and bundled assets](docs/assets/readme/hero-desktop.png)
 
 ### 为什么需要 AIMD
 
@@ -217,6 +216,20 @@ npm install
 npm run typecheck
 npm run build:web
 npm run test:e2e
+```
+
+Windows 桌面版构建与冒烟测试说明见 [`docs/windows-desktop.md`](docs/windows-desktop.md)。
+
+Windows 一键环境准备与构建：
+
+```bat
+build-windows.bat
+```
+
+macOS 一键环境准备与构建：
+
+```bash
+./build-dmg.sh
 ```
 
 ### License
@@ -436,6 +449,20 @@ npm install
 npm run typecheck
 npm run build:web
 npm run test:e2e
+```
+
+For Windows desktop build and smoke-test notes, see [`docs/windows-desktop.md`](docs/windows-desktop.md).
+
+One-command Windows environment preparation and build:
+
+```bat
+build-windows.bat
+```
+
+One-command macOS environment preparation and build:
+
+```bash
+./build-dmg.sh
 ```
 
 ### License

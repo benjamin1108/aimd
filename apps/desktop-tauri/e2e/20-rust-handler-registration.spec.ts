@@ -90,6 +90,7 @@ test.describe("Rust invoke_handler 命令注册校验", () => {
     "open_in_new_window",
     "focus_doc_window",
     "register_window_path",
+    "unregister_current_window_path",
     "update_window_path",
   ];
 
