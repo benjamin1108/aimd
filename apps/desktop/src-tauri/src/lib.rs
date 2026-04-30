@@ -17,7 +17,7 @@ use std::fs;
 use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Mutex;
-use tauri::{RunEvent, State, WindowEvent};
+use tauri::{Manager, RunEvent, State, WindowEvent};
 
 static MAIN_INITIALIZED: AtomicBool = AtomicBool::new(false);
 
@@ -713,21 +713,19 @@ fn replace_aimd_asset(
 }
 
 pub fn run() {
-    let mut builder = tauri::Builder::default();
+    let builder = tauri::Builder::default();
 
     #[cfg(any(target_os = "windows", target_os = "linux"))]
-    {
-        builder = builder.plugin(tauri_plugin_single_instance::init(|app, args, _cwd| {
-            let path = args
-                .into_iter()
-                .skip(1)
-                .find(|arg| is_supported_doc_extension(std::path::Path::new(arg)));
-            let handle = app.clone();
-            tauri::async_runtime::spawn(async move {
-                let _ = windows::open_in_new_window(handle, path).await;
-            });
-        }));
-    }
+    let builder = builder.plugin(tauri_plugin_single_instance::init(|app, args, _cwd| {
+        let path = args
+            .into_iter()
+            .skip(1)
+            .find(|arg| is_supported_doc_extension(std::path::Path::new(arg)));
+        let handle = app.clone();
+        tauri::async_runtime::spawn(async move {
+            let _ = windows::open_in_new_window(handle, path).await;
+        });
+    }));
 
     let app = builder
         .manage(PendingOpenPaths::default())

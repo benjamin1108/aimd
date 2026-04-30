@@ -12,7 +12,7 @@ set -euo pipefail
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 DESKTOP="$ROOT/apps/desktop"
 ICONS="$DESKTOP/src-tauri/icons"
-BUNDLE="$DESKTOP/src-tauri/target/release/bundle"
+BUNDLE="$ROOT/target/release/bundle"
 DIST="$ROOT/dist"
 
 ICON_SRC=""
@@ -139,6 +139,10 @@ if [[ -n "$app_src" ]]; then
   cp -R "$app_src" "$DIST/"
   echo "  app -> $DIST/$(basename "$app_src")"
 fi
+
+# 构建产物只在 dist/ 下保留一份，清掉 cargo 默认产物目录中的最终包
+rm -f "$BUNDLE"/dmg/*.dmg
+rm -rf "$BUNDLE"/macos/*.app
 
 elapsed=$(( $(date +%s) - start_ts ))
 echo "==> done in ${elapsed}s"

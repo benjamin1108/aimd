@@ -1,422 +1,184 @@
-# AIMD — AI Markdown Document
+<div align="center">
 
-[中文](#中文) | [English](#english)
+# AIMD
 
-## 中文
+**把图文文档装进一个文件。**
 
-> 把 AI 生成的 Markdown 变成完整、可迁移、可编辑的文档。
+正文、图片、元信息始终在一起 — 发给别人不丢图，换台电脑也能完整打开。
 
-AIMD 是面向 AI 生成时代的单文件文档格式。它把 Markdown、图片、资源和元数据打包进一个开放的 `.aimd` 文件中，让报告、教程、研究笔记、技术文档和 Agent 输出可以被移动、归档、编辑、检查和分享，而不会因为图片路径断裂而损坏。
+[下载 macOS 版](#下载) · [下载 Windows 版](#下载) · [它解决什么问题](#为什么会有-aimd) · [文件格式](#文件格式)
 
-```text
-Markdown 是内容层。
-AIMD 是文档容器。
-```
+</div>
 
+![AIMD Desktop — 一个文件打开，左侧大纲与资源，中间正文与配图同屏可见](docs/assets/readme/hero-desktop.png)
 
-### 为什么需要 AIMD
+---
 
-AI 工具正在让 Markdown 成为结构化内容的默认输出格式。ChatGPT、Claude、Gemini、Cursor、Perplexity、Agent、Notebook 和内部自动化流程都会生成类似 Markdown 的文档。
+## 为什么会有 AIMD
 
-但 Markdown 本身不是完整文档：
+AI 工具正在让 Markdown 变成内容输出的默认格式。日报、调研、教程、周报、Agent 跑出来的报告，几乎都是 Markdown。
 
-- 图片通常存放在文件外部，文档移动后容易丢失或失效。
-- 截图、图表、流程图和生成图片是内容语义的一部分，却经常以散落文件保存。
-- AI 生成报告需要记录来源、模型、提示词和溯源信息。
-- 给普通用户分享 `.md` 文件加 `images/` 目录很脆弱。
-- PDF 便于分发，但不适合作为 AI 工作流里的可编辑中间格式。
+但 Markdown 不是一个完整的"文档"：
 
-AIMD 保留 Markdown 的简单性，同时补上文档容器能力。
+- 图片散在文件夹里，一拖动就断了
+- 发给同事，对方不会装编辑器
+- 想存档，过几个月发现配图全丢了
+- 转成 PDF，就不能再编辑了
 
-### AIMD 能做什么
+`.aimd` 是一个开放格式 — 一个 ZIP 容器，里面装着 Markdown 正文、所有图片，以及元数据。**一个文件，发哪儿都齐整。**
 
-| 你想要... | AIMD 提供... |
-|---|---|
-| 保存 AI 生成的报告 | 一个同时包含 Markdown 和图片的 `.aimd` 文件 |
-| 分享给别人 | 移动后也不会丢图的可迁移文档 |
-| 发给未安装 AIMD 的人 | 一个自渲染的独立 `.html` 文件 |
-| 保留开发者工作流 | 通过 CLI 打包、解包、检查、预览和导出 |
-| 归档 Agent 输出 | 稳定保存 Markdown、资源、哈希和未来溯源信息的容器 |
-| 恢复原始内容 | 随时解包回普通 Markdown + assets 目录 |
+AIMD Desktop 是配套的桌面应用：双击 `.aimd` 就打开，像看 Markdown 一样阅读，像写 Markdown 一样编辑，图片直接粘贴进文档里就和正文绑在一起了。
 
-### 适合谁
+---
 
-#### AI 内容创作者
+## 给谁用
 
-当 AI 工具生成了报告、教程、课程、方案或图文文档，而你希望把它保存成一个可编辑文件时，可以使用 AIMD。
+- **写 AI 日报 / 调研报告的你** — AI 给你的内容连图带表，存成 `.aimd`，发给老板、扔进群里、归档，都是一个文件搞定
+- **整理技术文档的你** — 截图、流程图、架构图直接粘进编辑器，不用单独管 `images/` 目录
+- **跑 Agent 输出的你** — 让 Agent 直接产出 `.aimd`（ZIP + manifest，结构透明），未来还能记录模型、提示词、出处
 
-#### 开发者和技术写作者
+---
 
-适合 README 类文档、架构笔记、API 指南、设计文档和包含图表、截图或生成图片的技术报告。
+## 你能在 AIMD Desktop 里做什么
 
-#### Agent 和自动化构建者
+### 一个文件，三种看法
 
-可以把 AIMD 作为周报、研究摘要、会议纪要、QA 报告、构建报告等生成型交付物的输出格式。
+- **阅读模式** — 干净的排版，专注读
+- **编辑模式** — 所见即所得，直接在渲染好的页面上改字、加粗、贴图
+- **源码模式** — 左边写 Markdown，右边实时预览
 
-### 产品体验
+顶部一键切换；正常 / 加宽 / 超宽三档版面，长图大表也舒服。
 
-从 Markdown 开始，把它打包成 `.aimd`，在 AIMD Desktop 中打开，并把文档作为一个文件保持可读、可编辑、可检查、可分享。
+### 图片就该跟正文走
 
-### 快速开始
+- **粘贴即入文档** — 截图直接 ⌘V，图自动塞进 `.aimd`，不再是外部链接
+- **自动去重 + 压缩** — 同一张图复制多次只存一份；大图按需压缩，文件不臃肿
+- **保存自动清理** — 删掉的图片，不再被引用的资源，会在保存时一起 GC 掉
 
-#### macOS：安装并注册 `.aimd`
+### 拖、双击、关联，怎么自然怎么来
 
-```bash
-git clone https://github.com/aimd-org/aimd.git
-cd aimd
-./scripts/install-mac.sh
-```
+- 直接把 `.aimd` 拖进窗口，立刻打开
+- 系统里双击 `.aimd` 文件，自动用 AIMD 启动
+- 也能直接打开普通 `.md` 文件，按需另存为 `.aimd` 升级
+- 多窗口同时开多个文档（⌘⇧N），互不干扰
 
-安装脚本会：
+### 还顺手的细节
 
-1. 将 `aimd` 二进制安装到 `~/.local/bin/aimd`。
-2. 在 `~/Applications/` 安装用户级 macOS app wrapper。
-3. 注册 `.aimd` 文件关联，让文件可以从 Finder 打开。
+- 左侧自动生成大纲，跳转章节；下面是资源面板，文档里所有图片一目了然
+- 点图片即放大灯箱，按 Esc 收起
+- 最近打开列表，丢了文件路径也能回到现场
+- 完整快捷键：⌘N 新建 / ⌘O 打开 / ⌘S 保存 / ⇧⌘S 另存为 / ⌘W 关闭
 
-不需要 `sudo`，不写入 `/usr/local`，并且可逆。
+---
 
-#### 从源码构建（桌面应用）
+## 下载
 
-需要 Node.js 20+ 和 Rust（stable）。
+桌面应用支持 **macOS** 和 **Windows**。
 
-```bash
-cd apps/desktop
-npm install
-npm run build
-```
+| 平台 | 文件 | 安装 |
+|---|---|---|
+| macOS (Apple Silicon) | `AIMD Desktop_0.1.0_aarch64.dmg` | 双击挂载，把 AIMD 拖进 Applications |
+| Windows 10/11 (x64) | `AIMD Desktop_0.1.0_x64-setup.exe` | 双击安装 |
 
-macOS 一键构建（含环境安装）：
+> 当前版本为 `v0.1.0`，可在 [Releases](../../releases) 下载。
 
-```bash
-./build-dmg.sh
-```
+首次打开 `.aimd` 文件时，建议在系统中右键 → "打开方式" → "始终用 AIMD 打开"，之后双击即可。
 
-Windows 一键构建：
+---
 
-```bat
-build-windows.bat
-```
+## 文件格式
 
-### 文件格式
-
-`.aimd` 文件是一个 ZIP 容器，结构小而可检查：
+`.aimd` 就是一个普通 ZIP，结构透明，可以用任何解压工具打开看：
 
 ```text
 report.aimd
-├── manifest.json          文档元数据、资源、哈希
-├── main.md                Markdown 内容
-└── assets/                打包的图片和资源
-    ├── cover.svg
-    └── trend.png
+├── manifest.json     文档元信息、资源清单、SHA-256
+├── main.md           Markdown 正文
+└── assets/           打包进来的图片和资源
+    ├── cover.png
+    └── chart-001.png
 ```
 
-Markdown 图片引用会被改写为稳定的资源 URI：
+正文里的图片用稳定引用形式 `![](asset://chart-001)`，移动文件、改名字、跨平台，都不会断。
 
-```markdown
-![Cover](asset://cover-001)
-```
+**为什么不直接用 PDF？** PDF 是给人看的终点，AIMD 是给人编辑的中间格式 — 可读、可改、可归档、可被脚本和 Agent 处理。
 
-解包时，AIMD 会把这些引用改写回普通相对路径，因此结果仍然可以被标准 Markdown 编辑器打开。
+**为什么不直接用 Markdown + images 文件夹？** 那个组合发出去就散架。AIMD 是同一个东西，但只剩一个文件。
 
-### AIMD 和其他格式的区别
+---
 
-| 格式 | 擅长 | 对 AI 生成文档的不足 |
-|---|---|---|
-| Markdown + assets 目录 | 简单、可读、Git 友好 | 移动或分享时图片容易断 |
-| PDF | 适合最终分发 | 难编辑，不适合作为 AI 中间格式 |
-| DOCX | Office 工作流 | 自动化和开发者工具链复杂 |
-| 单 HTML | 浏览器友好 | 源内容和表现层混在一起 |
-| AIMD | 可迁移的 Markdown 文档包 | 早期格式，生态还在发展 |
+## 从源码构建
 
-### 渲染和分享模式
+桌面应用基于 [Tauri 2](https://tauri.app/)（Rust + TypeScript）。
 
-| 模式 | 适合 | 资源交付方式 |
-|---|---|---|
-| `view` | 本地阅读/编辑 | 原生窗口 + 本地流式读取 |
-| `preview` | 浏览器预览 | 本地 HTTP 流式读取 |
-| `seal` | 分享给任何人 | 一个内嵌 ZIP 的独立 HTML |
-| `export html` | 静态发布 | 资源内联进 HTML |
-
-### 路线图
-
-已实现：
-
-- `.aimd` ZIP 容器，包含 `manifest.json`、`main.md` 和 `assets/`。
-- `pack`、`unpack`、`inspect`、`preview`、`view`、`seal` 和 `export html`。
-- macOS 打开流程和桌面编辑器 MVP。
-- Desktop 中的 Markdown 打开、图片插入、图片粘贴和图片压缩。
-
-下一步：
-
-- AI 元数据和溯源：模型、提示词、来源引用、审阅状态。
-- 文档健康检查：缺失资源、断链、过大文件、结构问题。
-- 更好的分享/导出 UI：`.aimd`、sealed HTML、PDF、DOCX、Markdown 项目。
-- VS Code / Cursor 集成，服务开发者工作流。
-- 开放文件格式规范、manifest schema、SDK、签名和校验。
-
-参考：
-
-- [MRD](docs/aimd_mrd_v_0_1.md)
-- [Product expansion and diagnosis](docs/product_expansion_and_diagnosis.md)
-- [Desktop architecture spec](docs/aimd_desktop_tauri_spec.md)
-
-### 开发
-
-工具链：Node.js 20+ 和 Rust（stable）。不需要 Go。
+需要：Node.js 18+，Rust（cargo），平台对应工具链（macOS 需 Xcode CLT，Windows 需 MSVC + WebView2）。
 
 ```bash
-cd apps/desktop
-npm install
-npm run typecheck
-npm run build:web
-npm run test:e2e
-```
-
-Rust workspace 单元测试：
-
-```bash
-cargo test --workspace
-```
-
-Windows 一键环境准备与构建：
-
-```bat
-build-windows.bat
-```
-
-macOS 一键环境准备与构建：
-
-```bash
-./build-dmg.sh
-```
-
-### License
-
-TBD.
-
-## English
-
-> Turn AI-generated Markdown into a complete, portable, editable document.
-
-AIMD is a single-file document format for the AI generation era. It packages Markdown, images, assets, and metadata into one open `.aimd` file, so reports, tutorials, research notes, technical docs, and agent outputs can be moved, archived, edited, inspected, and shared without broken image paths.
-
-```text
-Markdown is the content layer.
-AIMD is the document container.
-```
-
-### Why AIMD
-
-AI tools are making Markdown the default output format for structured content. ChatGPT, Claude, Gemini, Cursor, Perplexity, agents, notebooks, and internal automation all produce Markdown-like documents.
-
-But Markdown alone is not a complete document:
-
-- Images live outside the file and break when the document is moved.
-- Screenshots, charts, diagrams, and generated images are part of the meaning, but are stored as loose files.
-- AI-generated reports need source, model, prompt, and provenance metadata.
-- Sharing a `.md` file plus an `images/` folder is fragile for normal users.
-- PDF is portable, but it is not a good editable intermediate format for AI workflows.
-
-AIMD keeps the simplicity of Markdown and adds the missing document container.
-
-### What You Can Do
-
-| You want to... | AIMD gives you... |
-|---|---|
-| Save an AI-generated report | One `.aimd` file with Markdown and images bundled together |
-| Share with someone else | A portable document that will not lose images when moved |
-| Send to someone without AIMD | A sealed self-rendering `.html` file |
-| Keep developer workflows | Pack, unpack, inspect, preview, and export from CLI |
-| Archive agent outputs | A stable container for Markdown, assets, hashes, and future provenance |
-| Recover the original content | Unpack back to plain Markdown + assets at any time |
-
-### Who It Is For
-
-#### AI Content Creators
-
-Use AIMD when an AI tool gives you a useful report, tutorial, lesson, proposal, or visual document and you want to keep it as one editable file.
-
-#### Developers and Technical Writers
-
-Use AIMD for README-like documents, architecture notes, API guides, design docs, and technical reports that contain diagrams, screenshots, or generated charts.
-
-#### Agent and Automation Builders
-
-Use AIMD as the output format for weekly reports, research digests, meeting summaries, QA reports, build reports, and other generated deliverables.
-
-### Product Experience
-
-Start from Markdown, package it as `.aimd`, open it in AIMD Desktop, and keep the document readable, editable, inspectable, and shareable as one file.
-
-### Quick Start
-
-#### macOS: Install and Register `.aimd`
-
-```bash
-git clone https://github.com/aimd-org/aimd.git
+# 克隆
+git clone https://github.com/<your-org>/aimd.git
 cd aimd
-./scripts/install-mac.sh
-```
 
-The installer:
-
-1. Builds the `aimd` binary into `~/.local/bin/aimd`.
-2. Installs a user-level macOS app wrapper in `~/Applications/`.
-3. Registers `.aimd` so files can be opened from Finder.
-
-No `sudo`, no `/usr/local`, and fully reversible.
-
-#### Build from Source
-
-Requires Rust stable and Node.js 20 or newer.
-
-```bash
-cargo build --workspace --release
-cd apps/desktop && npm install && npm run build
-```
-
-### CLI Examples
-
-```bash
-# Package Markdown and local images into one .aimd file
-aimd pack report.md -o report.aimd
-
-# Open in a native macOS window
-aimd view report.aimd
-
-# Preview in a browser through a local server
-aimd preview report.aimd
-
-# Inspect manifest, assets, and SHA-256 integrity
-aimd inspect report.aimd
-aimd inspect report.aimd --json
-
-# Unpack back to a normal Markdown project
-aimd unpack report.aimd -o report-out/
-
-# Create a self-rendering HTML file for people without AIMD
-aimd seal report.aimd -o report.html
-
-# Export static HTML with images inlined
-aimd export html report.aimd -o report-static.html
-```
-
-The repository includes a sample in [examples/report/](examples/report/). Run the full smoke flow:
-
-```bash
-./scripts/smoke.sh
-```
-
-### Commands
-
-| Command | Purpose |
-|---|---|
-| `aimd pack <md> [-o out.aimd] [--title T]` | Bundle Markdown and local image references into one `.aimd` |
-| `aimd unpack <aimd> [-o dir] [--keep-asset-uri]` | Recover plain Markdown and assets |
-| `aimd inspect <aimd> [--json]` | Print manifest, assets, sizes, and hash status |
-| `aimd view <aimd> [--width W --height H]` | Open a native macOS viewer/editor |
-| `aimd preview <aimd> [--port N] [--no-open]` | Serve a local browser preview |
-| `aimd seal <aimd> [-o out.html]` | Produce a self-rendering standalone HTML file |
-| `aimd export html <aimd> [-o out.html]` | Export static HTML with base64-inlined assets |
-| `aimd version` | Print binary and format version |
-
-Flags may be placed before or after positional arguments.
-
-### File Format
-
-An `.aimd` file is a ZIP container with a small, inspectable structure:
-
-```text
-report.aimd
-├── manifest.json          document metadata, assets, hashes
-├── main.md                Markdown content
-└── assets/                bundled images and resources
-    ├── cover.svg
-    └── trend.png
-```
-
-Markdown image references are rewritten into stable asset URIs:
-
-```markdown
-![Cover](asset://cover-001)
-```
-
-When unpacked, AIMD rewrites those references back into ordinary relative paths, so the result can still be opened by standard Markdown editors.
-
-### How AIMD Is Different
-
-| Format | Good at | Missing for AI-generated documents |
-|---|---|---|
-| Markdown + assets folder | Simple, readable, Git-friendly | Images break when moved or shared |
-| PDF | Portable final output | Hard to edit, poor as an AI intermediate format |
-| DOCX | Office workflows | Complex for automation and developer tooling |
-| Single HTML | Browser-friendly | Source content and presentation are mixed |
-| AIMD | Portable Markdown document package | Early format, ecosystem still growing |
-
-### Rendering and Sharing Modes
-
-| Mode | Best for | How assets are delivered |
-|---|---|---|
-| `view` | Local reading/editing | Native window + local streaming |
-| `preview` | Browser preview | Local HTTP streaming |
-| `seal` | Sharing with anyone | One standalone HTML file with embedded ZIP |
-| `export html` | Static publishing | HTML with inlined assets |
-
-### Roadmap
-
-Implemented:
-
-- `.aimd` ZIP container with `manifest.json`, `main.md`, and `assets/`.
-- `pack`, `unpack`, `inspect`, `preview`, `view`, `seal`, and `export html`.
-- macOS open flow and desktop editor MVP.
-- Markdown import, image insertion, image paste, and image compression in Desktop.
-
-Next:
-
-- AI metadata and provenance: model, prompt, source references, review status.
-- Document health check: missing assets, broken links, oversized files, structure issues.
-- Better share/export UI: `.aimd`, sealed HTML, PDF, DOCX, Markdown project.
-- VS Code / Cursor integration for developer workflows.
-- Open file format spec, manifest schema, SDK, and signing/verification.
-
-See:
-
-- [MRD](docs/aimd_mrd_v_0_1.md)
-- [Product expansion and diagnosis](docs/product_expansion_and_diagnosis.md)
-- [Desktop architecture spec](docs/aimd_desktop_tauri_spec.md)
-
-### Development
-
-```bash
-cargo test --workspace
-cargo clippy --workspace --all-targets -- -D warnings
-./scripts/smoke.sh
-```
-
-Desktop app:
-
-```bash
+# 开发运行
 cd apps/desktop
 npm install
+npm run dev          # 启动 Tauri dev 窗口
+
+# 类型检查 + 端到端
 npm run typecheck
-npm run build:web
 npm run test:e2e
 ```
 
-For Windows desktop build and smoke-test notes, see [`docs/windows-desktop.md`](docs/windows-desktop.md).
+打包发布：
 
-One-command Windows environment preparation and build:
+```bash
+# macOS — 产出 .dmg / .app 到 dist/
+./build-dmg.sh
 
-```bat
+# Windows — 产出 .exe / .msi 到 dist/
 build-windows.bat
 ```
 
-One-command macOS environment preparation and build:
+仓库里附了一个示例文档可以直接打开看效果：[`examples/ai-daily-2026-04-30.aimd`](examples/ai-daily-2026-04-30.aimd)。
 
-```bash
-./build-dmg.sh
+---
+
+## 仓库结构
+
+```text
+aimd/
+├── apps/desktop/        Tauri 桌面应用（前端 TS + 后端 Rust）
+├── crates/
+│   ├── aimd-core/       .aimd ZIP 容器读写
+│   ├── aimd-mdx/        Markdown 解析与改写
+│   └── aimd-render/     渲染管线
+├── skill/               Claude Code skill —— 让 AI Agent 直接读写 .aimd
+└── examples/            示例文档
 ```
 
-### License
+`skill/` 目录里是一个可以装到 Claude Code 的 skill，让 AI 能直接用 Python 脚本读写 `.aimd`，把 AI 生成的内容打包进来。
+
+---
+
+## 路线图
+
+**已交付（v0.1）**
+
+- `.aimd` 单文件容器：manifest + main.md + assets，SHA-256 校验
+- macOS / Windows 桌面应用：阅读 / 编辑 / 源码三模式，多窗口
+- 图片粘贴、去重、按需压缩、保存时 GC
+- 普通 `.md` 兼容打开与按需升级
+- 文件关联、最近打开、会话恢复
+
+**接下来**
+
+- AI 出处与溯源元信息（模型、提示词、来源引用、审阅状态）
+- 文档健康检查（缺图、断链、过大资源、结构异常）
+- 更多导出方式：自渲染 HTML、PDF
+- 浏览器在线查看器
+- 文件格式正式规范与 SDK
+
+---
+
+## License
 
 TBD.

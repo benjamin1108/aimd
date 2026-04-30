@@ -115,7 +115,7 @@ powershell -NoProfile -ExecutionPolicy Bypass -Command ^
   "$patterns=@('*.exe','*.msi','*.msix','*.zip');" ^
   "$files=foreach($p in $patterns){ Get-ChildItem -LiteralPath $bundle -Recurse -File -Filter $p -ErrorAction SilentlyContinue };" ^
   "if (-not $files) { throw 'no Windows artifacts found under: ' + $bundle }" ^
-  "foreach($f in $files){ Copy-Item -LiteralPath $f.FullName -Destination (Join-Path $dist $f.Name) -Force; Write-Host ('  ' + $f.FullName + ' -> ' + (Join-Path $dist $f.Name)) }"
+  "foreach($f in $files){ Copy-Item -LiteralPath $f.FullName -Destination (Join-Path $dist $f.Name) -Force; Write-Host ('  ' + $f.FullName + ' -> ' + (Join-Path $dist $f.Name)); Remove-Item -LiteralPath $f.FullName -Force }"
 if errorlevel 1 exit /b 1
 
 echo ==^> done
