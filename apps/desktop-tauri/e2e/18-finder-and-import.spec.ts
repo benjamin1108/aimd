@@ -27,6 +27,7 @@ async function installTauriMock(page: Page) {
     const handlers: Record<string, (a?: Args) => unknown> = {
       initial_open_path: () => null,
       choose_aimd_file: () => "/mock/sample.aimd",
+      choose_doc_file: () => "/mock/report.md",
       choose_markdown_file: () => "/mock/report.md",
       choose_image_file: () => null,
       choose_save_aimd_file: (a) =>
@@ -241,7 +242,7 @@ test.describe("2. Open Markdown as document", () => {
     await installTauriMock(page);
     await page.goto("/");
 
-    await page.locator("#empty-import").click();
+    await page.locator("#empty-open").click();
 
     await expect(page.locator("#doc-title")).toHaveText("测试报告");
     await expect(page.locator("#reader h1")).toHaveText("测试报告");
@@ -258,7 +259,7 @@ test.describe("2. Open Markdown as document", () => {
     await installTauriMock(page);
     await page.goto("/");
 
-    await page.locator("#empty-import").click();
+    await page.locator("#empty-open").click();
     await expect(page.locator("#doc-path")).toContainText("/mock/report.md");
 
     // 切换到编辑模式，输入内容使 dirty
@@ -283,7 +284,7 @@ test.describe("2. Open Markdown as document", () => {
     await installTauriMock(page);
     await page.goto("/");
 
-    await page.locator("#empty-import").click();
+    await page.locator("#empty-open").click();
     await expect(page.locator("#doc-actions")).toBeVisible();
 
     await page.locator("#close").click();

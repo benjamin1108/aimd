@@ -27,6 +27,7 @@ async function installMock(page: Page) {
     const handlers: Record<string, (a: Args) => unknown> = {
       initial_open_path: () => null,
       choose_aimd_file: () => "/mock/saved.aimd",
+      choose_doc_file: () => "/mock/saved.aimd",
       open_aimd: () => docs["/mock/saved.aimd"],
       render_markdown_standalone: () => ({ html: "<h1>未命名文档</h1>" }),
       render_markdown: (a) => ({

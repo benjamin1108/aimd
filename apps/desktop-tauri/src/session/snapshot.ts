@@ -83,7 +83,7 @@ export async function restoreSession() {
   if (!path) return;
   try {
     const doc = await invoke<AimdDocument>("open_aimd", { path });
-    applyDocument({ ...doc, isDraft: false, format: "aimd" }, "read");
+    applyDocument({ ...doc, isDraft: false, format: "aimd", dirty: false }, "read");
     rememberOpenedPath(doc.path);
     setStatus("已恢复上次文档", "info");
   } catch {
@@ -98,7 +98,7 @@ export async function restoreSnapshot(snapshot: SessionSnapshot): Promise<{ doc:
       const diskDoc = await invoke<AimdDocument>("open_aimd", { path: snapshot.path });
       if (!snapshot.dirty && snapshot.markdown === diskDoc.markdown) {
         return {
-          doc: { ...diskDoc, isDraft: false, format: "aimd" },
+          doc: { ...diskDoc, isDraft: false, format: "aimd", dirty: false },
           mode: snapshot.mode,
           message: "已恢复上次文档",
         };

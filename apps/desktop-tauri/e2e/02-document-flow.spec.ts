@@ -26,6 +26,7 @@ async function installTauriMock(page: Page, options: { initialPath?: string | nu
     const handlers: Record<string, (a: Args) => unknown> = {
       initial_open_path: () => s.initialPath,
       choose_aimd_file: () => s.doc.path,
+      choose_doc_file: () => s.doc.path,
       choose_markdown_file: () => null,
       choose_image_file: () => null,
       choose_save_aimd_file: () => "/mock/saved.aimd",

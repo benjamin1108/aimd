@@ -46,6 +46,7 @@ async function installTauriMock(page: Page) {
     const handlers: Record<string, (a: Args) => unknown> = {
       initial_open_path: () => null,
       choose_aimd_file: () => s.doc.path,
+      choose_doc_file: () => s.doc.path,
       // Return a fake image path so insertImage proceeds past the dialog.
       choose_image_file: () => "/mock/image.png",
       // insertImage now calls read_image_bytes first, then add_image_bytes.

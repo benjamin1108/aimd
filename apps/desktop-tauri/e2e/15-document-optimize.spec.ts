@@ -89,6 +89,7 @@ async function installTauriMock(
     const handlers: Record<string, (a: Args) => unknown> = {
       initial_open_path: () => null,
       choose_aimd_file: () => s.doc.path,
+      choose_doc_file: () => s.doc.path,
       choose_image_file: () => null,
       choose_save_aimd_file: () => s.doc.path,
       open_aimd: () => s.doc,

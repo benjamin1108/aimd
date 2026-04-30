@@ -16,12 +16,33 @@ export function onInlineInput() {
   state.inlineDirty = true;
   state.doc.dirty = true;
   lightNormalize(inlineEditorEl());
+  ensureSelectionInEditor();
   updateChrome();
   // Defer expensive HTML→MD conversion (full normalize + turndown) until idle.
   if (state.flushTimer) window.clearTimeout(state.flushTimer);
   state.flushTimer = window.setTimeout(() => {
     flushInline();
   }, 700);
+}
+
+function ensureSelectionInEditor() {
+  const root = inlineEditorEl();
+  const sel = window.getSelection();
+  if (!sel || sel.rangeCount === 0) return;
+  const anchor = sel.anchorNode;
+  if (anchor && root.contains(anchor)) return;
+  root.focus();
+  const last = root.lastChild;
+  if (!last) return;
+  const r = document.createRange();
+  if (last.nodeType === Node.TEXT_NODE) {
+    r.setStart(last, (last as Text).length);
+  } else {
+    r.setStartAfter(last);
+  }
+  r.collapse(true);
+  sel.removeAllRanges();
+  sel.addRange(r);
 }
 
 export function normalizeInlineDOM() {

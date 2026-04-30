@@ -65,6 +65,7 @@ test.describe("Rust invoke_handler 命令注册校验", () => {
   const expectedCommands = [
     "choose_aimd_file",
     "choose_markdown_file",
+    "choose_doc_file",
     "choose_image_file",
     "choose_save_aimd_file",
     "confirm_discard_changes",
@@ -86,6 +87,7 @@ test.describe("Rust invoke_handler 命令注册校验", () => {
     "convert_md_to_draft",
     "save_markdown",
     "confirm_upgrade_to_aimd",
+    "open_in_new_window",
   ];
 
   test("lib.rs 包含 tauri::generate_handler! 宏调用", () => {

@@ -38,12 +38,12 @@ test.describe("Empty state — running outside Tauri", () => {
     expect(trap.errors).toEqual([]);
   });
 
-  test("launchpad exposes new/open/import actions", async ({ page }) => {
+  test("launchpad exposes new/open actions", async ({ page }) => {
     await page.goto("/");
     await expect(page.locator(".brand-mark")).toHaveText("A");
     await expect(page.locator("#empty-new")).toContainText("新建文档");
     await expect(page.locator("#empty-open")).toContainText("打开文件");
-    await expect(page.locator("#empty-import")).toContainText("打开 Markdown");
+    await expect(page.locator("#empty-import")).not.toBeAttached();
   });
 
   test("status pill is in idle tone on first paint", async ({ page }) => {

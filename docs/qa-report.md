@@ -1,331 +1,378 @@
-# QA 报告 — 第 5 轮 (2026-04-29)
+# QA 报告 — 第 7 轮 (2026-04-30)
 
-> 本轮触发原因：用户报告四个新 bug（行内代码按钮嵌套+光标飞出、链接按钮无反应回归、H1/H2/H3 Enter 不分割文本、工具栏无 hover 提示）。
-> 沿用 BUG 编号从 BUG-012 起。
+> 本轮触发原因：用户验收第 6 轮交付时发现 3 个回归 / 未达预期：
+> 1) 保存按钮在保存后**仍然没有灰掉**（第 6 轮的 fix 不完整）
+> 2) YAML frontmatter "只展示了 tag，没有内容"，且**位置在标题上方而非下方**
+> 3) 多窗口"按钮 + 快捷键"方向理解错了，用户要的是 **Finder 双击多个 .aimd 自动开多个窗口**
+> BUG 编号从 BUG-022 起；其中 BUG-022/023/024 是第 6 轮回归。
 
 ---
 
 ## 摘要
 
-- e2e: **172 passed / 4 failed**（新增 spec 27/28/29，其中 4 个用例稳定复现 bug）
-- typecheck: PASS
-- build:web: PASS（60.97 kB JS / 23.16 kB CSS）
-- go vet: PASS
-- go build: PASS
-- **P0 阻塞: 0 | P1 严重: 3 | P2 一般: 1 | P3 优化: 0**
+- **P0 阻塞: 1**（BUG-022 保存按钮，破坏核心保存语义）
+- **P1 严重: 2**（BUG-023 YAML 渲染位置 + 内容缺失，BUG-024 多窗口 Finder 行为）
+- 本轮**不跑** e2e（用户已经手测确认问题，让 dev agent 改完一次性跑构建即可）
 
 ---
 
-## P1（严重——影响核心编辑流程）
+## P0（阻塞——核心保存交互失效）
 
-### [BUG-012] 行内代码按钮 toggle 逻辑错误，重复点击产生多层嵌套 `<code>`
+### [BUG-022] 保存按钮在保存后仍然亮（dirty=false 却 disabled=false）— 第 6 轮 fix 不完整
 
-- **位置**: `apps/desktop-tauri/src/main.ts:1430–1451`（`wrapSelectionInTag` 函数）
-- **发现方式**: e2e spec `e2e/27-inline-code-toggle.spec.ts`，2 个用例稳定失败
-- **严重度**: P1（行内代码是常用格式，嵌套导致字体渐变缩小，视觉异常明显）
-- **现象**:
-  - 第 1 次点击 `<>` 按钮：选中文字被包裹为 `<code>`，正常
-  - 第 2 次点击（预期 unwrap）：产生 `<code><code>...</code></code>` 双层嵌套，字体进一步缩小
-  - 连续点击 5 次后：存在多层嵌套，e2e 断言 `code code count = 1`（期望 `0`），失败
-  - 完整往返测试（wrap -> unwrap）：unwrap 后 `code` 数量为 `2`（期望 `0`），失败
-  - 截图路径：
-    - `test-results/27-inline-code-toggle-Bug--66c26-按钮-5-次：不出现-code-嵌套，光标始终在编辑区-chromium/test-failed-1.png`
-    - `test-results/27-inline-code-toggle-Bug--26ebc-ap、第-2-次-unwrap，最终无-code-残留-chromium/test-failed-1.png`
-- **复现步骤**:
-  1. 打开文档，进入编辑模式
-  2. 选中一段文字
-  3. 点击工具栏 `<>` 按钮（行内代码）→ 文字变为 `<code>` 格式
-  4. 再次选中 code 内文字，再点 `<>` 按钮
-  5. 观察：文字没有 unwrap，反而多了一层 `<code>`，字体变得更小
-  6. 连续重复步骤 4-5，字体持续缩小
-- **根因（精确代码位置）**:
+- **精确根因**: `apps/desktop-tauri/src/document/persist.ts:42–57`（aimd 分支）和 `apps/desktop-tauri/src/document/persist.ts:25–39`（markdown 分支）的 `try / finally` 结构里：
 
   ```typescript
-  // apps/desktop-tauri/src/main.ts:1430-1451
-  function wrapSelectionInTag(tag: string) {
-    const sel = document.getSelection();
-    if (!sel || sel.rangeCount === 0 || sel.isCollapsed) return;
-    const range = sel.getRangeAt(0);
-    // unwrap 检测：只检查 range.commonAncestorContainer.parentElement
-    const parent = range.commonAncestorContainer.parentElement;
-    if (parent && parent.tagName.toLowerCase() === tag) {
-      // ← 这个检测在以下情况下失效：
-      //   当用户重新选中整个 <code> 元素内的内容时，
-      //   range.commonAncestorContainer 可能是 <code> 元素本身（而非其文字子节点），
-      //   此时 .parentElement 是 <code> 的父节点（如 <p>），
-      //   tagName 检测失败 → 进入 wrap 分支 → 再套一层 <code>
-      const text = parent.textContent || "";
-      parent.replaceWith(document.createTextNode(text));
-      return;
-    }
-    const wrapper = document.createElement(tag);
-    try {
-      wrapper.appendChild(range.extractContents());
-      range.insertNode(wrapper);
-      range.selectNodeContents(wrapper);
-      sel.removeAllRanges();
-      sel.addRange(range);
-    } catch {
-      /* ignore selection errors */   // ← 光标飞出后静默忽略，不恢复焦点
-    }
+  setStatus("正在保存", "loading");
+  saveEl().disabled = true;          // 行 43：保存中禁用按钮，防双击
+  try {
+    const doc = await invoke<AimdDocument>("save_aimd", { ... });
+    applyDocument({ ...doc, isDraft: false, format: "aimd", dirty: false }, state.mode);
+    // ↑ applyDocument 内部 → updateChrome() → saveEl().disabled = !dirty && !isDraft
+    //   = !false && !false = true ✅ 此时 disabled 已被 updateChrome 正确设为 true
+    rememberOpenedPath(doc.path);
+    setStatus("已保存", "success");
+  } catch (err) {
+    console.error(err);
+    setStatus("保存失败", "warn");
+  } finally {
+    saveEl().disabled = false;       // 行 56：⚠️ 把 updateChrome 设的 disabled=true 又冲回 false！
   }
   ```
 
-  具体问题：
-  1. **unwrap 检测逻辑不健壮**：`range.commonAncestorContainer` 在用户全选 `<code>` 内容时，会是 `<code>` 元素本身（类型 `ELEMENT_NODE`），导致 `.parentElement` 拿到的是 `<p>` 而非 `<code>`，`tagName` 不匹配，直接进 wrap 路径，再套一层。
-  2. **catch 块静默吞错误**：`extractContents` 或 `insertNode` 失败时，光标可能飞出编辑区，`catch { /* ignore */ }` 不做 `inlineEditorEl.focus()` 兜底。
-- **建议修复方向**:
-  - unwrap 检测应同时考虑 `commonAncestorContainer` 本身是否是目标 tag：
-    ```typescript
-    const container = range.commonAncestorContainer;
-    const parent = container.nodeType === Node.ELEMENT_NODE
-      ? container as HTMLElement
-      : (container as Node).parentElement;
-    if (parent && parent.tagName.toLowerCase() === tag) { /* unwrap */ }
-    ```
-  - catch 块改为 `catch { inlineEditorEl.focus(); }` 确保焦点回到编辑区
-- **关联 e2e**: `e2e/27-inline-code-toggle.spec.ts`（2/3 用例失败）
+  第 6 轮的 fix 给 `applyDocument` 调用点加了 `dirty: false`，让 `updateChrome` 内部计算出 `disabled=true` —— 但**紧接着 `finally` 块又执行 `saveEl().disabled = false`**，把按钮强行点亮。markdown 分支（行 25–39）有完全相同的 bug。
+
+- **修复方向（推荐）**:
+  - 删掉 `finally { saveEl().disabled = false; }` 两处，改为 `finally { updateChrome(); }`，让按钮状态完全由 state 驱动（已是单一真源）。
+  - **同样的检查**也要做：`saveDocumentAs`（persist.ts:71, 92）的 `saveAsEl().disabled = true / finally { saveAsEl().disabled = false }` —— 这个其实没问题（saveAs 永远 enabled when has doc，不靠 dirty），但为了一致性建议同样改成 `finally { updateChrome(); }`。
+- **验证步骤**（dev agent 自查时必跑）:
+  1. 启动 app，打开任意 .aimd 文件 → 立即看顶栏「保存」按钮 → **应是灰色** disabled
+  2. 进入编辑模式，按 ⌘B 改一下文字 → **应变橙色** enabled
+  3. 按 ⌘S 保存 → 保存完成后 → **应立即变回灰色** disabled
+  4. 这三步任一不符 → fix 不完整，继续查
+- **架构提醒**: 这是单一真源原则（state.doc.dirty + state.doc.isDraft → updateChrome → DOM）破坏的典型例子。直接操作 `saveEl().disabled` 必须以 state 为准，不能在 finally 里盲设 false。
 
 ---
 
-### [BUG-013] 链接按钮在 Tauri/WKWebView 下完全无响应（`window.prompt` 被静默吞掉）
+## P1（严重——影响阅读观感和多文档工作流）
 
-- **位置**: `apps/desktop-tauri/src/main.ts:1296`（`runFormatCommand` link case）
-- **发现方式**: 用户实测 + 静态代码走查（与同文件第 1705-1706 行注释的已知问题一致）
-- **严重度**: P1（链接功能在真实 Tauri 应用里完全不工作）
-- **现象**:
-  - 在 Tauri macOS 应用（WKWebView）内，点击工具栏链接按钮（`<>`旁的链条图标），**完全没有任何视觉反馈**——既不弹 prompt，也不创建链接
-  - Playwright Chromium e2e（`e2e/28-link-button-regression.spec.ts`）4/4 用例全部通过，说明在 Chromium 里按钮逻辑正确，但 Tauri WebView 环境下行为不同
-  - 对比：同一个文件第 1705 行已有注释："Tauri 2 webview 默认吞掉 `window.confirm()`（无 UI、悄悄返回 false）"，链接按钮使用的 `window.prompt()` 同样受此影响
-- **根因（精确代码位置）**:
+### [BUG-023] YAML frontmatter "只展示了 tag 没有内容" + 位置应该在标题下方
 
-  ```typescript
-  // apps/desktop-tauri/src/main.ts:1296
-  const url = window.prompt("链接地址（http/https）", "https://");
+- **位置**:
+  - `internal/render/html.go:21–50`（`Markdown` 函数 —— 当前把 frontmatter 卡片**前置**到整个 body 之前）
+  - `internal/mdx/frontmatter.go:61–141`（`RenderFrontmatterHTML` + `parseSimpleYAML` —— parser 当前对 block scalar `|` `>` 和 flow-style 数组 `[a, b]` 处理不完善）
+- **现象（用户原话）**:
+  > YAML frontmatter这个**只展示了 tag，没有内容**，另外 YAML frontmatter 应该用一种优雅的样式**展示在标题下面，而不是上面**
+
+- **拆成两个子问题独立修**:
+
+  #### 23a. 渲染位置：从"标题上方"改为"H1 标题下方"
+  
+  当前 `html.go:46–48`：
+  ```go
+  out := buf.Bytes()
+  if hasFM {
+      out = append(mdx.RenderFrontmatterHTML(fm), out...)  // ← 前置到全文档头
+  }
   ```
-
-  Tauri 2 的 WKWebView（macOS）和 WebView2（Windows）默认屏蔽了 `window.alert()`、`window.confirm()`、`window.prompt()` 等浏览器原生对话框。调用 `window.prompt()` 时：
-  - 不弹出任何 UI
-  - 立即同步返回 `null`
-  - `if (url && url.trim())` 判断为 `false`，整个链接创建逻辑被跳过
-  - 用户看到"点击没有任何反应"
-
-  代码中 `ensureCanDiscardChanges` 函数（第 1708 行）已经意识到这个问题并用 `invoke("confirm_discard_changes")` 走 Rust 原生对话框来绕过。链接按钮是遗漏的同类问题。
-- **复现步骤**（需真实 Tauri 应用）:
-  1. 启动 AIMD Desktop（macOS Tauri 版本）
-  2. 打开任意文档，进入编辑模式
-  3. 选中一段文字
-  4. 点击工具栏"链接"按钮
-  5. 观察：**无任何反应**（无 prompt，无链接，无错误）
-- **建议修复方向**:
-  - 方案 A（快速）：用自定义内联输入浮层替代 `window.prompt()`，避免依赖被 WebView 屏蔽的原生对话框。参照 launchpad 已有的模态 UI 模式实现一个轻量链接输入框。
-  - 方案 B（与 `confirm_discard_changes` 对齐）：在 Rust 侧新增 `prompt_link_url` 命令，通过 Tauri 的 dialog 插件弹出原生输入框，JS 端通过 `invoke` 调用。
-  - 方案 C（应急）：如果 Tauri 配置允许，在 `tauri.conf.json` 的 `security.capabilities` 里重新启用 `window.prompt`（Tauri 2 某些版本可通过配置恢复）
-- **关联 e2e**:
-  - `e2e/24-link-button-bug.spec.ts`（Chromium 下 4/4 通过）
-  - `e2e/28-link-button-regression.spec.ts`（Chromium 下 4/4 通过；Tauri WebView 无法用 Chromium e2e 覆盖）
-
----
-
-### [BUG-014] H1/H2/H3 中间按 Enter 不分割文本，光标后内容留在 heading 内
-
-- **位置**: `apps/desktop-tauri/src/main.ts:1161–1177`（`onInlineKeydown` 函数的 Enter 处理）
-- **发现方式**: e2e spec `e2e/29-heading-enter-split.spec.ts`，2 个用例稳定失败
-- **严重度**: P1（基础编辑操作，用户在 heading 中间按 Enter 期望分段，但内容没有分割）
-- **现象**:
-  - 在 H1 "Hello World" 中，把光标放在 "World" 之前，按 Enter
-  - **期望**：H1 = "Hello "，新段落 `<p>` = "World"
-  - **实际（bug）**：H1 仍然 = "Hello World"，新段落是空的（只有 `<br>`），"World" 留在 H1 内
-  - e2e 失败错误：`H1 不应包含 "World"，当前 H1 文本："Hello World"`
-  - H2/H3 同样受影响（测试确认）
-  - 截图路径：`test-results/29-heading-enter-split-Bug-67ba2-Enter：光标前内容留在-H1，光标后内容移到新-p-chromium/test-failed-1.png`（截图可见：H1 完整，下方是空段落，光标在空段落里）
-- **复现步骤**:
-  1. 打开文档，进入编辑模式
-  2. 确保编辑区有一个 H1 标题，如 "Hello World"
-  3. 把光标放到 "World" 之前（即 H1 文字中间）
-  4. 按 Enter
-  5. 观察：H1 仍然是 "Hello World"，其后新增了一个空段落，而 "World" 没有被移到新段落
-- **根因（精确代码位置）**:
-
-  ```typescript
-  // apps/desktop-tauri/src/main.ts:1161-1177
-  function onInlineKeydown(event: KeyboardEvent) {
-    if (event.key === "Enter" && !event.shiftKey) {
-      const sel = document.getSelection();
-      if (sel && sel.rangeCount > 0) {
-        const range = sel.getRangeAt(0);
-        const block = closestBlock(range.startContainer);
-        if (block && /^H[1-6]$/.test(block.tagName)) {
-          event.preventDefault();
-          const p = document.createElement("p");
-          p.appendChild(document.createElement("br")); // ← 新段落直接是空的
-          block.after(p);                              // ← 插到 heading 后面
-          // ↑↑↑ 完全没有提取 range 后面的内容！
-          // 光标在 heading 中间时，range 后的文字（"World"）仍留在 heading 内。
-          // 正确做法：
-          //   1. range.extractContents() 提取光标到 heading 末尾的内容
-          //   2. 将提取的内容放入新的 <p>
-          const r = document.createRange();
-          r.setStart(p, 0);
-          r.collapse(true);
-          sel.removeAllRanges();
-          sel.addRange(r);
-          inlineEditorEl.dispatchEvent(new Event("input"));
-        }
+  
+  期望流程：
+  ```
+  [<h1>标题</h1>]
+  [<section class="aimd-frontmatter">...</section>]   ← 元数据卡片插这里
+  [其余正文]
+  ```
+  
+  **修复**：
+  ```go
+  out := buf.Bytes()
+  if hasFM {
+      card := mdx.RenderFrontmatterHTML(fm)
+      // 找首个 </h1>，插在它之后；找不到就 fallback 到前置
+      if idx := bytes.Index(out, []byte("</h1>")); idx >= 0 {
+          insertAt := idx + len("</h1>")
+          merged := make([]byte, 0, len(out)+len(card)+1)
+          merged = append(merged, out[:insertAt]...)
+          merged = append(merged, '\n')
+          merged = append(merged, card...)
+          merged = append(merged, out[insertAt:]...)
+          out = merged
+      } else {
+          out = append(card, out...)
       }
-    }
-  ```
-
-  关键缺失：代码在 `event.preventDefault()` 之后直接创建空 `<p>`，没有用 `range.setEnd(block, block.childNodes.length)` 扩展 range 到 heading 末尾，然后 `range.extractContents()` 把光标后的内容移入新段落。
-- **建议修复方向**:
-
-  ```typescript
-  // 伪代码——提取光标到 heading 末尾的内容
-  event.preventDefault();
-  // 1. 扩展 range 到 heading 末尾，提取光标后的内容
-  const afterRange = range.cloneRange();
-  afterRange.setEnd(block, block.childNodes.length);
-  const fragment = afterRange.extractContents();
-  // 2. 创建新段落，把提取到的内容放进去
-  const p = document.createElement("p");
-  if (fragment.textContent) {
-    p.appendChild(fragment);
-  } else {
-    p.appendChild(document.createElement("br")); // 末尾 Enter 时 fragment 为空
   }
-  block.after(p);
-  // 3. 光标移到新段落开头
-  const r = document.createRange();
-  r.setStart(p, 0);
-  r.collapse(true);
-  sel.removeAllRanges();
-  sel.addRange(r);
-  inlineEditorEl.dispatchEvent(new Event("input"));
   ```
-- **关联 e2e**: `e2e/29-heading-enter-split.spec.ts`（4 个用例中 2 个失败：H1 中间和 H2 中间；末尾和开头行为合理通过）
+  
+  注意 `bytes.Index` 找的是 ASCII "</h1>" 子串，goldmark 输出大概率是 `<h1 id="...">...</h1>`，闭合 tag 是固定的 `</h1>`，匹配没问题。
+
+  #### 23b. Parser "只展示了 tag 没有内容" 调研 + 增强
+  
+  用户原话歧义：可能是
+  - **解释 A**："只展示了 tag 字段（标签字段），其他字段（title/date 等）都没了" → parser 漏字段
+  - **解释 B**："标签（dt/key 部分）展示了，内容（dd/value 部分）是空的" → value 解析失败
+  
+  让 dev agent 先**写一个测试**再决定修哪里。新建 `internal/mdx/frontmatter_test.go`：
+  
+  ```go
+  package mdx
+  
+  import "testing"
+  
+  func TestExtractFrontmatter_basic(t *testing.T) {
+      src := []byte("---\ntitle: Test\ntags:\n  - foo\n  - bar\ndate: 2026-01-01\n---\n\n# Body\n")
+      fm, body, ok := ExtractFrontmatter(src)
+      if !ok { t.Fatal("expected frontmatter") }
+      if string(body) != "# Body\n" { t.Errorf("body=%q", body) }
+      if !bytes.Contains(fm, []byte("title: Test")) { t.Errorf("missing title") }
+  }
+  
+  func TestRenderFrontmatterHTML_simpleKeys(t *testing.T) {
+      fm := []byte("title: 测试\ndate: 2026-04-30\ntags:\n  - alpha\n  - beta\n")
+      html := string(RenderFrontmatterHTML(fm))
+      // 必须包含三个 dt 和三个 dd
+      for _, want := range []string{"<dt>title</dt>", "<dd>测试</dd>",
+                                    "<dt>date</dt>", "<dd>2026-04-30</dd>",
+                                    "<dt>tags</dt>", "<dd>alpha, beta</dd>"} {
+          if !strings.Contains(html, want) {
+              t.Errorf("missing %s in:\n%s", want, html)
+          }
+      }
+  }
+  
+  func TestRenderFrontmatterHTML_blockScalar(t *testing.T) {
+      // 当前 parser 对 "|" / ">" 块标量不支持，验证 fallback
+      fm := []byte("description: |\n  Line 1\n  Line 2\n")
+      html := string(RenderFrontmatterHTML(fm))
+      // 至少不应该把 "|" 当成 value 字面量原样输出
+      if strings.Contains(html, "<dd>|</dd>") {
+          t.Errorf("block scalar | leaked literally as value: %s", html)
+      }
+  }
+  
+  func TestRenderFrontmatterHTML_flowArray(t *testing.T) {
+      // tags: [foo, bar] flow-style
+      fm := []byte("tags: [foo, bar]\n")
+      html := string(RenderFrontmatterHTML(fm))
+      // 期望解析成 "foo, bar" 而非字面 "[foo, bar]"
+      if !strings.Contains(html, "<dd>foo, bar</dd>") &&
+         !strings.Contains(html, "<dd>[foo, bar]</dd>") {
+          t.Errorf("flow array not handled at all: %s", html)
+      }
+      // 至少有 dd
+      if !strings.Contains(html, "<dt>tags</dt>") {
+          t.Errorf("missing tags dt: %s", html)
+      }
+  }
+  ```
+  
+  跑一次 `go test ./internal/mdx -v -run Frontmatter`。哪些测试 fail，就动 parser 修哪个 case。
+  
+  **Parser 增强建议**（按需补齐 parseSimpleYAML）:
+  - **块标量** `key: |` / `key: >`：value 是 "|" 或 ">" 时，吃后续缩进行（前缀至少 2 空格），把它们 join 成 value（`|` 用 \n、`>` 用空格）。
+  - **flow array** `key: [a, b, c]`：value 以 `[` 开头、`]` 结尾时，去掉中括号，按 `,` split，trim 每项，join 成 `"a, b, c"`。
+  - 其他保持不变；解析不动的 fallback 到现在的 `<pre><code>原文</code></pre>`。
+
+- **CSS 复核**: `apps/desktop-tauri/src/styles.css:1646–1680` 的 `.aimd-frontmatter` 卡片样式整体 OK，但**新位置**（H1 下方）的 `margin-top` 需要加一点（比如 `margin-top: 8px`），让卡片与 H1 视觉上有清晰间距而非粘住。
+- **不动的部分**: turndown 回写（编辑模式 → markdown 时保留 frontmatter）—— 第 6 轮已记为下一轮 TODO，本轮**继续暂不做**。但要确保现状不会更糟：在编辑模式下展示的 inline-editor 里**不要**显示 frontmatter section（用户编辑时看到元数据卡片，turndown 回去时变成奇怪 markdown 会更糟）。
+  - 简单兜底：`apply.ts:applyDocument` / `outline.ts:applyHTML` 在向 `inlineEditorEl` 注入 HTML 前，先用 `tmp.querySelectorAll(".aimd-frontmatter").forEach(el => el.remove())` 摘掉 frontmatter section。reader 和 preview 不动。
 
 ---
 
-## P2（一般——影响体验但不阻断流程）
+### [BUG-024] 多窗口：用户要的是 Finder 双击多个 .aimd 自动开多个窗口（不是按钮）
 
-### [BUG-015] 工具栏按钮的 `title` tooltip 在 Tauri WebView 下不显示
+- **现状**:
+  - 第 6 轮加了 `#new-window` 按钮 + ⌘⇧N 快捷键（`apps/desktop-tauri/src/main.ts:56–58, lib.rs:495 windows::open_in_new_window`）—— 这个保留，**不删**。
+  - 但**真正核心场景**没修：用户在 Finder 里选中多个 .aimd 双击 → 当前行为是所有文件 emit `aimd-open-file` 给所有已存在窗口，最后一个文件 win，前面的被覆盖；或者所有文件全部"打架"覆盖单个 main 窗口。
+- **位置**: `apps/desktop-tauri/src-tauri/src/lib.rs:500–516`（`RunEvent::Opened` 处理）
+  ```rust
+  app.run(|app_handle, event| {
+      if let RunEvent::Opened { urls } = event {
+          for url in urls {
+              if let Ok(path) = url.to_file_path() {
+                  if is_supported_doc_extension(&path) {
+                      let path = path.to_string_lossy().to_string();
+                      if let Some(pending) = app_handle.try_state::<PendingOpenPaths>() {
+                          if let Ok(mut paths) = pending.0.lock() {
+                              paths.push(path.clone());
+                          }
+                      }
+                      let _ = app_handle.emit("aimd-open-file", path);  // ← 广播给所有窗口
+                  }
+              }
+          }
+      }
+  });
+  ```
 
-- **位置**: `apps/desktop-tauri/src/main.ts:276–297`（工具栏按钮 HTML），`apps/desktop-tauri/src/styles.css:1300–1318`（`.ft-btn` 样式）
-- **发现方式**: 静态代码走查 + 用户反馈
-- **严重度**: P2（tooltip 缺失不阻断操作，但影响可发现性，对新用户尤其明显）
-- **现象**:
-  - 鼠标悬浮在工具栏按钮上：
-    - **CSS hover 效果**：存在（`.ft-btn:hover:not(:disabled)` 定义了背景色 + 阴影，代码第 1314 行）
-    - **原生 tooltip**：所有按钮都有 `title=""` 属性（如 `title="粗体 (⌘B)"`），但在 Tauri WebView（WKWebView/WebView2）里，浏览器不渲染 `title` attribute 产生的悬浮提示框
-  - 用户看到 hover 时按钮背景变亮，但无文字说明（不知道按钮功能）
-- **技术背景**:
-  - 原生浏览器（Chrome/Firefox/Safari）会在元素有 `title` 属性时，悬停约 500ms 后显示浏览器内置 tooltip。Tauri 的 WebView 嵌入模式下，这个 tooltip 渲染由宿主 OS 控制，在 macOS WKWebView 里通常**不显示**。
-  - 这不是代码 bug，而是 WebView 平台限制。
-- **已有状态**:
-  - 所有 11 个工具栏按钮均已有 `title` 属性（覆盖完整）
-  - CSS hover 状态已定义（背景 + 阴影 + 颜色变化）
-  - 缺少的是在 WebView 内可见的自定义 tooltip（CSS/JS 实现）
-- **建议修复方向**:
-  - 方案 A：用 CSS `::after` + `attr(title)` 实现纯 CSS tooltip，鼠标悬停延迟显示
-  - 方案 B：用 JS 监听 `mouseenter`/`mouseleave`，动态创建 tooltip DOM 节点
-  - 无需修改按钮 HTML（`title` 属性已齐全，可供 JS/CSS 读取）
-- **关联 e2e**: 无（tooltip 显示为纯视觉，需手动验证或截图对比）
+- **修复方向（推荐）**:
+
+  分场景处理：
+  - **冷启动 + 多文件**（app 没在跑，用户 Finder 选 3 个 .aimd 双击）：第 1 个文件交给主窗口（走原 `initial_open_path` 通道），剩下 2 个开新窗口
+  - **热启动**（app 已经在跑，用户再双击新文件）：永远开新窗口，**不要**广播 emit 给已有窗口
+
+  实现：
+  1. **新增静态原子标志** `MAIN_INITIALIZED: AtomicBool`，在 `initial_open_path` 命令首次被调用时置 `true`（说明主窗口至少完成了一次 bootstrap）。
+  2. **改造 `RunEvent::Opened`**：
+     ```rust
+     use std::sync::atomic::{AtomicBool, Ordering};
+     static MAIN_INITIALIZED: AtomicBool = AtomicBool::new(false);
+
+     // 顶层文件 import 区不变，下面是 app.run 里的新逻辑
+     app.run(move |app_handle, event| {
+         if let RunEvent::Opened { urls } = event {
+             let mut consumed_main = false;
+             for url in urls {
+                 if let Ok(path) = url.to_file_path() {
+                     if !is_supported_doc_extension(&path) { continue; }
+                     let path_str = path.to_string_lossy().to_string();
+
+                     // 主窗口尚未 bootstrap：第一份文件走 PendingOpenPaths（被
+                     // initial_open_path 取走），其余文件开新窗口
+                     if !MAIN_INITIALIZED.load(Ordering::SeqCst) && !consumed_main {
+                         if let Some(p) = app_handle.try_state::<PendingOpenPaths>() {
+                             if let Ok(mut paths) = p.0.lock() {
+                                 paths.push(path_str.clone());
+                             }
+                         }
+                         consumed_main = true;
+                         continue;
+                     }
+
+                     // 热路径：每个文件单开新窗口
+                     let h = app_handle.clone();
+                     let p = path_str.clone();
+                     tauri::async_runtime::spawn(async move {
+                         let _ = windows::open_in_new_window(h, Some(p)).await;
+                     });
+                 }
+             }
+         }
+     });
+     ```
+  3. **改 `initial_open_path`**：
+     ```rust
+     #[tauri::command]
+     fn initial_open_path(pending: State<'_, PendingOpenPaths>) -> Option<String> {
+         let result = if let Some(path) = std::env::args()
+             .skip(1)
+             .find(|arg| is_supported_doc_extension(std::path::Path::new(arg))) {
+             Some(path)
+         } else {
+             pending.0.lock().ok().and_then(|mut p| p.pop())
+         };
+         MAIN_INITIALIZED.store(true, Ordering::SeqCst);
+         result
+     }
+     ```
+
+- **新窗口 emit 的 race condition 问题**（一并修）:
+
+  `windows.rs:open_in_new_window` 当前在 `WebviewWindowBuilder::build()` 之后立刻 `window.emit("aimd-open-file", p)`。但新窗口的 JS / `listen("aimd-open-file")` 注册要等 DOMContentLoaded 之后才存在 —— **emit 大概率在 listener 之前发出，被丢失**。第 6 轮的"按钮 → 新窗口"测试因为按钮场景没传 path，没暴露这个 race。Finder 双击场景每次都传 path，必现。
+
+  **修复方向**: 改成"per-window pending map"：
+  ```rust
+  use std::collections::HashMap;
+  
+  #[derive(Default)]
+  pub struct WindowPending(pub Mutex<HashMap<String, String>>);
+  
+  pub async fn open_in_new_window(app: AppHandle, path: Option<String>) -> Result<(), String> {
+      let nanos = ...;
+      let label = format!("doc-{}", nanos);
+      // 先把 path 存到 per-window pending（如果有），让新窗口的 initial_open_path 取走
+      if let Some(p) = path {
+          if let Some(wp) = app.try_state::<WindowPending>() {
+              if let Ok(mut map) = wp.0.lock() {
+                  map.insert(label.clone(), p);
+              }
+          }
+      }
+      WebviewWindowBuilder::new(...).build().map_err(|e| e.to_string())?;
+      Ok(())
+  }
+  ```
+  
+  然后 `initial_open_path` 同时检查 per-window 和 global pending：
+  ```rust
+  #[tauri::command]
+  fn initial_open_path(
+      window: tauri::Window,
+      pending: State<'_, PendingOpenPaths>,
+      wp: State<'_, WindowPending>,
+  ) -> Option<String> {
+      let label = window.label().to_string();
+      // 1. per-window pending（新窗口走这条）
+      if let Ok(mut map) = wp.0.lock() {
+          if let Some(p) = map.remove(&label) {
+              MAIN_INITIALIZED.store(true, Ordering::SeqCst);
+              return Some(p);
+          }
+      }
+      // 2. main 窗口才检查 argv + global pending
+      let result = if label == "main" {
+          if let Some(path) = std::env::args().skip(1).find(...) {
+              Some(path)
+          } else {
+              pending.0.lock().ok().and_then(|mut p| p.pop())
+          }
+      } else { None };
+      MAIN_INITIALIZED.store(true, Ordering::SeqCst);
+      result
+  }
+  ```
+  
+  并在 `tauri::Builder::default()` 的链上加 `.manage(WindowPending::default())`（lib.rs 大概第 466 行附近）。
+
+- **验证步骤**:
+  1. App 不在跑 → Finder 选 3 个 .aimd 双击 → 应弹出 3 个独立窗口，每个加载对应文件
+  2. App 在跑（已开 1 个文档）→ 双击新 .aimd → 新窗口开起来，原窗口不变
+  3. ⌘⇧N 新窗口按钮（第 6 轮加的）依然能用，新窗口启动时不带文档进入 launchpad
+  4. ⌘O 在新窗口里能开文档，与 main 窗口完全独立
+- **架构提醒**:
+  - `MAIN_INITIALIZED` 用 `AtomicBool` 静态，不要塞进 PendingOpenPaths 那个 Mutex（避免锁竞争）
+  - `WindowPending` 抽到 `windows.rs` 里定义并 `pub` 导出，`lib.rs` 只 `mod windows;` 引用
+  - `lib.rs` 当前 642 行，本轮净增 < 30 行（命令函数新增 `tauri::Window` 参数 + 静态 atomic）。windows.rs 净增 < 30 行（WindowPending struct + map insert）。
 
 ---
 
-## Beta 清单更新
+## 共性架构守则（继承第 6 轮）
 
-（在第 4 轮基础上更新）
-
-| 状态 | 项目 |
-|------|------|
-| [ ] | 双击 `.aimd` 文件打开（macOS file association）— 手动 |
-| [~] | 通过 `⌘O` 打开 |
-| [x] | 通过侧栏底部"打开 AIMD 文件"按钮打开 |
-| [x] | 阅读模式正确渲染 markdown |
-| [x] | 粗体 / 斜体 / 删除线 |
-| [x] | H1 / H2 / H3 / 正文（切换） |
-| [x] | 无序列表 / 有序列表 / 引用 |
-| [ ] | **行内代码 `<>` 按钮** — BUG-012 (P1)，重复点击产生嵌套 `<code>`，e2e 稳定失败 |
-| [ ] | **链接按钮** — BUG-013 (P1)，WKWebView 下 `window.prompt` 被屏蔽，点击无任何反应 |
-| [ ] | **H1/H2/H3 内按 Enter 分段** — BUG-014 (P1)，光标后内容不分割，e2e 稳定失败 |
-| [x] | 源码模式 textarea + 实时预览同步 |
-| [x] | 三种模式互相切换不丢数据 |
-| [x] | `⌘S` 保存 |
-| [~] | 保存后 dirty 标记复位 |
-| [x] | 插入图片正确写入 `asset://` 引用 |
-| [x] | 大纲自动从渲染态提取 |
-| [x] | 大纲点击滚动到对应标题 |
-| [~] | 资源段显示嵌入图片缩略图 |
-| [x] | 文档↔大纲、大纲↔资源 之间的拖动手柄可用 |
-| [x] | 状态指示器颜色正确 |
-| [x] | dirty 状态同步显示 |
-| [~] | 中文 IME 输入正常 |
-| [~] | 路径含空格 / 中文 正常打开保存 |
-| [ ] | 大文件（10MB+）打开不卡死 |
-| [x] | 极小窗口（< 760px）布局不破 |
-| [x] | 粘贴恶意 HTML 被 sanitize |
-| [x] | typecheck 干净 |
-| [x] | build:web 干净 |
-| [x] | go vet 干净 |
-| [x] | go build 干净 |
-| [ ] | **工具栏按钮 tooltip 可见** — BUG-015 (P2)，WKWebView 不渲染 `title` 属性浮窗 |
-| [ ] | **新建文档后编辑器自动获得焦点** — BUG-008 (P1)（上轮残留）|
-| [ ] | .dmg 拖入 /Applications 后可冷启动 — 手动 |
+1. **不要把 main.ts / chrome.ts / lib.rs 写长**。
+2. **state 是单一真源**：DOM 属性（特别是 `disabled`）由 `updateChrome()` 单点设置，业务函数不要在 finally 里盲设。
+3. **测试驱动**：BUG-023b 必须先写 frontmatter_test.go，看哪个 test fail 再改 parser。
+4. 改完一次性跑：
+   ```bash
+   cd apps/desktop-tauri && npm run typecheck && npm run build:web
+   cd ../.. && go vet ./... && go test ./internal/aimd ./internal/mdx
+   ```
+   全过再写 dev-report；e2e 不强求。
 
 ---
 
-## 本轮新增 vs 上轮残留
+## 测试用素材
 
-- **新增**: BUG-012 (P1), BUG-013 (P1), BUG-014 (P1), BUG-015 (P2)
-- **已修复**: 无（本轮为排查，未修 bug）
-- **仍残留（上轮）**: BUG-008 (P1，新建文档焦点问题）
-- **上轮 BUG-009 状态说明**: 用户本轮反馈链接按钮"点击没有任何反应"——比 BUG-009 描述的"selection 丢失"更严重。经查，根因是 `window.prompt` 在 WKWebView 下被完全屏蔽（静默返回 null），BUG-009 的 `cloneRange` 修复方案仍然正确但不够——即使恢复了 selection，prompt 根本不弹出，createLink 永远不执行。本轮登记为 BUG-013，建议同时处理。
-- **新增 e2e 覆盖**:
-  - `e2e/27-inline-code-toggle.spec.ts` — 行内代码嵌套 + toggle（2/3 用例失败，复现 BUG-012）
-  - `e2e/28-link-button-regression.spec.ts` — 链接按钮 prompt 触发回归（Chromium 下 4/4 通过，确认 Chromium 无问题；Tauri 特定问题需真机验证）
-  - `e2e/29-heading-enter-split.spec.ts` — H1/H2/H3 Enter 分割文本（2/4 用例失败，复现 BUG-014）
-
----
-
-## e2e 结果汇总
+YAML frontmatter 阅读模式手测样本（写到 `/tmp/test-fm.md` 临时文件）:
 
 ```
-172 passed / 4 failed（1 worker，约 2.8 分钟）
+---
+title: 测试文档
+date: 2026-04-30
+author: 测试用户
+tags:
+  - alpha
+  - beta
+  - gamma
+draft: true
+---
 
-失败列表：
+# 主标题
 
-[FAIL] e2e/27-inline-code-toggle.spec.ts:124 — 连续点击 code 按钮 5 次：不出现 code 嵌套，光标始终在编辑区
-       Error: expect(1).toBe(0)  — 第 2 次点击后出现 code code 嵌套
-
-[FAIL] e2e/27-inline-code-toggle.spec.ts:163 — 第 1 次 wrap、第 2 次 unwrap，最终无 code 残留
-       Error: expect(2).toBe(0)  — 点 2 次后仍有 2 个 code 标签（应为 0）
-
-[FAIL] e2e/29-heading-enter-split.spec.ts:91 — H1 中间按 Enter：光标前内容留在 H1，光标后内容移到新 p
-       Error: H1 不应包含 "World"，当前 H1 文本："Hello World"
-
-[FAIL] e2e/29-heading-enter-split.spec.ts:175 — H2 中间按 Enter：文本被分割到新段落
-       Error: H2 不应包含 "Heading"，当前："Second Heading"
+正文第一段。元数据卡片应该出现在这一段**之前、主标题之后**。
 ```
 
----
+期望阅读模式渲染顺序：
+1. `<h1>主标题</h1>`
+2. `<section class="aimd-frontmatter"><dl>` 含 5 个 dt/dd 配对（title/date/author/tags/draft）
+3. `<p>正文第一段...</p>`
 
-## 静态检查结果
-
-| 检查项 | 结果 |
-|--------|------|
-| `tsc --noEmit` | PASS |
-| `npm run build:web` | PASS（vite 131ms，60.97 kB JS）|
-| `go vet ./...` | PASS（无输出）|
-| `go build ./...` | PASS（无输出）|
-
----
-
-## Bug 根因速查表
-
-| BUG | 文件:行 | 类型 | e2e 状态 |
-|-----|---------|------|---------|
-| BUG-012 | `main.ts:1435` `wrapSelectionInTag` | `commonAncestorContainer` 判断不含 ELEMENT_NODE 的自身检测 | 2 用例红 |
-| BUG-013 | `main.ts:1296` `window.prompt(...)` | WKWebView 屏蔽原生 dialog，调用静默返回 null | Chromium 绿，Tauri 无法 e2e |
-| BUG-014 | `main.ts:1168-1170` heading Enter handler | 没有 `range.extractContents()` 提取光标后内容，直接插空 `<p>` | 2 用例红 |
-| BUG-015 | `main.ts:276-297` `title` 属性 | WKWebView 不渲染 `title` 浮窗，需自定义 CSS/JS tooltip | 纯视觉，无 e2e |
+5 个字段都应可见且每个字段都有内容（除非 YAML 里值就是空）。

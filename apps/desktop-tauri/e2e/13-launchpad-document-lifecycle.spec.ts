@@ -45,6 +45,7 @@ async function installTauriMock(
     const handlers: Record<string, (a: Args) => unknown> = {
       initial_open_path: () => s.initialPath,
       choose_aimd_file: () => "/mock/sample.aimd",
+      choose_doc_file: () => "/mock/sample.aimd",
       choose_markdown_file: () => "/mock/report.md",
       choose_image_file: () => null,
       choose_save_aimd_file: (a) => `/mock/${String((a as any)?.suggestedName ?? "untitled.aimd")}`,
@@ -242,7 +243,13 @@ test.describe("Launchpad and document lifecycle", () => {
     await installTauriMock(page);
     await page.goto("/");
 
-    await page.locator("#empty-import").click();
+    // Override choose_doc_file to return a .md path so routeOpenedPath goes through openMarkdownDocument.
+    await page.evaluate(() => {
+      const orig = (window as any).__TAURI_INTERNALS__.invoke;
+      (window as any).__TAURI_INTERNALS__.invoke = async (cmd: string, a: unknown) =>
+        cmd === "choose_doc_file" ? "/mock/report.md" : orig(cmd, a);
+    });
+    await page.locator("#empty-open").click();
 
     await expect(page.locator("#doc-title")).toHaveText("report");
     await expect(page.locator("#reader h1")).toHaveText("report");

@@ -87,10 +87,6 @@ export const APP_HTML = `
               <span class="secondary-btn-icon">${ICONS.folder}</span>
               <span>打开</span>
             </button>
-            <button id="head-import" class="secondary-btn" type="button">
-              <span class="secondary-btn-icon">${ICONS.document}</span>
-              <span>打开 Markdown</span>
-            </button>
           </div>
 
           <div class="head-actions" id="doc-actions" hidden>
@@ -109,6 +105,12 @@ export const APP_HTML = `
               </button>
             </div>
 
+            <div class="width-switch" role="tablist">
+              <button id="width-normal" class="mode-btn" role="tab" aria-selected="true" type="button" title="常规宽度" data-width="normal">常规</button>
+              <button id="width-wide"   class="mode-btn" role="tab" aria-selected="false" type="button" title="加宽" data-width="wide">加宽</button>
+              <button id="width-ultra"  class="mode-btn" role="tab" aria-selected="false" type="button" title="超宽" data-width="ultra">超宽</button>
+            </div>
+
             <div class="quick-actions">
               <button id="save" class="primary-btn" type="button" disabled>
                 <span class="primary-btn-icon">${ICONS.save}</span>
@@ -117,6 +119,10 @@ export const APP_HTML = `
               <button id="save-as" class="secondary-btn" type="button" disabled>
                 <span class="secondary-btn-icon">${ICONS.folder}</span>
                 <span>另存为</span>
+              </button>
+              <button id="new-window" class="secondary-btn" type="button" title="新窗口 (⌘⇧N)">
+                <span class="secondary-btn-icon">${ICONS.plus}</span>
+                <span>新窗口</span>
               </button>
               <button id="close" class="secondary-btn" type="button" disabled>
                 <span class="secondary-btn-icon">${ICONS.close}</span>
@@ -179,10 +185,6 @@ export const APP_HTML = `
                 <button id="empty-open" class="secondary-btn lg" type="button">
                   <span class="secondary-btn-icon">${ICONS.folder}</span>
                   <span>打开文件</span>
-                </button>
-                <button id="empty-import" class="secondary-btn lg" type="button">
-                  <span class="secondary-btn-icon">${ICONS.document}</span>
-                  <span>打开 Markdown</span>
                 </button>
               </div>
               <div class="empty-hint">⌘N 新建 · ⌘O 打开 · ⇧⌘S 另存为 · 拖入 .aimd 可直接打开</div>

@@ -29,6 +29,7 @@ async function installLongDocMock(page: Page) {
     const handlers: Record<string, (a: Args) => unknown> = {
       initial_open_path: () => null,
       choose_aimd_file: () => d.path,
+      choose_doc_file: () => d.path,
       choose_image_file: () => null,
       open_aimd: () => d,
       save_aimd: () => ({ ...d, dirty: false }),

@@ -41,7 +41,10 @@ export function applyHTML(html: string) {
   state.paintedVersion.read = state.htmlVersion;
   state.paintedVersion.source = state.htmlVersion;
   if (state.mode === "edit" && state.doc) {
-    inlineEditorEl().innerHTML = renderedHTML;
+    const tmp = document.createElement("div");
+    tmp.innerHTML = renderedHTML;
+    tmp.querySelectorAll(".aimd-frontmatter").forEach((el) => el.remove());
+    inlineEditorEl().innerHTML = tmp.innerHTML;
     tagAssetImages(inlineEditorEl(), state.doc.assets);
     state.paintedVersion.edit = state.htmlVersion;
     state.inlineDirty = false;
@@ -138,7 +141,10 @@ export function paintPaneIfStale(mode: Mode) {
   if (!state.doc) return;
   if (state.paintedVersion[mode] === state.htmlVersion) return;
   if (mode === "edit") {
-    inlineEditorEl().innerHTML = state.doc.html;
+    const tmpEdit = document.createElement("div");
+    tmpEdit.innerHTML = state.doc.html;
+    tmpEdit.querySelectorAll(".aimd-frontmatter").forEach((el) => el.remove());
+    inlineEditorEl().innerHTML = tmpEdit.innerHTML;
     tagAssetImages(inlineEditorEl(), state.doc.assets);
     state.inlineDirty = false;
   } else if (mode === "read") {

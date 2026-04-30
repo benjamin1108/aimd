@@ -34,7 +34,7 @@ export async function saveDocument() {
       console.error(err);
       setStatus("保存失败", "warn");
     } finally {
-      saveEl().disabled = false;
+      updateChrome();
     }
     return;
   }
@@ -46,14 +46,14 @@ export async function saveDocument() {
       path: state.doc.path,
       markdown: state.doc.markdown,
     });
-    applyDocument({ ...doc, isDraft: false, format: "aimd" }, state.mode);
+    applyDocument({ ...doc, isDraft: false, format: "aimd", dirty: false }, state.mode);
     rememberOpenedPath(doc.path);
     setStatus("已保存", "success");
   } catch (err) {
     console.error(err);
     setStatus("保存失败", "warn");
   } finally {
-    saveEl().disabled = false;
+    updateChrome();
   }
 }
 
@@ -77,11 +77,11 @@ export async function saveDocumentAs() {
       title: displayDocTitle(state.doc),
     });
     if (isMarkdownDoc) {
-      applyDocument({ ...doc, isDraft: false, format: "aimd" }, state.mode);
+      applyDocument({ ...doc, isDraft: false, format: "aimd", dirty: false }, state.mode);
       rememberOpenedPath(doc.path);
       setStatus("已转换为 .aimd", "success");
     } else {
-      applyDocument({ ...doc, isDraft: false, format: "aimd" }, state.mode);
+      applyDocument({ ...doc, isDraft: false, format: "aimd", dirty: false }, state.mode);
       rememberOpenedPath(doc.path);
       setStatus(wasDraft ? "文件已创建" : "已另存为", "success");
     }
@@ -89,7 +89,7 @@ export async function saveDocumentAs() {
     console.error(err);
     setStatus("另存为失败", "warn");
   } finally {
-    saveAsEl().disabled = false;
+    updateChrome();
   }
 }
 
@@ -120,7 +120,7 @@ export async function upgradeMarkdownToAimd(): Promise<boolean> {
       markdown: state.doc.markdown,
       title: displayDocTitle(state.doc),
     });
-    applyDocument({ ...doc, isDraft: false, format: "aimd" }, state.mode);
+    applyDocument({ ...doc, isDraft: false, format: "aimd", dirty: false }, state.mode);
     rememberOpenedPath(savePath);
     setStatus("已升级为 .aimd", "success");
     return true;

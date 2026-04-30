@@ -37,6 +37,7 @@ async function installTauriMock(page: Page) {
     const handlers: Record<string, (a: Args) => unknown> = {
       initial_open_path: () => null,
       choose_aimd_file: () => d.path,
+      choose_doc_file: () => d.path,
       choose_image_file: () => null,
       open_aimd: () => d,
       save_aimd: (a) => ({ ...d, markdown: (a as any)?.markdown ?? d.markdown, dirty: false }),
@@ -189,6 +190,7 @@ test.describe("3. Context menu is prevented (production mode)", () => {
       const handlers: Record<string, (a: Args) => unknown> = {
         initial_open_path: () => null,
         choose_aimd_file: () => d.path,
+        choose_doc_file: () => d.path,
         choose_image_file: () => null,
         open_aimd: () => d,
         save_aimd: (a) => ({ ...d, markdown: (a as any)?.markdown ?? d.markdown, dirty: false }),

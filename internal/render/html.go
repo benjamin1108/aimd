@@ -19,6 +19,10 @@ type AssetResolver func(id string) string
 // Markdown renders a Markdown document to an HTML body fragment, rewriting
 // asset:// image references using resolve.
 func Markdown(src []byte, resolve AssetResolver) ([]byte, error) {
+	fm, body, hasFM := mdx.ExtractFrontmatter(src)
+	if hasFM {
+		src = body
+	}
 	rewritten := mdx.Rewrite(src, func(ref mdx.ImageRef) string {
 		id := mdx.AssetURIID(ref.URL)
 		if id == "" {
@@ -38,7 +42,22 @@ func Markdown(src []byte, resolve AssetResolver) ([]byte, error) {
 	if err := md.Convert(rewritten, &buf); err != nil {
 		return nil, err
 	}
-	return buf.Bytes(), nil
+	out := buf.Bytes()
+	if hasFM {
+		card := mdx.RenderFrontmatterHTML(fm)
+		if idx := bytes.Index(out, []byte("</h1>")); idx >= 0 {
+			insertAt := idx + len("</h1>")
+			merged := make([]byte, 0, len(out)+len(card)+1)
+			merged = append(merged, out[:insertAt]...)
+			merged = append(merged, '\n')
+			merged = append(merged, card...)
+			merged = append(merged, out[insertAt:]...)
+			out = merged
+		} else {
+			out = append(card, out...)
+		}
+	}
+	return out, nil
 }
 
 // EditorPage returns the native-window HTML app used by aimd view. The app

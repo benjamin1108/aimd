@@ -1,11 +1,16 @@
+mod windows;
+
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use std::fs;
 use std::io::{Read as _, Write};
 use std::path::PathBuf;
 use std::process::{Command, Stdio};
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Mutex;
-use tauri::{AppHandle, Emitter, Manager, RunEvent, State};
+use tauri::{AppHandle, Manager, RunEvent, State};
+
+static MAIN_INITIALIZED: AtomicBool = AtomicBool::new(false);
 
 #[derive(Default)]
 struct PendingOpenPaths(Mutex<Vec<String>>);
@@ -28,6 +33,14 @@ fn choose_aimd_file() -> Option<String> {
 fn choose_markdown_file() -> Option<String> {
     rfd::FileDialog::new()
         .add_filter("Markdown", &["md", "markdown", "mdx"])
+        .pick_file()
+        .map(|path| path.to_string_lossy().to_string())
+}
+
+#[tauri::command]
+fn choose_doc_file() -> Option<String> {
+    rfd::FileDialog::new()
+        .add_filter("AIMD or Markdown", &["aimd", "md", "markdown", "mdx"])
         .pick_file()
         .map(|path| path.to_string_lossy().to_string())
 }
@@ -93,14 +106,34 @@ fn is_supported_doc_extension(path: &std::path::Path) -> bool {
 }
 
 #[tauri::command]
-fn initial_open_path(pending: State<'_, PendingOpenPaths>) -> Option<String> {
-    if let Some(path) = std::env::args()
-        .skip(1)
-        .find(|arg| is_supported_doc_extension(std::path::Path::new(arg)))
-    {
-        return Some(path);
+fn initial_open_path(
+    window: tauri::Window,
+    pending: State<'_, PendingOpenPaths>,
+    wp: State<'_, windows::WindowPending>,
+) -> Option<String> {
+    let label = window.label().to_string();
+    // Per-window pending map (new windows opened via open_in_new_window).
+    if let Ok(mut map) = wp.0.lock() {
+        if let Some(p) = map.remove(&label) {
+            MAIN_INITIALIZED.store(true, Ordering::SeqCst);
+            return Some(p);
+        }
     }
-    pending.0.lock().ok()?.pop()
+    // Main window: check CLI args then global PendingOpenPaths.
+    if label == "main" {
+        let result = if let Some(path) = std::env::args()
+            .skip(1)
+            .find(|arg| is_supported_doc_extension(std::path::Path::new(arg)))
+        {
+            Some(path)
+        } else {
+            pending.0.lock().ok().and_then(|mut p| p.pop())
+        };
+        MAIN_INITIALIZED.store(true, Ordering::SeqCst);
+        return result;
+    }
+    MAIN_INITIALIZED.store(true, Ordering::SeqCst);
+    None
 }
 
 #[tauri::command]
@@ -453,6 +486,7 @@ fn find_resource_aimd(dir: PathBuf, depth: usize) -> Option<PathBuf> {
 pub fn run() {
     let app = tauri::Builder::default()
         .manage(PendingOpenPaths::default())
+        .manage(windows::WindowPending::default())
         .setup(|_| {
             self_register_aimd_handler();
             Ok(())
@@ -460,6 +494,7 @@ pub fn run() {
         .invoke_handler(tauri::generate_handler![
             choose_aimd_file,
             choose_markdown_file,
+            choose_doc_file,
             choose_image_file,
             choose_save_aimd_file,
             confirm_discard_changes,
@@ -480,24 +515,39 @@ pub fn run() {
             reveal_in_finder,
             convert_md_to_draft,
             save_markdown,
-            confirm_upgrade_to_aimd
+            confirm_upgrade_to_aimd,
+            windows::open_in_new_window
         ])
         .build(tauri::generate_context!())
         .expect("error while building AIMD Desktop");
 
-    app.run(|app_handle, event| {
+    app.run(move |app_handle, event| {
         if let RunEvent::Opened { urls } = event {
+            let mut consumed_main = false;
             for url in urls {
                 if let Ok(path) = url.to_file_path() {
-                    if is_supported_doc_extension(&path) {
-                        let path = path.to_string_lossy().to_string();
+                    if !is_supported_doc_extension(&path) {
+                        continue;
+                    }
+                    let path_str = path.to_string_lossy().to_string();
+
+                    // Cold-start: first file goes to main window via PendingOpenPaths.
+                    if !MAIN_INITIALIZED.load(Ordering::SeqCst) && !consumed_main {
                         if let Some(pending) = app_handle.try_state::<PendingOpenPaths>() {
                             if let Ok(mut paths) = pending.0.lock() {
-                                paths.push(path.clone());
+                                paths.push(path_str.clone());
                             }
                         }
-                        let _ = app_handle.emit("aimd-open-file", path);
+                        consumed_main = true;
+                        continue;
                     }
+
+                    // Hot-path or additional files: open each in a new window.
+                    let h = app_handle.clone();
+                    let p = path_str.clone();
+                    tauri::async_runtime::spawn(async move {
+                        let _ = windows::open_in_new_window(h, Some(p)).await;
+                    });
                 }
             }
         }

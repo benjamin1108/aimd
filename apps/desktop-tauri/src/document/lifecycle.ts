@@ -15,8 +15,8 @@ import { saveDocument } from "./persist";
 import { clearSessionSnapshot, clearLastSessionPath } from "../session/snapshot";
 
 export async function chooseAndOpen() {
-  const path = await invoke<string | null>("choose_aimd_file");
-  if (path) await openDocument(path);
+  const path = await invoke<string | null>("choose_doc_file");
+  if (path) await routeOpenedPath(path);
 }
 
 export async function openMarkdownDocument(markdownPath: string, opts?: { skipConfirm?: boolean }) {
@@ -105,7 +105,7 @@ export async function openDocument(path: string, options: { skipConfirm?: boolea
   setStatus("正在打开", "loading");
   try {
     const doc = await invoke<AimdDocument>("open_aimd", { path });
-    applyDocument({ ...doc, isDraft: false, format: "aimd" }, "read");
+    applyDocument({ ...doc, isDraft: false, format: "aimd", dirty: false }, "read");
     rememberOpenedPath(doc.path);
     setStatus("已打开", "success");
     void triggerOptimizeOnOpen(doc.path);

@@ -28,6 +28,7 @@ async function installTauriMock(page: Page) {
     const handlers: Record<string, (a?: Args) => unknown> = {
       initial_open_path: () => null,
       choose_aimd_file: () => "/mock/sample.aimd",
+      choose_doc_file: () => "/mock/report.md",
       choose_markdown_file: () => "/mock/report.md",
       choose_image_file: () => null,
       choose_save_aimd_file: (a) =>
@@ -243,7 +244,7 @@ test.describe("C. 打开 markdown 文档关闭行为边界", () => {
   test("unedited markdown doc closes without confirm dialog", async ({ page }) => {
     await installTauriMock(page);
     await page.goto("/");
-    await page.locator("#empty-import").click();
+    await page.locator("#empty-open").click();
     await expect(page.locator("#doc-path")).toContainText("/mock/report.md");
 
     // 未编辑，dirty=false，关闭不应触发 confirm_discard_changes invoke
@@ -269,7 +270,7 @@ test.describe("C. 打开 markdown 文档关闭行为边界", () => {
   test("edited markdown doc (dirty=true) triggers confirm on close", async ({ page }) => {
     await installTauriMock(page);
     await page.goto("/");
-    await page.locator("#empty-import").click();
+    await page.locator("#empty-open").click();
     await expect(page.locator("#doc-path")).toContainText("/mock/report.md");
 
     // 切到 source 模式编辑，触发 dirty=true
@@ -305,10 +306,11 @@ test.describe("D. 已知边界：ensureCanDiscardChanges 只检 dirty，不检 i
   }) => {
     await installTauriMock(page);
     await page.goto("/");
-    await page.locator("#empty-import").click();
+    await page.locator("#empty-open").click();
     await expect(page.locator("#doc-path")).toContainText("/mock/report.md");
 
     // 用计数器替换 invoke 中的 confirm_discard_changes，dirty=false 时不应被调用
+    // 同时覆盖 choose_doc_file 返回 .aimd 文件，确保第二次打开走 openDocument 而不是 openMarkdownDocument
     await page.evaluate(() => {
       const w = window as any;
       w.__discardCalled = 0;
@@ -318,6 +320,7 @@ test.describe("D. 已知边界：ensureCanDiscardChanges 只检 dirty，不检 i
           w.__discardCalled += 1;
           return "discard";
         }
+        if (cmd === "choose_doc_file") return "/mock/sample.aimd";
         return orig(cmd, a);
       };
       // head-open 在文档打开状态下 hidden=true，强制点击

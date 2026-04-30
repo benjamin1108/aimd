@@ -15,15 +15,17 @@ import {
 import { setMode } from "./ui/mode";
 import { updateChrome } from "./ui/chrome";
 import { bindFormatToolbar } from "./editor/format-toolbar";
+import { bindWidthSwitch } from "./ui/width";
 import { bindSidebarResizers, bindSidebarHrResizer } from "./ui/resizers";
 import { bindImageLightbox } from "./ui/lightbox";
 import { showFileContextMenu } from "./ui/context-menu";
 import { onInlineInput, flushInline } from "./editor/inline";
+import { bindImageDeleteGuard } from "./editor/image-delete";
 import { onInlinePaste, onInlineKeydown, collectClipboardImages, pasteImageFiles } from "./editor/paste";
 import { scheduleRender } from "./ui/outline";
 import { clearRecentDocuments, loadRecentPaths } from "./ui/recents";
 import {
-  chooseAndOpen, chooseAndImportMarkdown, newDocument, closeDocument,
+  chooseAndOpen, newDocument, closeDocument,
   routeOpenedPath, openDocument,
 } from "./document/lifecycle";
 import { saveDocument, saveDocumentAs } from "./document/persist";
@@ -37,13 +39,11 @@ const $ = <T extends HTMLElement>(selector: string) => document.querySelector<T>
 
 $("#head-new").addEventListener("click", () => { void newDocument(); });
 $("#head-open").addEventListener("click", () => { void chooseAndOpen(); });
-$("#head-import").addEventListener("click", () => { void chooseAndImportMarkdown(); });
 $("body").addEventListener("dragover", onWindowDragOver);
 $("body").addEventListener("drop", onWindowDrop);
 $("body").addEventListener("dragleave", onWindowDragLeave);
 $("#empty-open").addEventListener("click", chooseAndOpen);
 $("#empty-new").addEventListener("click", () => { void newDocument(); });
-$("#empty-import").addEventListener("click", () => { void chooseAndImportMarkdown(); });
 $("#sidebar-new").addEventListener("click", () => { void newDocument(); });
 $("#sidebar-save").addEventListener("click", () => { void saveDocument(); });
 $("#sidebar-open").addEventListener("click", chooseAndOpen);
@@ -53,6 +53,9 @@ modeEditEl().addEventListener("click", () => setMode("edit"));
 modeSourceEl().addEventListener("click", () => setMode("source"));
 saveEl().addEventListener("click", saveDocument);
 saveAsEl().addEventListener("click", saveDocumentAs);
+$<HTMLButtonElement>("#new-window").addEventListener("click", () => {
+  void invoke("open_in_new_window", { path: null });
+});
 closeEl().addEventListener("click", () => { void closeDocument(); });
 
 markdownEl().addEventListener("input", () => {
@@ -82,6 +85,8 @@ inlineEditorEl().addEventListener("focus", () => {
 }, { once: true });
 
 bindFormatToolbar();
+bindWidthSwitch();
+bindImageDeleteGuard(inlineEditorEl());
 bindSidebarResizers();
 bindSidebarHrResizer();
 
@@ -95,7 +100,10 @@ document.addEventListener("keydown", (event) => {
     return;
   }
 
-  if (mod && key === "n") {
+  if (mod && key === "n" && event.shiftKey) {
+    event.preventDefault();
+    void invoke("open_in_new_window", { path: null });
+  } else if (mod && key === "n") {
     event.preventDefault();
     void newDocument();
   }
