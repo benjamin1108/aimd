@@ -1257,10 +1257,21 @@ body.resizing-v * {
 }
 
 .aimd table {
+  /* Keep table layout based on normal word boundaries. The document-level
+     `overflow-wrap: anywhere` is useful for prose, but in tables it lets one
+     long text column shrink neighboring short tokens like `24bit` or `OpCode`
+     down to arbitrary character breaks. Tables may scroll horizontally when
+     their real minimum width is wider than the reader. */
+  display: block;
   width: 100%;
+  max-width: 100%;
   margin: 18px 0;
   border-collapse: collapse;
   font-size: 13px;
+  table-layout: auto;
+  overflow-x: auto;
+  overflow-wrap: normal;
+  word-break: normal;
 }
 
 .aimd thead th {
@@ -1271,12 +1282,16 @@ body.resizing-v * {
   font-weight: 600;
   text-align: left;
   letter-spacing: 0;
+  overflow-wrap: break-word;
+  word-break: normal;
 }
 
 .aimd tbody td {
   padding: 9px 12px;
   border-bottom: 1px solid var(--hairline);
   vertical-align: top;
+  overflow-wrap: break-word;
+  word-break: normal;
 }
 
 .aimd tbody tr:last-child td { border-bottom: 0; }

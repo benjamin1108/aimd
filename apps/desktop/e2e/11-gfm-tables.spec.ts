@@ -54,6 +54,63 @@ async function installTauriMock(page: Page) {
   }, seed);
 }
 
+async function installTableLayoutMock(page: Page) {
+  const longDescription = [
+    "这一列是很长的说明文字，用来模拟用户在标准 Markdown 表格里写入大量解释性内容。",
+    "浏览器应当把主要换行压力放在这类长文本列上，而不是把相邻列里的短代码词从中间切断。",
+    "这里再追加一段内容，让表格布局必须在多个列之间做取舍。",
+  ].join("");
+  const doc = {
+    path: "/mock/table-layout.aimd",
+    title: "表格布局",
+    markdown: "# 表格布局\n\n| 位宽 | 字段 | 说明 |\n| --- | --- | --- |\n| 24bit | OpCode | 长说明 |\n",
+    html: `
+      <h1>表格布局</h1>
+      <table>
+        <thead>
+          <tr><th>位宽</th><th>字段</th><th>说明</th></tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><span data-token="width">24bit</span></td>
+            <td><span data-token="opcode">OpCode</span></td>
+            <td>${longDescription}</td>
+          </tr>
+        </tbody>
+      </table>
+    `,
+    assets: [] as Array<unknown>,
+    dirty: false,
+  };
+
+  await page.addInitScript((d: typeof doc) => {
+    type Args = Record<string, unknown> | undefined;
+    const handlers: Record<string, (a: Args) => unknown> = {
+      initial_open_path: () => null,
+      choose_aimd_file: () => d.path,
+      choose_doc_file: () => d.path,
+      choose_image_file: () => null,
+      open_aimd: () => d,
+      save_aimd: () => ({ ...d, dirty: false }),
+      render_markdown: () => ({ html: d.html }),
+      render_markdown_standalone: () => ({ html: d.html }),
+      add_image: () => null,
+      list_aimd_assets: () => [],
+    };
+    (window as any).__TAURI_INTERNALS__ = {
+      invoke: async (cmd: string, a?: Args) => {
+        const fn = handlers[cmd];
+        if (!fn) throw new Error(`mock invoke: unknown command ${cmd}`);
+        return fn(a);
+      },
+      transformCallback: (cb: Function) => cb,
+    };
+    (window as any).__TAURI_EVENT_PLUGIN_INTERNALS__ = {
+      unregisterListener: () => {},
+    };
+  }, doc);
+}
+
 async function pasteHTMLIntoEditor(page: Page, html: string) {
   await page.locator("#inline-editor").evaluate((el: HTMLElement, payload: string) => {
     el.focus();
@@ -136,5 +193,48 @@ test.describe("GFM round-trip", () => {
     // `- [x]` for checked. Tolerate either case for the checked marker.
     expect(md).toMatch(/-\s*\[\s\]\s*task one/);
     expect(md).toMatch(/-\s*\[[xX]\]\s*task two/);
+  });
+});
+
+test.describe("GFM table layout", () => {
+  const expectShortTokensStaySingleLine = async (root: ReturnType<Page["locator"]>) => {
+    const metrics = await root.evaluate((el: HTMLElement) => {
+      const style = getComputedStyle(el);
+      const lineHeight = Number.parseFloat(style.lineHeight);
+      const widthToken = el.querySelector('[data-token="width"]') as HTMLElement;
+      const opcodeToken = el.querySelector('[data-token="opcode"]') as HTMLElement;
+      const tokenLines = (node: HTMLElement) => node.getClientRects().length;
+      return {
+        lineHeight,
+        scrollWidth: el.scrollWidth,
+        clientWidth: el.clientWidth,
+        widthLines: tokenLines(widthToken),
+        opcodeLines: tokenLines(opcodeToken),
+        widthHeight: widthToken.getBoundingClientRect().height,
+        opcodeHeight: opcodeToken.getBoundingClientRect().height,
+      };
+    });
+
+    expect(metrics.widthLines).toBe(1);
+    expect(metrics.opcodeLines).toBe(1);
+    expect(metrics.widthHeight).toBeLessThan(metrics.lineHeight * 1.5);
+    expect(metrics.opcodeHeight).toBeLessThan(metrics.lineHeight * 1.5);
+    expect(metrics.scrollWidth).toBeLessThanOrEqual(metrics.clientWidth + 1);
+  };
+
+  test("long text columns do not force short code-like tokens to split", async ({ page }) => {
+    await page.setViewportSize({ width: 760, height: 720 });
+    await installTableLayoutMock(page);
+    await page.goto("/");
+    await page.locator("#empty-open").click();
+
+    const reader = page.locator("#reader");
+    await expect(reader).toBeVisible();
+    await expectShortTokensStaySingleLine(reader);
+
+    await page.locator("#mode-edit").click();
+    const editor = page.locator("#inline-editor");
+    await expect(editor).toBeVisible();
+    await expectShortTokensStaySingleLine(editor);
   });
 });
