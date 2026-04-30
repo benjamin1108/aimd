@@ -88,6 +88,9 @@ test.describe("Rust invoke_handler 命令注册校验", () => {
     "save_markdown",
     "confirm_upgrade_to_aimd",
     "open_in_new_window",
+    "focus_doc_window",
+    "register_window_path",
+    "update_window_path",
   ];
 
   test("lib.rs 包含 tauri::generate_handler! 宏调用", () => {

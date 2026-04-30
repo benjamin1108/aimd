@@ -85,6 +85,9 @@ export async function saveDocumentAs() {
       rememberOpenedPath(doc.path);
       setStatus(wasDraft ? "文件已创建" : "已另存为", "success");
     }
+    try {
+      await invoke("update_window_path", { newPath: doc.path });
+    } catch { /* 命令不存在时静默忽略 */ }
   } catch (err) {
     console.error(err);
     setStatus("另存为失败", "warn");

@@ -8,7 +8,7 @@ use std::path::PathBuf;
 use std::process::{Command, Stdio};
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Mutex;
-use tauri::{AppHandle, Manager, RunEvent, State};
+use tauri::{AppHandle, Manager, RunEvent, State, WindowEvent};
 
 static MAIN_INITIALIZED: AtomicBool = AtomicBool::new(false);
 
@@ -487,6 +487,7 @@ pub fn run() {
     let app = tauri::Builder::default()
         .manage(PendingOpenPaths::default())
         .manage(windows::WindowPending::default())
+        .manage(windows::OpenedWindows::default())
         .setup(|_| {
             self_register_aimd_handler();
             Ok(())
@@ -516,40 +517,49 @@ pub fn run() {
             convert_md_to_draft,
             save_markdown,
             confirm_upgrade_to_aimd,
-            windows::open_in_new_window
+            windows::open_in_new_window,
+            windows::focus_doc_window,
+            windows::register_window_path,
+            windows::update_window_path
         ])
         .build(tauri::generate_context!())
         .expect("error while building AIMD Desktop");
 
     app.run(move |app_handle, event| {
-        if let RunEvent::Opened { urls } = event {
-            let mut consumed_main = false;
-            for url in urls {
-                if let Ok(path) = url.to_file_path() {
-                    if !is_supported_doc_extension(&path) {
-                        continue;
-                    }
-                    let path_str = path.to_string_lossy().to_string();
-
-                    // Cold-start: first file goes to main window via PendingOpenPaths.
-                    if !MAIN_INITIALIZED.load(Ordering::SeqCst) && !consumed_main {
-                        if let Some(pending) = app_handle.try_state::<PendingOpenPaths>() {
-                            if let Ok(mut paths) = pending.0.lock() {
-                                paths.push(path_str.clone());
-                            }
+        match event {
+            RunEvent::Opened { urls } => {
+                let mut consumed_main = false;
+                for url in urls {
+                    if let Ok(path) = url.to_file_path() {
+                        if !is_supported_doc_extension(&path) {
+                            continue;
                         }
-                        consumed_main = true;
-                        continue;
-                    }
+                        let path_str = path.to_string_lossy().to_string();
 
-                    // Hot-path or additional files: open each in a new window.
-                    let h = app_handle.clone();
-                    let p = path_str.clone();
-                    tauri::async_runtime::spawn(async move {
-                        let _ = windows::open_in_new_window(h, Some(p)).await;
-                    });
+                        // Cold-start: first file goes to main window via PendingOpenPaths.
+                        if !MAIN_INITIALIZED.load(Ordering::SeqCst) && !consumed_main {
+                            if let Some(pending) = app_handle.try_state::<PendingOpenPaths>() {
+                                if let Ok(mut paths) = pending.0.lock() {
+                                    paths.push(path_str.clone());
+                                }
+                            }
+                            consumed_main = true;
+                            continue;
+                        }
+
+                        // Hot-path or additional files: open_in_new_window already deduplicates.
+                        let h = app_handle.clone();
+                        let p = path_str.clone();
+                        tauri::async_runtime::spawn(async move {
+                            let _ = windows::open_in_new_window(h, Some(p)).await;
+                        });
+                    }
                 }
             }
+            RunEvent::WindowEvent { label, event: WindowEvent::Destroyed, .. } => {
+                windows::unregister_window_label(app_handle, &label);
+            }
+            _ => {}
         }
     });
 }

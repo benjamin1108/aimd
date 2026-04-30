@@ -38,6 +38,9 @@ export async function openMarkdownDocument(markdownPath: string, opts?: { skipCo
     applyDocument(doc, "read");
     rememberOpenedPath(markdownPath);
     setStatus("已打开（Markdown）", "success");
+    try {
+      await invoke("register_window_path", { path: markdownPath });
+    } catch { /* 命令不存在时静默忽略 */ }
   } catch (err) {
     console.error(err);
     setStatus("打开失败", "warn");
@@ -45,6 +48,17 @@ export async function openMarkdownDocument(markdownPath: string, opts?: { skipCo
 }
 
 export async function routeOpenedPath(path: string, opts?: { skipConfirm?: boolean }) {
+  // 若该路径已在另一个窗口打开，聚焦那个窗口并结束
+  try {
+    const label = await invoke<string | null>("focus_doc_window", { path });
+    if (label) return;
+  } catch {
+    // Rust 命令不可用时（如 e2e mock 未注册）继续走正常流程
+  }
+
+  // 若当前窗口本身就持有该路径，直接 no-op（避免重新加载丢失未保存内容）
+  if (state.doc?.path && normPathsEqual(state.doc.path, path)) return;
+
   const lower = path.toLowerCase();
   if (lower.endsWith(".aimd")) {
     await openDocument(path, { skipConfirm: opts?.skipConfirm });
@@ -53,6 +67,10 @@ export async function routeOpenedPath(path: string, opts?: { skipConfirm?: boole
   } else {
     setStatus("不支持的文件类型", "warn");
   }
+}
+
+function normPathsEqual(a: string, b: string): boolean {
+  return a.replace(/\\/g, "/").toLowerCase() === b.replace(/\\/g, "/").toLowerCase();
 }
 
 export async function chooseAndImportMarkdown() {
@@ -108,6 +126,9 @@ export async function openDocument(path: string, options: { skipConfirm?: boolea
     applyDocument({ ...doc, isDraft: false, format: "aimd", dirty: false }, "read");
     rememberOpenedPath(doc.path);
     setStatus("已打开", "success");
+    try {
+      await invoke("register_window_path", { path: doc.path });
+    } catch { /* 命令不存在（旧版 / e2e mock）时静默忽略 */ }
     void triggerOptimizeOnOpen(doc.path);
   } catch (err) {
     console.error(err);
