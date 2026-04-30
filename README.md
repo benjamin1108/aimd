@@ -77,8 +77,8 @@ AIMD Desktop 是配套的桌面应用：双击 `.aimd` 就打开，像看 Markdo
 
 | 平台 | 文件 | 安装 |
 |---|---|---|
-| macOS (Apple Silicon) | [`AIMD Desktop_0.1.0_aarch64.dmg`](https://github.com/benjamin1108/aimd/releases/download/v0.1.0/AIMD%20Desktop_0.1.0_aarch64.dmg) | 双击挂载，把 AIMD 拖进 Applications |
-| Windows 10/11 (x64) | [`AIMD Desktop_0.1.0_x64-setup.exe`](https://github.com/benjamin1108/aimd/releases/download/v0.1.0/AIMD%20Desktop_0.1.0_x64-setup.exe) | 双击安装 |
+| macOS (Apple Silicon) | [`AIMD.Desktop_0.1.0_aarch64.dmg`](https://github.com/benjamin1108/aimd/releases/download/v0.1.0/AIMD.Desktop_0.1.0_aarch64.dmg) | 双击挂载，把 AIMD 拖进 Applications |
+| Windows 10/11 (x64) | [`AIMD.Desktop_0.1.0_x64-setup.exe`](https://github.com/benjamin1108/aimd/releases/download/v0.1.0/AIMD.Desktop_0.1.0_x64-setup.exe) | 双击安装 |
 
 > 当前版本为 `v0.1.0`，可在 [Releases](https://github.com/benjamin1108/aimd/releases/tag/v0.1.0) 下载。
 
