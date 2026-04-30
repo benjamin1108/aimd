@@ -1,4 +1,4 @@
-import { state } from "../core/state";
+import { state, ASSET_URI_PREFIX } from "../core/state";
 import { inlineEditorEl, markdownEl } from "../core/dom";
 import { updateChrome } from "../ui/chrome";
 import {
@@ -62,7 +62,20 @@ export function flushInline() {
     state.htmlVersion += 1;
     state.paintedVersion.edit = state.htmlVersion;
     renderOutline();
+    gcInlineAssets(md);
     persistSessionSnapshot();
+  }
+}
+
+function gcInlineAssets(markdown: string) {
+  if (!state.doc || state.doc.assets.length === 0) return;
+  const prefix = ASSET_URI_PREFIX;
+  const before = state.doc.assets.length;
+  state.doc.assets = state.doc.assets.filter((a) =>
+    markdown.includes(prefix + a.id)
+  );
+  if (state.doc.assets.length !== before) {
+    updateChrome();
   }
 }
 

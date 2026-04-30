@@ -7,6 +7,7 @@ import (
 	"os"
 	"path"
 	"path/filepath"
+	"regexp"
 	"strings"
 	"time"
 
@@ -23,9 +24,26 @@ type NewAsset struct {
 
 // RewriteOptions controls an in-place rewrite of an AIMD file.
 type RewriteOptions struct {
-	Markdown     []byte
-	DeleteAssets map[string]bool
-	AddAssets    []NewAsset
+	Markdown        []byte
+	DeleteAssets    map[string]bool
+	AddAssets       []NewAsset
+	GCUnreferenced  bool
+}
+
+// assetIDPattern matches asset:// references in three forms:
+//   - Markdown image:  ![alt](asset://id)
+//   - Markdown link:   [text](asset://id)
+//   - HTML img tag:    <img src="asset://id"> or <img src='asset://id'>
+var assetIDPattern = regexp.MustCompile(`asset://([A-Za-z0-9._-]+)`)
+
+// ReferencedAssetIDs scans markdown text and returns the set of asset ids that
+// appear in any asset:// reference (image, link, or HTML img src).
+func ReferencedAssetIDs(markdown []byte) map[string]bool {
+	refs := make(map[string]bool)
+	for _, m := range assetIDPattern.FindAllSubmatch(markdown, -1) {
+		refs[string(m[1])] = true
+	}
+	return refs
 }
 
 // Rewrite replaces the mutable parts of an AIMD file while preserving its
@@ -39,9 +57,17 @@ func Rewrite(file string, opt RewriteOptions) error {
 	mf.Assets = nil
 	mf.UpdatedAt = time.Now().UTC()
 
+	var gcRefs map[string]bool
+	if opt.GCUnreferenced {
+		gcRefs = ReferencedAssetIDs(opt.Markdown)
+	}
+
 	existing := make([]NewAsset, 0, len(r.Manifest.Assets))
 	for _, asset := range r.Manifest.Assets {
 		if opt.DeleteAssets != nil && opt.DeleteAssets[asset.ID] {
+			continue
+		}
+		if opt.GCUnreferenced && !gcRefs[asset.ID] {
 			continue
 		}
 		data, err := r.ReadFile(asset.Path)

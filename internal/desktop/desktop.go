@@ -188,7 +188,10 @@ func Create(file, markdown, title string) (*DocumentDTO, error) {
 
 // Save rewrites the document markdown and returns the updated document.
 func Save(file, markdown string) (*DocumentDTO, error) {
-	if err := aimd.Rewrite(file, aimd.RewriteOptions{Markdown: []byte(markdown)}); err != nil {
+	if err := aimd.Rewrite(file, aimd.RewriteOptions{
+		Markdown:       []byte(markdown),
+		GCUnreferenced: true,
+	}); err != nil {
 		return nil, err
 	}
 	return Open(file)
@@ -230,7 +233,11 @@ func SaveAs(srcFile, destFile, markdown, title string) (*DocumentDTO, error) {
 		w.Close()
 		return nil, err
 	}
+	gcRefs := aimd.ReferencedAssetIDs([]byte(markdown))
 	for _, asset := range r.Manifest.Assets {
+		if !gcRefs[asset.ID] {
+			continue
+		}
 		data, err := r.ReadFile(asset.Path)
 		if err != nil {
 			w.Close()
@@ -275,6 +282,8 @@ func RenderStandalone(markdown string) (map[string]string, error) {
 }
 
 // AddImage stores imagePath as an asset and returns an insertable markdown node.
+// If an asset with identical byte content already exists in the document, the
+// existing asset is reused (no duplicate is written).
 func AddImage(file, imagePath string) (*AddedAssetDTO, error) {
 	if !isImageFilename(imagePath) {
 		return nil, fmt.Errorf("not an image file: %s", imagePath)
@@ -286,6 +295,8 @@ func AddImage(file, imagePath string) (*AddedAssetDTO, error) {
 	if len(data) == 0 {
 		return nil, fmt.Errorf("empty image: %s", imagePath)
 	}
+	incomingHash := sha256Hex(data)
+
 	r, err := aimd.Open(file)
 	if err != nil {
 		return nil, err
@@ -295,6 +306,36 @@ func AddImage(file, imagePath string) (*AddedAssetDTO, error) {
 		r.Close()
 		return nil, err
 	}
+
+	// Check for an existing asset with the same content hash.
+	existingID, err := findAssetByHash(r, incomingHash)
+	if err != nil {
+		r.Close()
+		return nil, err
+	}
+
+	if existingID != "" {
+		// Reuse the existing asset — no write needed.
+		asset := r.Manifest.FindAsset(existingID)
+		if asset == nil {
+			r.Close()
+			return nil, fmt.Errorf("dedup: asset %q missing from manifest", existingID)
+		}
+		cacheDir, err := materializeAssets(file, r)
+		if err != nil {
+			r.Close()
+			return nil, err
+		}
+		_ = md
+		dto := assetDTO(*asset, cacheDir)
+		r.Close()
+		return &AddedAssetDTO{
+			Asset:    dto,
+			URI:      "asset://" + existingID,
+			Markdown: fmt.Sprintf("![%s](asset://%s)", imageAlt(filepath.Base(asset.Path)), existingID),
+		}, nil
+	}
+
 	id, filename := aimd.UniqueAssetName(r.Manifest, filepath.Base(imagePath))
 	if err := r.Close(); err != nil {
 		return nil, err
@@ -329,6 +370,27 @@ func AddImage(file, imagePath string) (*AddedAssetDTO, error) {
 		URI:      "asset://" + id,
 		Markdown: fmt.Sprintf("![%s](asset://%s)", imageAlt(filename), id),
 	}, nil
+}
+
+// sha256Hex returns the lowercase hex SHA-256 digest of data.
+func sha256Hex(data []byte) string {
+	sum := sha256.Sum256(data)
+	return hex.EncodeToString(sum[:])
+}
+
+// findAssetByHash returns the id of the first existing asset whose stored bytes
+// match wantHash, or "" if none match.
+func findAssetByHash(r *aimd.Reader, wantHash string) (string, error) {
+	for _, asset := range r.Manifest.Assets {
+		existing, err := r.ReadFile(asset.Path)
+		if err != nil {
+			return "", fmt.Errorf("findAssetByHash read %s: %w", asset.ID, err)
+		}
+		if sha256Hex(existing) == wantHash {
+			return asset.ID, nil
+		}
+	}
+	return "", nil
 }
 
 // ImportMarkdown packs a plain markdown project into a new AIMD file and opens it.
