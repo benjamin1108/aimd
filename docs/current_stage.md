@@ -2,186 +2,88 @@
 
 ## 1. 阶段名称
 
-**阶段**：v0.1 Core 已落地，macOS viewer/editor MVP 验证中  
-**日期**：2026-04-28  
-**状态**：可用但不应继续把当前 WebView MVP 当作长期生产级编辑器堆功能
+**阶段**：v0.1 纯 Rust + Tauri 桌面 — Windows/macOS 双平台 release 就绪  
+**日期**：2026-04-30  
+**状态**：P1 bug 已修，e2e 224/224 通过，可发 Beta
 
 ---
 
-## 2. 当前定位
-
-当前仓库的核心价值是：
+## 2. 当前架构
 
 ```text
-Markdown + assets -> 单文件 .aimd
-.aimd -> 可检查、可解包、可预览、可导出
+Rust workspace
+  crates/aimd-core    — .aimd 格式读写、资产 GC、rewrite
+  crates/aimd-mdx     — frontmatter 解析、asset:// 重写
+  crates/aimd-render  — Markdown → HTML（comrak GFM）
+  apps/desktop        — Tauri 2 桌面应用（Windows + macOS）
 ```
 
-当前 `aimd view` 的定位是：
-
-```text
-macOS 原生 WebView MVP
-用于验证阅读、编辑、图片插入、保存回包的产品方向
-```
-
-它不是长期最终形态。长期桌面编辑器建议按 `aimd_desktop_tauri_spec.md` 迁移到 Tauri + 成熟编辑器内核。
+前端（TypeScript + Vite）嵌入 Tauri WebView，通过 Tauri IPC 调用 Rust 命令。无 Go sidecar，无外部 CLI 依赖。
 
 ---
 
 ## 3. 已完成能力
 
-### Core / CLI
+### Core（`crates/aimd-core`）
 
-- `.aimd` ZIP 容器。
-- `manifest.json`。
-- `main.md`。
-- `assets/`。
-- `pack`。
-- `unpack`。
-- `inspect`。
-- `preview`。
-- `view`。
-- `seal`。
-- `export html`。
+- `.aimd` ZIP 容器读写（`Reader` / `Writer`）
+- `manifest.json` 元数据（title、createdAt、updatedAt、assets SHA-256）
+- `main.md` 文档体
+- `assets/` 资产管理（SHA-256 去重、GC、完整性校验）
+- `rewrite_file`：原地重写，支持资产增删和 GC
+- `pack_run`：Markdown 目录 → `.aimd`
 
-### macOS 集成
+### 渲染（`crates/aimd-render`）
 
-- `scripts/install-mac.sh` 可构建并安装 `aimd`。
-- 可注册 `.aimd` 文件双击关联。
-- 当前使用 AppleScript `.app` 转发到 `aimd view`。
+- GFM 扩展（table、tasklist、strikethrough、autolink、footnotes）
+- frontmatter 卡片（`<section class="aimd-frontmatter">`）
+- heading id 注入（`inject_heading_ids`，CJK 保留）
+- `asset://` resolver 替换
 
-### Viewer / Editor MVP
+### 桌面（`apps/desktop`）
 
-- 阅读模式。
-- 编辑模式。
-- inline 编辑基础能力。
-- Markdown 常见格式按钮。
-- 图片选择插入。
-- 图片粘贴兜底。
-- 删除图片。
-- 保存回 `.aimd`。
-- 右键菜单预留扩展入口。
+- 打开 `.aimd` / `.md` / `.markdown` / `.mdx`
+- 编辑模式（contenteditable）+ 预览模式
+- 保存、另存为、Markdown 导入
+- 图片插入（文件选择 + 粘贴）、图片压缩、图片删除
+- asset 替换（走 Reader/Writer，manifest 元数据同步更新）
+- SHA-256 完整性校验
+- 单实例（Windows/Linux）
+- Windows MSI + NSIS installer
+- macOS bundle
 
 ---
 
-## 4. 当前已知问题
+## 4. 构建与测试状态
 
-当前 viewer/editor 是 MVP，存在结构性限制：
-
-- 前端以 Go 字符串内嵌，维护成本高。
-- 复杂编辑行为依赖手写 `contenteditable`。
-- 选区、撤销重做、粘贴清洗、格式嵌套、表格编辑等会继续变复杂。
-- WebView 与 macOS 原生剪贴板/文件选择存在兼容兜底代码。
-- UI 质量可继续提升，但不建议投入过多长期编辑器能力在当前实现上。
-
----
-
-## 5. 当前阶段推荐工作
-
-优先级从高到低：
-
-1. 稳定 AIMD Core。
-2. 补足 AIMD 文件格式 SPEC。
-3. 明确 manifest schema。
-4. 增加 Core 层测试，尤其是 rewrite、asset 管理、pack/unpack round-trip。
-5. 将当前 macOS viewer 控制在 MVP 范围。
-6. 启动 Tauri Desktop 原型。
-7. 启动 VS Code 插件命令型原型。
+| 检查项 | 状态 |
+|---|---|
+| `cargo test --workspace` | 60+ tests 全绿 |
+| `cargo clippy --workspace --release -D warnings` | 0 警告 |
+| `npm run typecheck` (apps/desktop) | 通过 |
+| `npm run build:web` (apps/desktop) | 通过 |
+| `npm run test:e2e` | 224/224 通过 |
+| Windows MSI + NSIS | 正常产出 |
 
 ---
 
-## 6. 暂缓事项
+## 5. 下一阶段建议
 
-以下事项不建议继续堆在当前 `webview_go` viewer 上：
-
-- 完整富文本编辑器。
-- 表格复杂编辑。
-- 高级图片排版。
-- 完整撤销重做模型。
-- 插件化编辑器扩展。
-- 生产级右键菜单系统。
-- 多窗口复杂状态管理。
-
-这些能力应放到 Tauri Desktop 或 VS Code 插件中实现。
+1. AI 元数据与溯源（model、prompt、source、review status）
+2. 文档健康检查（缺失资产、断链、超大文件）
+3. 更好的导出 UI（sealed HTML、PDF、DOCX、Markdown 项目）
+4. VS Code / Cursor 插件命令型原型
+5. 开放文件格式 SPEC、manifest schema、SDK、签名/验证
 
 ---
 
-## 7. 下一阶段建议
-
-### Phase A：规格固化
-
-产出：
-
-- `aimd_file_format_spec.md`
-- `aimd_manifest_schema.md`
-- Core round-trip 测试
-
-目标：
-
-- 让 `.aimd` 格式边界稳定。
-- 为 Tauri、VS Code、SDK 提供共同协议。
-
-### Phase B：Tauri Shell 原型
-
-产出：
-
-- `apps/desktop-tauri`
-- 可打开 `.aimd`
-- 可展示正文和图片
-- 可调用 Go sidecar
-
-目标：
-
-- 验证桌面应用发布路径。
-
-### Phase C：VS Code 插件命令型原型
-
-产出：
-
-- `apps/vscode`
-- `AIMD: Inspect`
-- `AIMD: Pack Markdown`
-- `AIMD: Unpack AIMD`
-
-目标：
-
-- 让开发者工作流先跑起来。
-
----
-
-## 8. 当前架构原则
-
-```text
-Go Core 不丢
-CLI 不退化
-Viewer 不过度复杂化
-Desktop 用 Tauri 演进
-VS Code 插件服务开发者和 Agent
-所有入口共享同一个 AIMD 语义
-```
-
----
-
-## 9. 判断一项新需求该放哪里
+## 6. 各入口职责分工
 
 | 需求 | 应放位置 |
 |---|---|
-| pack/unpack/manifest/asset 规则 | Go Core / 文件格式 SPEC |
-| 命令行自动化 | CLI |
-| 普通用户双击编辑 | Tauri Desktop |
-| 开发者工作流 | VS Code Plugin |
-| Agent 生成报告 | CLI / AIMD Server |
-| 临时预览验证 | 当前 viewer / preview |
-| 完整富文本编辑 | Tauri Desktop / VS Code Plugin，不放当前 viewer |
-
----
-
-## 10. 当前完成标准
-
-当前阶段可以认为完成，当：
-
-- CLI 能稳定处理 `.aimd`。
-- 文件格式 SPEC 初稿完成。
-- 当前 viewer 不再承担长期编辑器扩展。
-- Tauri 和 VS Code 的原型路径明确。
-- 文档分类清晰，后续新需求知道应该进入哪条线。
+| pack/unpack/manifest/asset 规则 | `crates/aimd-core` |
+| Markdown 解析与资产 URI | `crates/aimd-mdx` |
+| Markdown → HTML 渲染 | `crates/aimd-render` |
+| 普通用户双击编辑 | `apps/desktop`（Tauri） |
+| 开发者工作流 | VS Code 插件（待做） |
+| Agent 生成报告 | CLI / AIMD Server（待做） |

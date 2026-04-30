@@ -10,7 +10,7 @@
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-DESKTOP="$ROOT/apps/desktop-tauri"
+DESKTOP="$ROOT/apps/desktop"
 ICONS="$DESKTOP/src-tauri/icons"
 BUNDLE="$DESKTOP/src-tauri/target/release/bundle"
 DIST="$ROOT/dist"
@@ -93,7 +93,6 @@ prepare_env() {
   ensure_xcode_clt
   ensure_brew
   ensure_brew_package node node
-  ensure_brew_package go go
   ensure_brew_package cargo rust
 }
 

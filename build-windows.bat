@@ -3,10 +3,14 @@ setlocal EnableExtensions
 
 set "ROOT=%~dp0"
 set "ROOT=%ROOT:~0,-1%"
-set "DESKTOP=%ROOT%\apps\desktop-tauri"
-set "BUNDLE=%DESKTOP%\src-tauri\target\release\bundle"
+set "DESKTOP=%ROOT%\apps\desktop"
+rem Cargo workspace lives at %ROOT%\Cargo.toml, so all crate target/ output
+rem (including the Tauri bundle) lands at %ROOT%\target, NOT under
+rem %DESKTOP%\src-tauri\target. The latter only exists as stale leftovers
+rem from a pre-workspace build and would silently ship outdated bundles.
+set "BUNDLE=%ROOT%\target\release\bundle"
 set "DIST=%ROOT%\dist"
-set "PATH=%ProgramFiles%\Go\bin;%USERPROFILE%\.cargo\bin;%USERPROFILE%\go\bin;%PATH%"
+set "PATH=%USERPROFILE%\.cargo\bin;%PATH%"
 
 echo ==^> AIMD Windows desktop build
 echo     root: %ROOT%
@@ -38,16 +42,6 @@ if errorlevel 1 (
   if errorlevel 1 exit /b 1
 ) else (
   echo ==^> npm found
-)
-
-where go >nul 2>nul
-if errorlevel 1 (
-  echo ==^> installing Go
-  winget install -e --id GoLang.Go --accept-source-agreements --accept-package-agreements
-  if errorlevel 1 exit /b 1
-  set "PATH=%ProgramFiles%\Go\bin;%PATH%"
-) else (
-  echo ==^> go found
 )
 
 where cargo >nul 2>nul
@@ -94,11 +88,6 @@ if errorlevel 1 (
 call npm -v
 if errorlevel 1 (
   echo error: npm is not available. Close this terminal and rerun build-windows.bat.
-  exit /b 1
-)
-call go version
-if errorlevel 1 (
-  echo error: go is not available. Close this terminal and rerun build-windows.bat.
   exit /b 1
 )
 call cargo --version

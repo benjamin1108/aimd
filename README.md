@@ -75,67 +75,27 @@ cd aimd
 
 不需要 `sudo`，不写入 `/usr/local`，并且可逆。
 
-#### 从源码构建
+#### 从源码构建（桌面应用）
 
-需要 Go 1.22 或更新版本。
-
-```bash
-go install github.com/aimd-org/aimd/cmd/aimd@latest
-```
-
-中国大陆用户可以先设置 Go 代理：
+需要 Node.js 20+ 和 Rust（stable）。
 
 ```bash
-go env -w GOPROXY=https://goproxy.cn,direct
-go install github.com/aimd-org/aimd/cmd/aimd@latest
+cd apps/desktop
+npm install
+npm run build
 ```
 
-### CLI 示例
+macOS 一键构建（含环境安装）：
 
 ```bash
-# 将 Markdown 和本地图片打包为一个 .aimd 文件
-aimd pack report.md -o report.aimd
-
-# 在原生 macOS 窗口中打开
-aimd view report.aimd
-
-# 通过本地服务在浏览器中预览
-aimd preview report.aimd
-
-# 检查 manifest、资源和 SHA-256 完整性
-aimd inspect report.aimd
-aimd inspect report.aimd --json
-
-# 解包回普通 Markdown 项目
-aimd unpack report.aimd -o report-out/
-
-# 为未安装 AIMD 的用户生成自渲染 HTML
-aimd seal report.aimd -o report.html
-
-# 导出资源内联的静态 HTML
-aimd export html report.aimd -o report-static.html
+./build-dmg.sh
 ```
 
-仓库内置了示例文档：[examples/report/](examples/report/)。可以运行完整 smoke flow：
+Windows 一键构建：
 
-```bash
-./scripts/smoke.sh
+```bat
+build-windows.bat
 ```
-
-### 命令
-
-| 命令 | 用途 |
-|---|---|
-| `aimd pack <md> [-o out.aimd] [--title T]` | 将 Markdown 和本地图片引用打包为一个 `.aimd` |
-| `aimd unpack <aimd> [-o dir] [--keep-asset-uri]` | 恢复为普通 Markdown 和资源目录 |
-| `aimd inspect <aimd> [--json]` | 输出 manifest、资源、大小和哈希状态 |
-| `aimd view <aimd> [--width W --height H]` | 打开原生 macOS 查看器/编辑器 |
-| `aimd preview <aimd> [--port N] [--no-open]` | 提供本地浏览器预览 |
-| `aimd seal <aimd> [-o out.html]` | 生成自渲染的独立 HTML 文件 |
-| `aimd export html <aimd> [-o out.html]` | 导出资源 base64 内联的静态 HTML |
-| `aimd version` | 输出二进制和格式版本 |
-
-参数可以放在位置参数前后。
 
 ### 文件格式
 
@@ -202,23 +162,21 @@ Markdown 图片引用会被改写为稳定的资源 URI：
 
 ### 开发
 
-```bash
-go test ./...
-go build -o bin/aimd ./cmd/aimd
-./scripts/smoke.sh
-```
-
-桌面应用：
+工具链：Node.js 20+ 和 Rust（stable）。不需要 Go。
 
 ```bash
-cd apps/desktop-tauri
+cd apps/desktop
 npm install
 npm run typecheck
 npm run build:web
 npm run test:e2e
 ```
 
-Windows 桌面版构建与冒烟测试说明见 [`docs/windows-desktop.md`](docs/windows-desktop.md)。
+Rust workspace 单元测试：
+
+```bash
+cargo test --workspace
+```
 
 Windows 一键环境准备与构建：
 
@@ -310,17 +268,11 @@ No `sudo`, no `/usr/local`, and fully reversible.
 
 #### Build from Source
 
-Requires Go 1.22 or newer.
+Requires Rust stable and Node.js 20 or newer.
 
 ```bash
-go install github.com/aimd-org/aimd/cmd/aimd@latest
-```
-
-For users in mainland China:
-
-```bash
-go env -w GOPROXY=https://goproxy.cn,direct
-go install github.com/aimd-org/aimd/cmd/aimd@latest
+cargo build --workspace --release
+cd apps/desktop && npm install && npm run build
 ```
 
 ### CLI Examples
@@ -436,15 +388,15 @@ See:
 ### Development
 
 ```bash
-go test ./...
-go build -o bin/aimd ./cmd/aimd
+cargo test --workspace
+cargo clippy --workspace --all-targets -- -D warnings
 ./scripts/smoke.sh
 ```
 
 Desktop app:
 
 ```bash
-cd apps/desktop-tauri
+cd apps/desktop
 npm install
 npm run typecheck
 npm run build:web

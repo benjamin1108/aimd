@@ -1,0 +1,14 @@
+[package]
+name = "aimd-render"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+
+[dependencies]
+aimd-mdx = { path = "../aimd-mdx" }
+comrak = { workspace = true }
+regex = { workspace = true }
+
+[dev-dependencies]
+aimd-core = { path = "../aimd-core" }
+tempfile = { workspace = true }

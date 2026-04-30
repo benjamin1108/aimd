@@ -1,14 +1,14 @@
 # Build artifacts
 /bin/
 /dist/
-.gocache/
 node_modules/
 target/
-apps/desktop-tauri/dist/
-apps/desktop-tauri/src-tauri/target/
-apps/desktop-tauri/src-tauri/gen/
-apps/desktop-tauri/playwright-report/
-apps/desktop-tauri/test-results/
+apps/desktop/dist/
+apps/desktop/src-tauri/target/
+apps/desktop/src-tauri/gen/
+apps/desktop/playwright-report/
+apps/desktop/test-results/
+crates/*/target/
 bugscreen/
 bug-screen/
 # Generated rendered outputs (sealed/exported); source templates under internal/ are kept
