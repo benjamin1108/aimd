@@ -130,6 +130,8 @@ fn rewrite_gc_preserves_referenced_assets_and_advances_updated_at() {
             markdown: md_before.clone(),
             delete_assets: None,
             add_assets: vec![],
+            add_files: vec![],
+            delete_files: std::collections::HashSet::new(),
             gc_unreferenced: true,
         },
     )
@@ -177,6 +179,8 @@ fn rewrite_produces_no_leftover_tmp_files() {
             markdown: md,
             delete_assets: None,
             add_assets: vec![],
+            add_files: vec![],
+            delete_files: std::collections::HashSet::new(),
             gc_unreferenced: true,
         },
     )

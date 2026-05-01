@@ -13,23 +13,6 @@ export const APP_HTML = `
         </header>
 
         <nav class="sidebar-body" id="sidebar-body">
-          <section class="nav-section nav-section--doc" id="doc-section">
-            <div class="section-label">文档</div>
-            <div class="section-content">
-              <div id="doc-card" class="doc-card" data-state="empty">
-                <span class="doc-card-icon">${ICONS.document}</span>
-                <div class="doc-card-text">
-                  <div class="doc-card-title">未打开文档</div>
-                  <div class="doc-card-meta">点击下方打开 .aimd</div>
-                </div>
-              </div>
-            </div>
-          </section>
-
-          <button class="sb-resizer" id="resizer-1" hidden
-                  data-above="#doc-section" data-below="#outline-section"
-                  aria-label="调整文档与大纲高度"></button>
-
           <section class="nav-section" id="outline-section" hidden>
             <div class="section-label">
               <span>大纲</span>
@@ -40,7 +23,38 @@ export const APP_HTML = `
             </div>
           </section>
 
-          <button class="sb-resizer" id="resizer-2" hidden
+          <section class="nav-section nav-section--tour" id="docutour-section" hidden>
+            <div class="section-label">
+              <span>导读</span>
+              <span class="section-count" id="docutour-count">0</span>
+            </div>
+            <div class="section-content">
+              <div id="docutour-panel" class="docutour-panel">
+                <header class="docutour-panel-head">
+                  <div>
+                    <div class="docutour-kicker">AI 导读</div>
+                    <div class="docutour-counter"></div>
+                  </div>
+                  <button class="docutour-exit" data-tour-exit type="button">退出</button>
+                </header>
+                <div class="docutour-progress" aria-hidden="true"><span></span></div>
+                <div class="docutour-content">
+                  <div class="docutour-meta"></div>
+                  <div class="docutour-step-title"></div>
+                  <div class="docutour-why"></div>
+                  <div class="docutour-insight"></div>
+                  <div class="docutour-next"></div>
+                </div>
+                <div class="docutour-sidebar-actions">
+                  <button class="docutour-control-btn" data-tour-prev type="button">上一步</button>
+                  <button class="docutour-control-btn" data-tour-next type="button">下一步</button>
+                </div>
+                <div class="docutour-keyhint">← / → 切换步骤</div>
+              </div>
+            </div>
+          </section>
+
+          <button class="sb-resizer" id="sb-resizer-outline-asset" hidden
                   data-above="#outline-section" data-below="#asset-section"
                   aria-label="调整大纲与资源高度"></button>
 
@@ -97,7 +111,6 @@ export const APP_HTML = `
             <div class="more-menu-wrap">
               <button id="more-menu-toggle" class="ghost-btn icon-only" type="button" title="更多文档操作" aria-haspopup="menu" aria-expanded="false">⋯</button>
               <div id="more-menu" class="action-menu" role="menu" hidden>
-                <div class="action-menu-group-label">文件</div>
                 <button id="save-as" class="action-menu-item" type="button" disabled>
                   <span class="action-menu-icon">${ICONS.folder}</span>
                   <span>另存为...</span>
@@ -107,8 +120,7 @@ export const APP_HTML = `
                   <span>新窗口打开</span>
                 </button>
                 <hr class="action-menu-sep" role="separator">
-                <div class="action-menu-group-label">危险</div>
-                <button id="close" class="action-menu-item action-menu-item--danger" type="button" disabled>
+                <button id="close" class="action-menu-item" type="button" disabled>
                   <span class="action-menu-icon">${ICONS.close}</span>
                   <span>关闭文档</span>
                 </button>
@@ -118,45 +130,31 @@ export const APP_HTML = `
         </header>
 
         <div class="doc-toolbar" id="doc-toolbar" hidden>
-          <div class="mode-switch" role="tablist">
-            <button id="mode-read" class="mode-btn" role="tab" aria-selected="true" type="button" disabled>
-              <span>阅读</span>
-            </button>
-            <button id="mode-edit" class="mode-btn" role="tab" aria-selected="false" type="button" disabled>
-              <span>编辑</span>
-            </button>
-            <button id="mode-source" class="mode-btn" role="tab" aria-selected="false" type="button" disabled>
-              <span>源码</span>
-            </button>
+          <div class="toolbar-group toolbar-group--mode">
+            <div class="mode-switch" role="tablist">
+              <button id="mode-read" class="mode-btn" role="tab" aria-selected="true" type="button" disabled>
+                <span>阅读</span>
+              </button>
+              <button id="mode-edit" class="mode-btn" role="tab" aria-selected="false" type="button" disabled>
+                <span>编辑</span>
+              </button>
+              <button id="mode-source" class="mode-btn" role="tab" aria-selected="false" type="button" disabled>
+                <span>源码</span>
+              </button>
+            </div>
           </div>
 
           <div class="doc-toolbar-spacer"></div>
 
-          <label class="toolbar-select-label">
-            <span>宽度</span>
-            <select id="width-select" class="toolbar-select" aria-label="阅读宽度">
-              <option value="normal">常规</option>
-              <option value="wide">加宽</option>
-              <option value="ultra">超宽</option>
-            </select>
-          </label>
-
-          <div class="tour-menu-wrap">
-            <button id="tour-menu-toggle" class="secondary-btn" type="button" aria-haspopup="menu" aria-expanded="false">
-              <span class="secondary-btn-icon">${ICONS.sparkle}</span>
-              <span>导览</span>
-              <span id="tour-status-dot" class="tour-status-dot" data-state="none" aria-hidden="true"></span>
+          <div class="toolbar-group toolbar-group--tour" id="tour-actions">
+            <button id="docutour-play" class="secondary-btn" type="button" hidden>
+              <span class="secondary-btn-icon">${ICONS.play}</span>
+              <span>播放导览</span>
             </button>
-            <div id="tour-menu" class="action-menu" role="menu" hidden>
-              <button id="docutour-play" class="action-menu-item" type="button" disabled>
-                <span class="action-menu-icon">${ICONS.play}</span>
-                <span>播放导读</span>
-              </button>
-              <button id="docutour-generate" class="action-menu-item" type="button" disabled>
-                <span class="action-menu-icon">${ICONS.sparkle}</span>
-                <span>生成/更新导览</span>
-              </button>
-            </div>
+            <button id="docutour-generate" class="ghost-btn" type="button" disabled>
+              <span class="secondary-btn-icon">${ICONS.sparkle}</span>
+              <span id="docutour-generate-label">生成导览</span>
+            </button>
           </div>
         </div>
 
@@ -200,22 +198,23 @@ export const APP_HTML = `
 
         <section class="workspace-body">
           <article id="empty" class="empty-state">
-            <div class="launch-hero">
+            <header class="launch-head">
               <div class="empty-mark">${ICONS.document}</div>
-              <div class="launch-eyebrow">AIMD Desktop</div>
-              <h2>把图文文档装进一个文件</h2>
-              <p>正文、图片和元信息始终在一起。发给别人，不丢图；换个目录，也能完整打开。</p>
-              <div class="launch-actions">
-                <button id="empty-new" class="primary-btn lg" type="button">
-                  <span class="primary-btn-icon">${ICONS.plus}</span>
-                  <span>新建文档</span>
-                </button>
-                <button id="empty-open" class="secondary-btn lg" type="button">
-                  <span class="secondary-btn-icon">${ICONS.folder}</span>
-                  <span>打开文件</span>
-                </button>
+              <div class="launch-head-text">
+                <h2>开始</h2>
+                <p>新建文档、打开 .aimd 或导入 Markdown。</p>
               </div>
-              <div class="empty-hint">⌘N 新建 · ⌘O 打开 · ⇧⌘S 另存为 · 拖入 .aimd 可直接打开</div>
+            </header>
+
+            <div class="launch-actions">
+              <button id="empty-new" class="primary-btn" type="button">
+                <span class="primary-btn-icon">${ICONS.plus}</span>
+                <span>新建文档</span>
+              </button>
+              <button id="empty-open" class="secondary-btn" type="button">
+                <span class="secondary-btn-icon">${ICONS.folder}</span>
+                <span>打开 .aimd</span>
+              </button>
             </div>
 
             <section class="recent-section" id="recent-section" hidden>
@@ -225,6 +224,8 @@ export const APP_HTML = `
               </div>
               <div id="recent-list" class="recent-list"></div>
             </section>
+
+            <div class="empty-hint">⌘N 新建 · ⌘O 打开 · ⇧⌘S 另存为 · 拖入 .aimd / Markdown 即可打开</div>
           </article>
 
           <article id="reader" class="reader aimd" hidden></article>
@@ -252,6 +253,11 @@ export const APP_HTML = `
         </section>
 
         <footer class="workspace-foot">
+          <button id="debug-indicator" class="debug-indicator" type="button" hidden aria-label="打开调试控制台">
+            <span class="debug-indicator-dot" aria-hidden="true"></span>
+            <span class="debug-indicator-label">调试</span>
+            <span id="debug-indicator-count" class="debug-indicator-count">0</span>
+          </button>
           <span class="status-pill" id="status-pill" data-tone="idle">
             <span class="status-dot"></span>
             <span id="status">就绪</span>

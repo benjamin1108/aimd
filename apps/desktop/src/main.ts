@@ -11,7 +11,8 @@ import { state } from "./core/state";
 import {
   markdownEl, inlineEditorEl, modeReadEl, modeEditEl, modeSourceEl,
   saveEl, saveAsEl, closeEl, docuTourGenerateEl, docuTourPlayEl,
-  moreMenuToggleEl, moreMenuEl, tourMenuToggleEl, tourMenuEl,
+  moreMenuToggleEl, moreMenuEl,
+  debugIndicatorEl, debugIndicatorCountEl,
 } from "./core/dom";
 import { setMode, refreshSourceBanner } from "./ui/mode";
 import { updateChrome } from "./ui/chrome";
@@ -36,9 +37,23 @@ import {
 } from "./drag/window-drop";
 import { persistSessionSnapshot, restoreSession } from "./session/snapshot";
 import { generateDocuTour, startDocuTour, stopDocuTour } from "./docutour/tour";
-import { installDebugConsole, openDebugConsole } from "./debug/console";
+import { installDebugConsole, openDebugConsole, onDebugChange } from "./debug/console";
 
 installDebugConsole();
+
+// footer 状态条上的隐式调试指示器：只有出现 warn / error 时才显示，
+// 文案 "调试 · N"，点击就开 Debug 窗口；不再用最小化 / 最小化条。
+onDebugChange((errorCount) => {
+  const indicator = debugIndicatorEl();
+  if (errorCount > 0) {
+    indicator.hidden = false;
+    debugIndicatorCountEl().textContent = String(errorCount);
+  } else {
+    indicator.hidden = true;
+    debugIndicatorCountEl().textContent = "0";
+  }
+});
+debugIndicatorEl().addEventListener("click", () => { openDebugConsole(); });
 
 const $ = <T extends HTMLElement>(selector: string) => document.querySelector<T>(selector)!;
 
@@ -46,10 +61,7 @@ function bindMenuToggle(toggle: HTMLButtonElement, menu: HTMLElement) {
   toggle.addEventListener("click", (event) => {
     event.stopPropagation();
     const nextHidden = !menu.hidden;
-    moreMenuEl().hidden = true;
-    tourMenuEl().hidden = true;
-    moreMenuToggleEl().setAttribute("aria-expanded", "false");
-    tourMenuToggleEl().setAttribute("aria-expanded", "false");
+    closeActionMenus();
     menu.hidden = nextHidden;
     toggle.setAttribute("aria-expanded", String(!nextHidden));
   });
@@ -57,9 +69,7 @@ function bindMenuToggle(toggle: HTMLButtonElement, menu: HTMLElement) {
 
 function closeActionMenus() {
   moreMenuEl().hidden = true;
-  tourMenuEl().hidden = true;
   moreMenuToggleEl().setAttribute("aria-expanded", "false");
-  tourMenuToggleEl().setAttribute("aria-expanded", "false");
 }
 
 $("#head-new").addEventListener("click", () => { void newDocument(); });
@@ -78,17 +88,16 @@ modeEditEl().addEventListener("click", () => setMode("edit"));
 modeSourceEl().addEventListener("click", () => setMode("source"));
 saveEl().addEventListener("click", saveDocument);
 saveAsEl().addEventListener("click", () => { closeActionMenus(); void saveDocumentAs(); });
-docuTourGenerateEl().addEventListener("click", () => { closeActionMenus(); void generateDocuTour(); });
-docuTourPlayEl().addEventListener("click", () => { closeActionMenus(); startDocuTour(); });
+docuTourGenerateEl().addEventListener("click", () => { void generateDocuTour(); });
+docuTourPlayEl().addEventListener("click", () => { startDocuTour(); });
 bindMenuToggle(moreMenuToggleEl(), moreMenuEl());
-bindMenuToggle(tourMenuToggleEl(), tourMenuEl());
 $<HTMLButtonElement>("#new-window").addEventListener("click", () => {
   closeActionMenus();
   void invoke("open_in_new_window", { path: null });
 });
 closeEl().addEventListener("click", () => { closeActionMenus(); void closeDocument(); });
 document.addEventListener("click", (event) => {
-  if (!(event.target as HTMLElement).closest(".more-menu-wrap, .tour-menu-wrap")) closeActionMenus();
+  if (!(event.target as HTMLElement).closest(".more-menu-wrap")) closeActionMenus();
 });
 
 markdownEl().addEventListener("input", () => {
@@ -164,10 +173,18 @@ document.addEventListener("keydown", (event) => {
 // As", etc). In dev we leave it on so DevTools "Inspect" still works. e2e sets
 // __aimd_force_contextmenu_block via addInitScript to drive the real listener
 // through the same path production runs.
-// Items marked [data-file-item] handle contextmenu themselves; let them pass.
+//
+// 例外（让原生菜单透出）：
+//   - [data-file-item] 自己处理 contextmenu。
+//   - input / textarea / contenteditable / 源码 #markdown：用户需要"剪切/复制/粘贴"
+//     原生菜单。一刀切阻断会让 API key 等密码字段也丢失粘贴入口（用户会以为
+//     "禁用了 copy paste"）。
 if (!(import.meta as any).env?.DEV || (window as any).__aimd_force_contextmenu_block) {
   document.addEventListener("contextmenu", (e) => {
-    if ((e.target as HTMLElement)?.closest("[data-file-item]")) return;
+    const target = e.target as HTMLElement | null;
+    if (!target) return;
+    if (target.closest("[data-file-item]")) return;
+    if (target.closest("input, textarea, [contenteditable='true'], #markdown")) return;
     e.preventDefault();
   }, { capture: true });
 }

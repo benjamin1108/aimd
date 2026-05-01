@@ -246,6 +246,37 @@ test.describe("3. Context menu is prevented (production mode)", () => {
     });
     expect(prevented).toBe(true);
   });
+
+  test("contextmenu 在 textarea / input / 源码 #markdown 上不被拦截（保留原生剪切/复制/粘贴菜单）", async ({ page }) => {
+    // 历史版本一刀切 preventDefault，连 input 的"粘贴"菜单都被吞掉，
+    // 用户会以为应用禁用了 copy/paste。例外要把输入控件透出来。
+    await installTauriMockWithContextmenuForce(page);
+    await page.goto("/");
+    await page.locator("#empty-open").click();
+    await page.locator("#mode-source").click();
+
+    const result = await page.evaluate(() => {
+      function fire(target: Element) {
+        const ev = new MouseEvent("contextmenu", { bubbles: true, cancelable: true });
+        target.dispatchEvent(ev);
+        return ev.defaultPrevented;
+      }
+      const md = document.querySelector("#markdown");
+      const sourceMd = md ? fire(md) : null;
+      const tmpInput = document.createElement("input");
+      document.body.appendChild(tmpInput);
+      const inputPrevented = fire(tmpInput);
+      tmpInput.remove();
+      const tmpTextarea = document.createElement("textarea");
+      document.body.appendChild(tmpTextarea);
+      const textareaPrevented = fire(tmpTextarea);
+      tmpTextarea.remove();
+      return { sourceMd, inputPrevented, textareaPrevented };
+    });
+    expect(result.sourceMd).toBe(false);
+    expect(result.inputPrevented).toBe(false);
+    expect(result.textareaPrevented).toBe(false);
+  });
 });
 
 test.describe("4. Text selectability", () => {

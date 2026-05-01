@@ -22,7 +22,18 @@ const LONG_DOC = {
   html: "<h1>一级标题</h1><p>填充段落 A</p><h2>二级</h2>" +
         "<p>填充段落 B</p>".repeat(20) +
         "<h2>末尾标题</h2><p>填充段落 C</p>",
-  assets: [] as Array<unknown>,
+  // outline / asset 之间的 resizer 仅在 asset 区有内容时才显示，
+  // 这里塞一张占位资源让 sidebar 同时展示两个 section。
+  assets: [{
+    id: "img-1",
+    path: "assets/sample.png",
+    mime: "image/png",
+    size: 1024,
+    sha256: "deadbeef",
+    role: "content-image",
+    url: "asset://localhost/sample.png",
+    localPath: "/tmp/sample.png",
+  }],
   dirty: false,
 };
 
@@ -91,16 +102,19 @@ test.describe("Outline navigation across modes", () => {
 });
 
 test.describe("Sidebar resizer", () => {
-  test("dragging resizer-1 changes the doc-section flex height", async ({ page }) => {
+  // ux-product-audit P1-4：原 doc-section 已经从 sidebar 移走（与 header 重复）。
+  // 现在 sidebar 上下两段是 #outline-section 和 #asset-section，
+  // 它们之间的 resizer 改名为 #sb-resizer-outline-asset。
+  test("dragging the outline/asset resizer changes outline-section flex height", async ({ page }) => {
     await installTauriMock(page);
     await page.goto("/");
     await page.locator("#empty-open").click();
 
-    const resizer = page.locator("#resizer-1");
+    const resizer = page.locator("#sb-resizer-outline-asset");
     await expect(resizer).toBeVisible();
 
-    const docSection = page.locator("#doc-section");
-    const before = await docSection.evaluate((el: HTMLElement) => el.getBoundingClientRect().height);
+    const outlineSection = page.locator("#outline-section");
+    const before = await outlineSection.evaluate((el: HTMLElement) => el.getBoundingClientRect().height);
 
     // Use raw mouse events so pointer capture on the resizer engages.
     const box = await resizer.boundingBox();
@@ -110,14 +124,14 @@ test.describe("Sidebar resizer", () => {
 
     await page.mouse.move(startX, startY);
     await page.mouse.down();
-    await page.mouse.move(startX, startY + 80, { steps: 8 });
+    await page.mouse.move(startX, startY - 60, { steps: 6 });
     await page.mouse.up();
 
-    const after = await docSection.evaluate((el: HTMLElement) => el.getBoundingClientRect().height);
-    expect(after).toBeGreaterThan(before);
+    const after = await outlineSection.evaluate((el: HTMLElement) => el.getBoundingClientRect().height);
+    expect(after).not.toBe(before);
 
     // After pointerup, the body must NOT remain in the resizing state, otherwise
-    // the whole UI stays locked to ns-resize / user-select: none.
+    // the whole UI stays locked to ns-resize.
     const stuck = await page.evaluate(() => document.body.classList.contains("resizing-v"));
     expect(stuck).toBe(false);
   });
@@ -127,22 +141,31 @@ test.describe("Sidebar resizer", () => {
     await page.goto("/");
     await page.locator("#empty-open").click();
 
-    const resizer = page.locator("#resizer-1");
-    const docSection = page.locator("#doc-section");
+    const resizer = page.locator("#sb-resizer-outline-asset");
+    const outlineSection = page.locator("#outline-section");
 
     // First, force a custom flex via direct drag.
     const box = await resizer.boundingBox();
     if (!box) throw new Error("resizer not laid out");
     await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
     await page.mouse.down();
-    await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2 + 60, { steps: 6 });
+    await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2 - 50, { steps: 6 });
     await page.mouse.up();
 
-    const customFlex = await docSection.evaluate((el: HTMLElement) => el.style.flex);
+    const customFlex = await outlineSection.evaluate((el: HTMLElement) => el.style.flex);
     expect(customFlex).not.toBe("");
 
     await resizer.dblclick();
-    const reset = await docSection.evaluate((el: HTMLElement) => el.style.flex);
+    const reset = await outlineSection.evaluate((el: HTMLElement) => el.style.flex);
     expect(reset).toBe("");
+  });
+
+  test("asset-section 无内容时整段折叠（不再常驻空区域）", async ({ page }) => {
+    await installTauriMock(page, { ...LONG_DOC, assets: [] });
+    await page.goto("/");
+    await page.locator("#empty-open").click();
+    await expect(page.locator("#outline-section")).toBeVisible();
+    await expect(page.locator("#asset-section")).toBeHidden();
+    await expect(page.locator("#sb-resizer-outline-asset")).toBeHidden();
   });
 });

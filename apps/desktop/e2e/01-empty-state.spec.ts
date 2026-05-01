@@ -15,14 +15,14 @@ function trapPageErrors(page: Page): { errors: string[] } {
 }
 
 test.describe("Empty state — running outside Tauri", () => {
-  test("brand, launchpad hero, hidden editor chrome", async ({ page }) => {
+  test("brand, launchpad shell, hidden editor chrome", async ({ page }) => {
+    // ux-product-audit P1-6：空态从 marketing hero 改为 launchpad 紧凑布局。
     const trap = trapPageErrors(page);
     await page.goto("/");
 
     await expect(page.locator(".brand-name")).toHaveText("AIMD");
     await expect(page.locator("#empty")).toBeVisible();
-    await expect(page.locator("#empty h2")).toContainText("把图文文档装进一个文件");
-    await expect(page.locator("#empty")).toContainText("发给别人，不丢图");
+    await expect(page.locator("#empty .launch-head h2")).toHaveText("开始");
 
     await expect(page.locator("#starter-actions")).toBeVisible();
     await expect(page.locator("#doc-actions")).toBeHidden();
@@ -42,7 +42,7 @@ test.describe("Empty state — running outside Tauri", () => {
     await page.goto("/");
     await expect(page.locator(".brand-mark")).toHaveText("A");
     await expect(page.locator("#empty-new")).toContainText("新建文档");
-    await expect(page.locator("#empty-open")).toContainText("打开文件");
+    await expect(page.locator("#empty-open")).toContainText("打开");
     await expect(page.locator("#empty-import")).not.toBeAttached();
   });
 

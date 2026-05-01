@@ -7,6 +7,7 @@ use std::path::Path;
 use std::sync::OnceLock;
 
 use crate::manifest::{Manifest, ROLE_CONTENT_IMAGE};
+use crate::manifest::{FILE_MAIN_MD, FILE_MANIFEST};
 use crate::reader::Reader;
 use crate::writer::Writer;
 
@@ -18,11 +19,18 @@ pub struct NewAsset {
     pub role: String,
 }
 
+pub struct PackageFile {
+    pub path: String,
+    pub data: Vec<u8>,
+}
+
 /// Controls an in-place rewrite of an AIMD file.
 pub struct RewriteOptions {
     pub markdown: Vec<u8>,
     pub delete_assets: Option<HashSet<String>>,
     pub add_assets: Vec<NewAsset>,
+    pub add_files: Vec<PackageFile>,
+    pub delete_files: HashSet<String>,
     pub gc_unreferenced: bool,
 }
 
@@ -92,6 +100,29 @@ pub fn rewrite_file<P: AsRef<Path>>(path: P, opt: RewriteOptions) -> io::Result<
 
     let mut w = Writer::new(mf);
     w.set_main_markdown(&opt.markdown)?;
+    let added_file_paths: HashSet<String> = opt.add_files.iter().map(|f| f.path.clone()).collect();
+    let manifest_entry = if r.manifest.entry.is_empty() {
+        FILE_MAIN_MD
+    } else {
+        &r.manifest.entry
+    };
+    let asset_paths: HashSet<String> = r.manifest.assets.iter().map(|a| a.path.clone()).collect();
+    for name in r.file_names()? {
+        if name == FILE_MANIFEST || name == manifest_entry {
+            continue;
+        }
+        if asset_paths.contains(&name) || name.starts_with("assets/") {
+            continue;
+        }
+        if opt.delete_files.contains(&name) || added_file_paths.contains(&name) {
+            continue;
+        }
+        let data = r.read_file(&name)?;
+        w.add_file(&name, &data)?;
+    }
+    for file in opt.add_files {
+        w.add_file(&file.path, &file.data)?;
+    }
     for asset in existing.into_iter().chain(opt.add_assets) {
         let role = if asset.role.is_empty() {
             ROLE_CONTENT_IMAGE.to_string()
@@ -309,6 +340,8 @@ mod tests {
             markdown: new_md.to_vec(),
             delete_assets: None,
             add_assets: Vec::new(),
+            add_files: Vec::new(),
+            delete_files: HashSet::new(),
             gc_unreferenced: true,
         };
 
@@ -359,6 +392,8 @@ mod tests {
             markdown: b"# Updated (no refs)".to_vec(),
             delete_assets: None,
             add_assets: Vec::new(),
+            add_files: Vec::new(),
+            delete_files: HashSet::new(),
             gc_unreferenced: false,
         };
         rewrite_file(&aimd_path, opt).unwrap();
@@ -368,6 +403,51 @@ mod tests {
             r.manifest.assets.len(),
             2,
             "gc_unreferenced=false must keep all assets"
+        );
+    }
+
+    #[test]
+    fn rewrite_file_preserves_and_updates_package_metadata() {
+        let tmp = tempfile::tempdir().unwrap();
+        let aimd_path = tmp.path().join("doc.aimd");
+        let m = Manifest::new("Test");
+        let mut w = Writer::new(m);
+        w.set_main_markdown(b"# Original").unwrap();
+        w.add_file("metadata/docutour.json", br#"{"version":1}"#)
+            .unwrap();
+        let bytes = w.finish_bytes().unwrap();
+        std::fs::write(&aimd_path, bytes).unwrap();
+
+        rewrite_file(
+            &aimd_path,
+            RewriteOptions {
+                markdown: b"# Updated".to_vec(),
+                delete_assets: None,
+                add_assets: Vec::new(),
+                add_files: vec![PackageFile {
+                    path: "metadata/docutour.json".to_string(),
+                    data: br#"{"version":2}"#.to_vec(),
+                }],
+                delete_files: HashSet::new(),
+                gc_unreferenced: false,
+            },
+        )
+        .unwrap();
+
+        let r = Reader::open(&aimd_path).unwrap();
+        assert_eq!(r.main_markdown().unwrap(), b"# Updated");
+        assert_eq!(
+            r.read_file("metadata/docutour.json").unwrap(),
+            br#"{"version":2}"#
+        );
+        assert_eq!(
+            r.file_names()
+                .unwrap()
+                .into_iter()
+                .filter(|name| name == "metadata/docutour.json")
+                .count(),
+            1,
+            "metadata entry must not be duplicated"
         );
     }
 

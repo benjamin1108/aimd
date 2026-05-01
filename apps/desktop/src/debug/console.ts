@@ -12,7 +12,9 @@ let installed = false;
 let modal: HTMLElement | null = null;
 let listEl: HTMLElement | null = null;
 let panelEl: HTMLElement | null = null;
-let minimized = false;
+
+type ChangeListener = (errorCount: number) => void;
+const listeners = new Set<ChangeListener>();
 
 function formatArg(value: unknown): string {
   if (value instanceof Error) return `${value.name}: ${value.message}\n${value.stack || ""}`.trim();
@@ -24,6 +26,28 @@ function formatArg(value: unknown): string {
   }
 }
 
+function errorEntryCount(): number {
+  let n = 0;
+  for (const entry of entries) {
+    if (entry.level === "warn" || entry.level === "error") n += 1;
+  }
+  return n;
+}
+
+/** 状态栏 #debug-indicator 通过它订阅"错误数"变化；只算 warn / error，
+ *  普通 log 不触发指示器，避免日常打印噪音让用户误以为有问题。 */
+export function onDebugChange(listener: ChangeListener): () => void {
+  listeners.add(listener);
+  // 立即通知一次当前值，方便订阅者初始化。
+  listener(errorEntryCount());
+  return () => listeners.delete(listener);
+}
+
+function emitChange() {
+  const n = errorEntryCount();
+  for (const listener of listeners) listener(n);
+}
+
 export function debugLog(level: DebugLevel, ...args: unknown[]) {
   entries.push({
     ts: new Date().toLocaleTimeString(),
@@ -32,6 +56,7 @@ export function debugLog(level: DebugLevel, ...args: unknown[]) {
   });
   if (entries.length > MAX_ENTRIES) entries.splice(0, entries.length - MAX_ENTRIES);
   renderEntries();
+  if (level !== "log") emitChange();
 }
 
 function renderEntries() {
@@ -57,21 +82,21 @@ function escapeHTML(value: string) {
     .replaceAll('"', "&quot;");
 }
 
-let debugModeActive = false;
-
+// 应用启动就 patch console + 监听 error/rejection，环形 buffer 始终在收集，
+// 打开窗口看到的就是完整历史。
 export function installDebugConsole() {
+  activateConsolePatch();
   window.addEventListener("error", (event) => {
-    if (debugModeActive) debugLog("error", event.error || event.message);
+    debugLog("error", event.error || event.message);
   });
   window.addEventListener("unhandledrejection", (event) => {
-    if (debugModeActive) debugLog("error", event.reason || "Unhandled promise rejection");
+    debugLog("error", event.reason || "Unhandled promise rejection");
   });
 }
 
 function activateConsolePatch() {
   if (installed) return;
   installed = true;
-  debugModeActive = true;
   const original = {
     log: console.log.bind(console),
     warn: console.warn.bind(console),
@@ -92,20 +117,18 @@ function activateConsolePatch() {
 }
 
 export function openDebugConsole() {
-  activateConsolePatch();
   if (!modal) {
     modal = document.createElement("div");
     modal.className = "debug-modal";
     modal.innerHTML = `
-      <section class="debug-panel" role="dialog" aria-label="Debug Console">
+      <section class="debug-panel" role="dialog" aria-label="调试控制台">
         <header class="debug-head" data-debug-drag>
           <div>
-            <h2>Debug Console</h2>
+            <h2>调试控制台</h2>
             <p>运行时日志、模型调用错误和未捕获异常</p>
           </div>
           <div class="debug-actions">
             <button class="secondary-btn sm" data-debug-clear type="button">清空</button>
-            <button class="secondary-btn sm" data-debug-minimize type="button">最小化</button>
             <button class="secondary-btn sm" data-debug-close type="button">关闭</button>
           </div>
         </header>
@@ -115,31 +138,20 @@ export function openDebugConsole() {
     panelEl = modal.querySelector<HTMLElement>(".debug-panel");
     listEl = modal.querySelector<HTMLElement>(".debug-list");
     modal.querySelector<HTMLElement>("[data-debug-close]")?.addEventListener("click", closeDebugConsole);
-    modal.querySelector<HTMLElement>("[data-debug-minimize]")?.addEventListener("click", minimizeDebugConsole);
     modal.querySelector<HTMLElement>("[data-debug-clear]")?.addEventListener("click", () => {
       entries.length = 0;
       renderEntries();
-    });
-    modal.addEventListener("click", (event) => {
-      if (event.target === modal) closeDebugConsole();
+      emitChange();
     });
     bindDrag();
     document.body.appendChild(modal);
   }
-  minimized = false;
   modal.hidden = false;
-  modal.classList.remove("minimized");
   renderEntries();
 }
 
 export function closeDebugConsole() {
   if (modal) modal.hidden = true;
-}
-
-function minimizeDebugConsole() {
-  if (!modal) return;
-  minimized = !minimized;
-  modal.classList.toggle("minimized", minimized);
 }
 
 function bindDrag() {

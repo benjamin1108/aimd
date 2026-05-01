@@ -3,13 +3,6 @@
 
 @media (max-width: 1020px) {
   .reader { padding: 32px 36px 60px; }
-  .empty-state {
-    grid-template-columns: minmax(0, 1fr);
-    align-items: start;
-  }
-  .recent-section {
-    max-width: 620px;
-  }
 }
 
 @media (max-width: 900px) {
@@ -17,6 +10,11 @@
     grid-template-columns: 220px minmax(0, 1fr);
   }
   .reader { padding: 28px 28px 56px; }
+}
+
+/* 桌面窄窗口下保留源码 / 预览双栏：让作者还能即时看到渲染结果。
+   只在 mobile/non-pointer 设备上把预览折叠掉。 */
+@media (max-width: 760px) {
   .editor-split { grid-template-columns: minmax(0, 1fr); }
   .preview-pane { display: none; }
 }
@@ -47,6 +45,7 @@
   .doc-toolbar-spacer {
     display: none;
   }
+  .toolbar-group--mode { flex: 1 1 100%; }
   .mode-switch {
     flex: 1 1 100%;
   }
@@ -54,19 +53,12 @@
     flex: 1 1 0;
     justify-content: center;
   }
-  .toolbar-select-label,
-  .tour-menu-wrap {
-    flex: 1 1 0;
-  }
-  .toolbar-select,
-  #tour-menu-toggle {
-    width: 100%;
+  .toolbar-group--tour {
+    flex: 1 1 100%;
+    justify-content: flex-end;
   }
   .empty-state {
-    padding: 28px 22px 36px;
-  }
-  .empty-state h2 {
-    font-size: 30px;
+    padding: 24px 18px 24px;
   }
   .launch-actions {
     flex-direction: column;

@@ -4,8 +4,9 @@
  * 钉住设计打磨这一轮的视觉/IA 决策，避免下一轮回归：
  * - 顶部 ⋯ 改 ghost-btn（无 secondary-btn class），保存按钮 primary-btn 视觉权重明确高于 ⋯
  * - 模式切换段控件改纯文字（不再渲染 .mode-btn-icon SVG）
- * - ⋯ 菜单加了 action-menu-group-label 分组标题
- * - 导览按钮带 #tour-status-dot，文档无导览时 data-state="none"，有导览时 "ready"
+ * - ⋯ 菜单不再用"危险"分组（关闭文档不是破坏性操作）
+ * - 导览按钮直显（无嵌套菜单 / 无状态点）：无导览时只有 #docutour-generate；有导览时
+ *   #docutour-play 出现，#docutour-generate 文案变为"重新生成"
  * - 进入 source 模式且文档含 frontmatter 时 #source-banner 可见，否则 hidden
  */
 import { test, expect, Page } from "@playwright/test";
@@ -41,12 +42,6 @@ async function installTauriMock(page: Page, opts: { withTour?: boolean } = {}) {
       open_aimd: () => doc,
       list_aimd_assets: () => [],
       confirm_discard_changes: () => "discard",
-      check_litellm_deps: () => ({
-        python3Found: true,
-        litellmFound: true,
-        python3Version: "Python 3.11",
-        installHint: "pip install litellm",
-      }),
     };
     (window as any).__TAURI_INTERNALS__ = {
       invoke: async (cmd: string, a?: Args) => {
@@ -99,31 +94,45 @@ test.describe("模式切换 — 纯文字分段控件", () => {
   });
 });
 
-test.describe("⋯ 菜单分组标题", () => {
-  test("展开后存在 action-menu-group-label 分组标题", async ({ page }) => {
+test.describe("⋯ 菜单：不再用危险分组", () => {
+  test('展开后没有"危险"分组标题，关闭文档不带 --danger class', async ({ page }) => {
     await installTauriMock(page);
     await page.goto("/");
     await page.locator("#empty-open").click();
     await page.locator("#more-menu-toggle").click();
-    await expect(page.locator("#more-menu .action-menu-group-label")).toHaveCount(2);
-    await expect(page.locator("#more-menu .action-menu-group-label").first()).toContainText("文件");
-    await expect(page.locator("#more-menu .action-menu-group-label").last()).toContainText("危险");
+    await expect(page.locator("#more-menu .action-menu-group-label")).toHaveCount(0);
+    await expect(page.locator("#close")).not.toHaveClass(/action-menu-item--danger/);
+    await expect(page.locator("#more-menu .action-menu-sep")).toBeVisible();
   });
 });
 
-test.describe("导览状态点", () => {
-  test("无导览的文档：tour-status-dot data-state=none", async ({ page }) => {
+test.describe("导览按钮：直显，不嵌套，无状态点", () => {
+  test("旧的 tour-menu / tour-status-dot 元素已经不存在", async ({ page }) => {
     await installTauriMock(page, { withTour: false });
     await page.goto("/");
     await page.locator("#empty-open").click();
-    await expect(page.locator("#tour-status-dot")).toHaveAttribute("data-state", "none");
+    await expect(page.locator("#tour-menu-toggle")).toHaveCount(0);
+    await expect(page.locator("#tour-menu")).toHaveCount(0);
+    await expect(page.locator("#tour-status-dot")).toHaveCount(0);
+    await expect(page.locator(".tour-status-dot")).toHaveCount(0);
   });
 
-  test("含导览的文档：tour-status-dot data-state=ready", async ({ page }) => {
+  test('无导览：仅 #docutour-generate 可见，文案"生成导览"', async ({ page }) => {
+    await installTauriMock(page, { withTour: false });
+    await page.goto("/");
+    await page.locator("#empty-open").click();
+    await expect(page.locator("#docutour-play")).toBeHidden();
+    await expect(page.locator("#docutour-generate")).toBeVisible();
+    await expect(page.locator("#docutour-generate")).toContainText("生成导览");
+  });
+
+  test('有导览：#docutour-play 显示步数，生成按钮变"重新生成"', async ({ page }) => {
     await installTauriMock(page, { withTour: true });
     await page.goto("/");
     await page.locator("#empty-open").click();
-    await expect(page.locator("#tour-status-dot")).toHaveAttribute("data-state", "ready");
+    await expect(page.locator("#docutour-play")).toBeVisible();
+    await expect(page.locator("#docutour-play")).toContainText("播放导览");
+    await expect(page.locator("#docutour-generate")).toContainText("重新生成");
   });
 });
 

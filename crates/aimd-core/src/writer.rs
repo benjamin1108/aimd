@@ -23,6 +23,11 @@ impl Writer {
         self.write_entry(FILE_MAIN_MD, content)
     }
 
+    /// Writes an arbitrary package entry. Callers must avoid manifest/main.md/assets collisions.
+    pub fn add_file(&mut self, name: &str, data: &[u8]) -> io::Result<()> {
+        self.write_entry(name, data)
+    }
+
     /// Writes a binary asset under assets/<filename> and registers it in the manifest.
     pub fn add_asset(
         &mut self,

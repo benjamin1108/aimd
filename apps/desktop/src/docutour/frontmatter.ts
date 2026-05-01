@@ -36,13 +36,6 @@ function splitFrontmatter(markdown: string): FrontmatterParts {
   return { found: false, yaml: "", body: markdown, newline };
 }
 
-function encodeUtf8Base64(value: string): string {
-  const bytes = new TextEncoder().encode(value);
-  let binary = "";
-  bytes.forEach((byte) => { binary += String.fromCharCode(byte); });
-  return btoa(binary);
-}
-
 function decodeUtf8Base64(value: string): string {
   const binary = atob(value);
   const bytes = new Uint8Array(binary.length);
@@ -88,10 +81,12 @@ export function extractDocuTour(markdown: string): DocuTourScript | null {
   if (!encoded) return null;
   try {
     const parsed = JSON.parse(decodeUtf8Base64(encoded)) as DocuTourScript;
-    if (parsed?.version !== 1 || !Array.isArray(parsed.steps)) return null;
+    if ((parsed?.version !== 1 && parsed?.version !== 2) || !Array.isArray(parsed.steps)) return null;
     return {
       ...parsed,
-      steps: parsed.steps.filter((step) => step.targetId && step.narration),
+      steps: parsed.steps.filter((step) =>
+        step.targetId && (step.narration || step.insight || step.why || step.label)
+      ),
     };
   } catch {
     return null;
@@ -120,15 +115,10 @@ export function summarizeFrontmatter(markdown: string): FrontmatterSummary {
   };
 }
 
-export function upsertDocuTour(markdown: string, script: DocuTourScript): string {
+export function removeDocuTour(markdown: string): string {
   const parts = splitFrontmatter(markdown);
-  const encoded = encodeUtf8Base64(JSON.stringify(script));
-  const wrapped = encoded.match(/.{1,92}/g)?.map((line) => `  ${line}`).join("\n") || `  ${encoded}`;
-  const tourYaml = `${TOUR_KEY}: |\n${wrapped}`;
-  if (!parts.found) {
-    return `---\n${tourYaml}\n---\n\n${markdown}`;
-  }
+  if (!parts.found) return markdown;
   const cleaned = removeTourKey(parts.yaml);
-  const yaml = [cleaned, tourYaml].filter((part) => part.trim()).join("\n");
-  return `---${parts.newline}${yaml}${parts.newline}---${parts.newline}${parts.newline}${parts.body}`;
+  if (!cleaned.trim()) return parts.body;
+  return `---${parts.newline}${cleaned}${parts.newline}---${parts.newline}${parts.newline}${parts.body}`;
 }

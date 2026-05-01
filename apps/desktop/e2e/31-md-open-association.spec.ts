@@ -130,7 +130,8 @@ test.describe("31. MD 按需升级方案", () => {
     await page.keyboard.press("End");
     await page.keyboard.type("x");
 
-    // 等待 dirty 状态显示（说明 state.doc.dirty = true 已生效）
+    // 等待 dirty 状态显示（说明 state.doc.dirty = true 已生效）。
+    // dirty 状态由底部 status-pill 承担。
     await page.waitForFunction(() => {
       const pill = document.querySelector("#status-pill");
       return pill && pill.getAttribute("data-tone") === "warn";

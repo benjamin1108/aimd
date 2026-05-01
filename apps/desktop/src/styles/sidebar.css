@@ -214,67 +214,6 @@ body.resizing-v * {
   text-transform: none;
 }
 
-/* Document card */
-
-.doc-card {
-  display: grid;
-  grid-template-columns: 22px minmax(0, 1fr);
-  gap: 9px;
-  align-items: center;
-  padding: 7px 9px;
-  margin: 0 2px;
-  border-radius: 8px;
-  color: var(--ink);
-  transition: background var(--t-fast) var(--ease);
-}
-
-.doc-card.active {
-  background: var(--bg-sidebar-active);
-}
-
-.doc-card-icon {
-  display: grid;
-  place-items: center;
-  width: 22px;
-  height: 22px;
-  color: var(--ink-muted);
-}
-.doc-card-icon svg { width: 14px; height: 14px; }
-
-.doc-card-text { min-width: 0; }
-
-.doc-card-title {
-  font-size: 13px;
-  font-weight: 500;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-.doc-card-meta {
-  margin-top: 1px;
-  color: var(--ink-muted);
-  font-size: 11px;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-.doc-card[data-state="dirty"] .doc-card-title::after {
-  content: "";
-  display: inline-block;
-  width: 5px;
-  height: 5px;
-  margin-left: 6px;
-  border-radius: 999px;
-  background: var(--tone-warn);
-  vertical-align: middle;
-}
-
-.doc-card[data-state="draft"] {
-  background: rgba(255, 255, 255, 0.45);
-}
-
 /* Outline */
 
 .outline-list {

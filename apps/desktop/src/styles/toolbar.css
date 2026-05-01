@@ -1,5 +1,14 @@
-/* Doc toolbar contents — toolbar-select, mode-switch, action-menu (⋯/导览),
-   tour status dot, source-mode metadata banner, starter / quick actions. */
+/* Doc toolbar contents — mode-switch, tour direct buttons, ⋯ action-menu,
+   source-mode metadata banner, starter / quick actions.
+
+   导览不再用嵌套菜单：直接渲染按钮（生成 / 重新生成 / 播放）。状态由按钮存在性
+   和文案表达，不再用顶部小圆点。 */
+
+.toolbar-group {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
 
 .toolbar-select-label {
   display: inline-flex;
@@ -27,8 +36,7 @@
   box-shadow: 0 0 0 3px rgba(31, 22, 11, 0.07);
 }
 
-.more-menu-wrap,
-.tour-menu-wrap {
+.more-menu-wrap {
   position: relative;
 }
 
@@ -39,37 +47,16 @@
   line-height: 1;
 }
 
-/* Tour menu trigger 上的状态点：
-   - 默认隐藏（.tour-status-dot[data-state="none"] 不渲染圆点）
-   - data-state="ready"：蓝色，"已存在导览"
-   - data-state="generating"：脉冲，"正在生成"
-*/
-#tour-menu-toggle {
-  position: relative;
+/* 生成导览按钮在调用模型期间脉冲式淡灰，避免用户重复点击。 */
+.ghost-btn.is-generating,
+.secondary-btn.is-generating {
+  opacity: 0.6;
+  animation: tour-generating-pulse 1.6s var(--ease) infinite;
 }
 
-.tour-status-dot {
-  display: none;
-  position: absolute;
-  top: 5px;
-  right: 5px;
-  width: 7px;
-  height: 7px;
-  border-radius: 50%;
-  background: var(--tone-info);
-  box-shadow: 0 0 0 2px var(--bg-panel);
-}
-
-.tour-status-dot[data-state="ready"] { display: block; }
-.tour-status-dot[data-state="generating"] {
-  display: block;
-  background: var(--tone-warn);
-  animation: tour-dot-pulse 1.4s var(--ease) infinite;
-}
-
-@keyframes tour-dot-pulse {
-  0%, 100% { transform: scale(1); opacity: 1; }
-  50%      { transform: scale(1.25); opacity: 0.55; }
+@keyframes tour-generating-pulse {
+  0%, 100% { opacity: 0.5; }
+  50%      { opacity: 0.9; }
 }
 
 /* Source-mode metadata banner — 出现在 textarea 上方，提示
@@ -152,27 +139,6 @@
   margin: 4px 0;
   border: none;
   border-top: 1px solid var(--hairline);
-}
-
-.action-menu-group-label {
-  padding: 6px 9px 2px;
-  color: var(--ink-faint);
-  font-size: 10px;
-  font-weight: 600;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-}
-
-.action-menu-item--danger {
-  color: var(--tone-danger, #c0392b);
-}
-
-.action-menu-item--danger .action-menu-icon {
-  color: var(--tone-danger, #c0392b);
-}
-
-.action-menu-item--danger:hover:not(:disabled) {
-  background: rgba(192, 57, 43, 0.08);
 }
 
 .action-menu-icon {

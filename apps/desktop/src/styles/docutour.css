@@ -4,10 +4,26 @@
 
 .docutour-active .workspace-head,
 .docutour-active .doc-toolbar,
-.docutour-active .sidebar,
 .docutour-active .workspace-foot {
   opacity: 0.22;
   transition: opacity var(--t-med) var(--ease);
+}
+
+.docutour-active #outline-section,
+.docutour-active #asset-section,
+.docutour-active #sb-resizer-outline-asset,
+.docutour-active .sidebar-foot {
+  display: none !important;
+}
+
+.docutour-active .sidebar-body {
+  padding: 8px 0 12px;
+}
+
+.docutour-active .sidebar {
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.28), transparent 34%),
+    var(--bg-sidebar);
 }
 
 .docutour-overlay {
@@ -15,110 +31,238 @@
   inset: 0;
   z-index: 1200;
   pointer-events: none;
-  background: rgba(15, 13, 9, 0.14);
+  background: transparent;
 }
 
-/* Spotlight — 旧版本是 3px 高饱和黄 + 9999px 实色遮罩，看起来像调试态。
-   新版本：半透明柔和黄 outline + 4px 外晕，遮罩压暗到 .32，让聚焦感来自
-   "亮"而不是"画框"。 */
 .docutour-highlight {
   position: relative;
   z-index: 1201;
   border-radius: 8px;
-  outline: 1.5px solid rgba(255, 220, 110, 0.55);
-  outline-offset: 6px;
+  outline: 1.5px solid rgba(163, 108, 28, 0.48);
+  outline-offset: 8px;
   box-shadow:
-    0 0 0 4px rgba(255, 220, 110, 0.18),
-    0 0 0 9999px rgba(15, 13, 9, 0.32),
-    0 20px 50px -22px rgba(0, 0, 0, 0.4);
-  background: var(--bg-panel);
+    0 0 0 4px rgba(163, 108, 28, 0.08),
+    0 18px 42px -28px rgba(31, 22, 11, 0.32);
   transition: outline-color var(--t-med) var(--ease),
               box-shadow var(--t-med) var(--ease);
 }
 
-/* Control bar — 半透明 + backdrop-blur，bottom 拉到 40 让出底部状态条，
-   避免与 .workspace-foot 区域视觉重叠。 */
-.docutour-control {
-  position: fixed;
-  left: 50%;
-  bottom: 40px;
-  z-index: 1210;
-  display: grid;
-  grid-template-columns: auto auto minmax(0, 1fr) auto;
-  align-items: center;
-  gap: 12px;
-  width: min(820px, calc(100vw - 48px));
-  transform: translateX(-50%);
-  padding: 12px 14px;
-  border: 1px solid rgba(255, 255, 255, 0.08);
+.docutour-highlight-region {
+  position: relative;
+  z-index: 1201;
+  margin: 10px -18px 18px;
+  padding: 14px 18px 18px;
+  border: 1.5px solid rgba(163, 108, 28, 0.36);
   border-radius: 12px;
-  background: rgba(15, 13, 9, 0.78);
-  -webkit-backdrop-filter: blur(10px);
-  backdrop-filter: blur(10px);
-  color: #fff;
+  background:
+    linear-gradient(90deg, rgba(255, 247, 225, 0.72), rgba(255, 255, 255, 0.92));
   box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.06),
-    0 18px 50px -22px rgba(0, 0, 0, 0.55);
+    inset 4px 0 0 rgba(163, 108, 28, 0.38),
+    0 18px 46px -34px rgba(31, 22, 11, 0.34);
 }
 
-.docutour-control-main {
-  min-width: 0;
+.docutour-highlight-region > :first-child {
+  margin-top: 0;
+}
+
+.docutour-highlight-region > :last-child {
+  margin-bottom: 0;
+}
+
+.nav-section--tour {
+  flex: 1 1 auto;
+  min-height: 0;
+  padding: 10px 14px 14px;
+}
+
+.nav-section--tour .section-label {
+  padding: 0 2px 12px;
+  color: var(--ink-muted);
+  font-size: 11px;
+  letter-spacing: 0.02em;
+}
+
+.nav-section--tour .section-content {
+  display: flex;
+  min-height: 0;
+  padding: 0;
+  margin: 0;
+  overflow: hidden;
+}
+
+.docutour-panel {
+  --docutour-progress: 0%;
+  display: grid;
+  grid-template-rows: auto auto minmax(0, 1fr) auto auto;
+  width: 100%;
+  height: 100%;
+  min-height: 0;
+  overflow: hidden;
+  border: 1px solid rgba(31, 22, 11, 0.09);
+  border-radius: 14px;
+  background:
+    radial-gradient(120% 70% at 0% 0%, rgba(255, 255, 255, 0.72), transparent 62%),
+    linear-gradient(180deg, rgba(255, 255, 255, 0.58), rgba(255, 255, 255, 0.2)),
+    rgba(31, 22, 11, 0.045);
+  color: var(--ink);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.72),
+    0 22px 58px -34px rgba(31, 22, 11, 0.38);
+}
+
+.docutour-panel-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 14px;
+  padding: 18px 18px 14px;
+}
+
+.docutour-kicker {
+  margin-bottom: 8px;
+  color: var(--ink);
+  font: 650 18px/1.1 var(--font-display);
+  letter-spacing: -0.014em;
 }
 
 .docutour-counter {
-  margin-bottom: 4px;
-  color: rgba(255, 255, 255, 0.55);
+  color: var(--ink-faint);
   font-family: var(--font-mono);
-  font-size: 11px;
+  font-size: 12px;
   letter-spacing: 0.04em;
 }
 
-.docutour-narration {
-  color: #fff;
-  font-size: 13.5px;
+.docutour-progress {
+  height: 1px;
+  margin: 0 18px;
+  overflow: hidden;
+  background: rgba(31, 22, 11, 0.08);
+}
+
+.docutour-progress span {
+  display: block;
+  width: var(--docutour-progress);
+  height: 100%;
+  background: var(--ink);
+  transition: width var(--t-med) var(--ease);
+}
+
+.docutour-content {
+  min-height: 0;
+  overflow-y: auto;
+  padding: 18px;
+  scrollbar-width: thin;
+  scrollbar-color: var(--hairline-strong) transparent;
+}
+
+.docutour-meta {
+  margin-bottom: 18px;
+  padding: 10px 12px;
+  border: 1px solid rgba(31, 22, 11, 0.07);
+  border-radius: 9px;
+  background: rgba(255, 255, 255, 0.42);
+  color: var(--ink-muted);
+  font-size: 13px;
   line-height: 1.55;
+}
+
+.docutour-step-title {
+  margin-bottom: 16px;
+  color: var(--ink);
+  font-size: 22px;
+  font-weight: 650;
+  line-height: 1.18;
+  letter-spacing: -0.012em;
+  text-wrap: balance;
+}
+
+.docutour-why,
+.docutour-next {
+  margin-top: 16px;
+  padding: 12px 0 0;
+  border-top: 1px solid rgba(31, 22, 11, 0.08);
+  color: var(--ink-muted);
+  font-size: 14px;
+  line-height: 1.65;
+}
+
+.docutour-insight {
+  color: var(--ink);
+  font-size: 16px;
+  line-height: 1.76;
   user-select: text;
+  text-wrap: pretty;
+}
+
+.docutour-sidebar-actions {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+  padding: 14px 18px 0;
+  border-top: 1px solid rgba(31, 22, 11, 0.08);
 }
 
 .docutour-control-btn {
-  height: 32px;
-  padding: 0 13px;
-  border: 1px solid rgba(255, 255, 255, 0.16);
-  border-radius: 7px;
-  background: rgba(255, 255, 255, 0.08);
-  color: #fff;
-  font-size: 12.5px;
-  font-weight: 500;
-  transition: background var(--t-fast) var(--ease);
+  height: 38px;
+  padding: 0 12px;
+  border: 1px solid var(--hairline);
+  border-radius: 9px;
+  background: var(--bg-panel);
+  color: var(--ink);
+  font-size: 13px;
+  font-weight: 600;
+  transition: background var(--t-fast) var(--ease),
+              transform var(--t-fast) var(--ease);
 }
 
 .docutour-control-btn:hover:not(:disabled) {
-  background: rgba(255, 255, 255, 0.16);
+  background: var(--bg-sidebar-hover);
+}
+
+.docutour-control-btn:active:not(:disabled) {
+  transform: translateY(1px);
 }
 
 .docutour-control-btn:disabled {
   opacity: 0.4;
 }
 
-/* Exit button moved INSIDE the control bar (left side), so it no longer
-   collides with top-right ⋯/Save buttons. Round, subtle. */
 .docutour-exit {
   display: grid;
   place-items: center;
-  width: 28px;
-  height: 28px;
-  border: 1px solid rgba(255, 255, 255, 0.14);
+  height: 30px;
+  padding: 0 11px;
+  border: 1px solid var(--hairline);
   border-radius: 999px;
-  background: rgba(255, 255, 255, 0.06);
-  color: rgba(255, 255, 255, 0.78);
-  font-size: 16px;
+  background: rgba(255, 255, 255, 0.42);
+  color: var(--ink-muted);
+  font-size: 12px;
+  font-weight: 600;
   line-height: 1;
-  pointer-events: auto;
   transition: background var(--t-fast) var(--ease),
-              color var(--t-fast) var(--ease);
+              color var(--t-fast) var(--ease),
+              transform var(--t-fast) var(--ease);
 }
 
 .docutour-exit:hover {
-  background: rgba(255, 255, 255, 0.16);
-  color: #fff;
+  background: var(--bg-sidebar-hover);
+  color: var(--ink);
+}
+
+.docutour-exit:active {
+  transform: translateY(1px);
+}
+
+.docutour-keyhint {
+  padding: 10px 18px 16px;
+  color: var(--ink-faint);
+  font-family: var(--font-mono);
+  font-size: 11px;
+  text-align: center;
+}
+
+@media (max-width: 900px) {
+  .docutour-active .panel {
+    grid-template-columns: minmax(320px, 42vw) minmax(0, 1fr);
+  }
 }

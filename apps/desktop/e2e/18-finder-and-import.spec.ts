@@ -267,7 +267,8 @@ test.describe("2. Open Markdown as document", () => {
     await page.locator("#empty-open").click();
     await expect(page.locator("#doc-path")).toContainText("/mock/report.md");
 
-    // 切换到编辑模式，输入内容使 dirty
+    // 切换到编辑模式，输入内容使 dirty；dirty 状态由底部 status-pill 承担
+    // （head 不再额外挂状态文字，避免和 footer 重复）。
     await page.locator("#mode-edit").click();
     await page.locator("#inline-editor").click();
     await page.keyboard.type("x");

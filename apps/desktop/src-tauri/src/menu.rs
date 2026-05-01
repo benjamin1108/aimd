@@ -1,4 +1,4 @@
-use tauri::menu::{MenuBuilder, SubmenuBuilder};
+use tauri::menu::{MenuBuilder, PredefinedMenuItem, SubmenuBuilder};
 
 pub const MENU_EVENT_IDS: &[&str] = &[
     "settings",
@@ -20,11 +20,14 @@ pub const MENU_EVENT_IDS: &[&str] = &[
 ];
 
 pub fn build_app_menu(app: &tauri::App) -> tauri::Result<tauri::menu::Menu<tauri::Wry>> {
+    // Tauri 默认 .quit() 在 macOS 下渲染成 "Quit AIMD Desktop"（英文）。
+    // 用 PredefinedMenuItem::quit + Some("退出 AIMD Desktop") 强制中文。
+    let quit_item = PredefinedMenuItem::quit(app, Some("退出 AIMD Desktop"))?;
     let app_menu = SubmenuBuilder::new(app, "AIMD")
         .text("settings", "设置...")
-        .text("debug-console", "Debug Console")
+        .text("debug-console", "调试控制台")
         .separator()
-        .quit()
+        .item(&quit_item)
         .build()?;
     let file_menu = SubmenuBuilder::new(app, "文件")
         .text("new-document", "新建")
@@ -35,6 +38,27 @@ pub fn build_app_menu(app: &tauri::App) -> tauri::Result<tauri::menu::Menu<tauri
         .separator()
         .text("new-window", "新窗口")
         .text("close-document", "关闭文档")
+        .build()?;
+    // 编辑菜单：必须存在，否则 macOS 上 Cmd+C / Cmd+V / Cmd+X / Cmd+A / Cmd+Z
+    // 这些 first-responder selector（copy:/paste:/cut:/selectAll:/undo:）找不到
+    // 菜单项分发，整个应用看起来"禁用了 copy paste"。Tauri 默认菜单本来包含
+    // 这一段，但我们手动 MenuBuilder::new(...).items(...) 把默认菜单都顶掉了，
+    // 所以这里要显式补回来，用 PredefinedMenuItem 让 Tauri 正确连接到平台行为。
+    let undo_item = PredefinedMenuItem::undo(app, Some("撤销"))?;
+    let redo_item = PredefinedMenuItem::redo(app, Some("重做"))?;
+    let cut_item = PredefinedMenuItem::cut(app, Some("剪切"))?;
+    let copy_item = PredefinedMenuItem::copy(app, Some("复制"))?;
+    let paste_item = PredefinedMenuItem::paste(app, Some("粘贴"))?;
+    let select_all_item = PredefinedMenuItem::select_all(app, Some("全选"))?;
+    let edit_menu = SubmenuBuilder::new(app, "编辑")
+        .item(&undo_item)
+        .item(&redo_item)
+        .separator()
+        .item(&cut_item)
+        .item(&copy_item)
+        .item(&paste_item)
+        .separator()
+        .item(&select_all_item)
         .build()?;
     let view_menu = SubmenuBuilder::new(app, "视图")
         .text("mode-read", "阅读")
@@ -50,6 +74,6 @@ pub fn build_app_menu(app: &tauri::App) -> tauri::Result<tauri::menu::Menu<tauri
         .text("play-tour", "播放导览")
         .build()?;
     MenuBuilder::new(app)
-        .items(&[&app_menu, &file_menu, &view_menu, &tools_menu])
+        .items(&[&app_menu, &file_menu, &edit_menu, &view_menu, &tools_menu])
         .build()
 }

@@ -1,5 +1,6 @@
 /* Debug console — floating modal that captures console.log + window errors.
-   Has minimized mode where it docks to bottom-right. */
+   关闭即隐藏；不再有最小化态。状态栏的 #debug-indicator 在出错时主动浮现，
+   点击它即可重新打开本窗口。 */
 
 .debug-modal {
   position: fixed;
@@ -30,20 +31,6 @@
   background: #10100e;
   box-shadow: 0 26px 70px -28px rgba(0, 0, 0, 0.72);
   pointer-events: auto;
-}
-
-.debug-modal.minimized .debug-panel {
-  left: auto !important;
-  top: auto !important;
-  right: 16px;
-  bottom: 16px;
-  width: 320px;
-  height: auto;
-  transform: none !important;
-}
-
-.debug-modal.minimized .debug-list {
-  display: none;
 }
 
 .debug-head {

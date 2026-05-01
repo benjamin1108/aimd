@@ -145,3 +145,25 @@
   font-size: 12.5px;
   height: auto;
 }
+
+/* 统一 focus-visible 体系：键盘 Tab 到的可交互元素显示 outline，
+   鼠标点击不会出。靠 :focus-visible（不是 :focus）避免点击时也描边。 */
+.primary-btn:focus-visible,
+.secondary-btn:focus-visible,
+.ghost-btn:focus-visible,
+.text-btn:focus-visible,
+.mode-btn:focus-visible,
+.action-menu-item:focus-visible,
+.recent-item:focus-visible,
+.outline-item:focus-visible,
+.ft-btn:focus-visible,
+.icon-btn:focus-visible {
+  outline: 2px solid rgba(31, 22, 11, 0.5);
+  outline-offset: 2px;
+}
+
+button:focus { outline: none; }
+button:focus-visible {
+  outline: 2px solid rgba(31, 22, 11, 0.5);
+  outline-offset: 2px;
+}

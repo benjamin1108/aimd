@@ -110,11 +110,24 @@ test.describe("Narrow viewport (< 760px) layout", () => {
     expect(headHeight).toBeLessThan(120);
   });
 
-  test("at 900px the source-mode preview pane is hidden", async ({ page }) => {
-    // Cross-check the intermediate breakpoint the CSS ships:
-    //   @media (max-width: 900px) { .preview-pane { display: none } }
-    // If this regresses, side-by-side editing crowds out the textarea.
+  test("source-mode preview pane only collapses below 760px", async ({ page }) => {
+    // ux-product-audit P2-3：原来 900px 就直接隐藏预览，桌面窄窗口编辑 markdown
+    // 时没有渲染反馈。新规则只在 mobile 760 以下折叠，900 仍保留双栏。
     await page.setViewportSize({ width: 880, height: 800 });
+    await installTauriMock(page);
+    await page.goto("/");
+    await page.locator("#empty-open").click();
+    await page.locator("#mode-source").click();
+    await expect(page.locator("#editor-wrap")).toBeVisible();
+
+    const previewVisible = await page.locator(".preview-pane").evaluate(
+      (el) => window.getComputedStyle(el).display !== "none",
+    );
+    expect(previewVisible).toBe(true);
+  });
+
+  test("at 700px the preview pane finally collapses", async ({ page }) => {
+    await page.setViewportSize({ width: 700, height: 800 });
     await installTauriMock(page);
     await page.goto("/");
     await page.locator("#empty-open").click();

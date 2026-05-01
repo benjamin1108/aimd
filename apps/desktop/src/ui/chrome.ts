@@ -1,11 +1,12 @@
 import { state } from "../core/state";
 import {
   titleEl, pathEl, statusEl, statusPillEl, panelEl, emptyEl,
-  docCardEl, outlineSectionEl, assetSectionEl, assetListEl, assetCountEl,
-  resizer1El, resizer2El, starterActionsEl, docActionsEl, sidebarFootEl,
+  outlineSectionEl, assetSectionEl, assetListEl, assetCountEl,
+  sidebarOutlineAssetResizerEl,
+  starterActionsEl, docActionsEl, sidebarFootEl,
   sidebarNewEl, sidebarSaveEl, saveEl, saveLabelEl, saveAsEl, closeEl,
   modeReadEl, modeEditEl, modeSourceEl, docuTourGenerateEl, docuTourPlayEl, docToolbarEl,
-  tourStatusDotEl,
+  docuTourGenerateLabelEl, docuTourSectionEl,
 } from "../core/dom";
 import type { AimdAsset, AimdDocument } from "../core/types";
 import { fileStem, extractHeadingTitle } from "../util/path";
@@ -43,14 +44,30 @@ function assetItem(asset: AimdAsset) {
   `;
 }
 
+// 底部 status-pill 是唯一的状态显示位：稳定态（就绪 / 未保存的修改 / 草稿提示）
+// + 临时反馈（保存中 / 已保存 / 失败）共用同一槽位。1.8s 后 success/info 会回退到
+// 当前 doc 的稳定态（脏 → 未保存的修改；干净 → 就绪）。不再额外开 head 状态文字。
+//
+// state.statusTimer 同时充当"当前是否在临时反馈窗口期"的标志：updateChrome 看到
+// 它非 null 时会跳过稳定态写入，避免把"已保存"立刻盖回"就绪"。
 export function setStatus(text: string, tone: "idle" | "loading" | "success" | "warn" | "info" = "idle") {
   statusEl().textContent = text;
   statusPillEl().dataset.tone = tone;
-  if (state.statusTimer) window.clearTimeout(state.statusTimer);
+  if (state.statusTimer) {
+    window.clearTimeout(state.statusTimer);
+    state.statusTimer = null;
+  }
   if (tone === "success" || tone === "info") {
     state.statusTimer = window.setTimeout(() => {
-      statusEl().textContent = state.doc?.dirty ? "未保存的修改" : "就绪";
-      statusPillEl().dataset.tone = state.doc?.dirty ? "warn" : "idle";
+      state.statusTimer = null;
+      const doc = state.doc;
+      if (doc?.dirty) {
+        statusEl().textContent = "未保存的修改";
+        statusPillEl().dataset.tone = "warn";
+      } else {
+        statusEl().textContent = "就绪";
+        statusPillEl().dataset.tone = "idle";
+      }
     }, 1800);
   }
 }
@@ -74,24 +91,20 @@ export function updateChrome() {
   pathEl().textContent = doc
     ? (doc.path || "未保存草稿 · 先另存为 .aimd")
     : "正文、图片和元信息始终在一起";
-  saveEl().disabled = !doc || (!doc.dirty && !doc.isDraft);
+  // 保存按钮在文档没有变化时禁用：用户的"按钮亮着但其实没活做"会变成第二种困惑。
+  // 草稿状态(isDraft)即使 dirty=false 也要保留可点（点击会触发 saveDocumentAs 创建文件）。
+  const canSave = Boolean(doc && (doc.dirty || doc.isDraft));
+  saveEl().disabled = !canSave;
   saveAsEl().disabled = !doc;
-  const existingTour = doc ? extractDocuTour(doc.markdown) : null;
+  const existingTour = doc ? (doc.docuTour || extractDocuTour(doc.markdown)) : null;
+  const hasTour = Boolean(existingTour?.steps.length);
   docuTourGenerateEl().disabled = !doc;
-  docuTourGenerateEl().querySelector("span:last-child")!.textContent = existingTour
-    ? "更新导览"
-    : "生成导览";
-  docuTourPlayEl().disabled = !doc || !existingTour?.steps.length;
-  docuTourPlayEl().querySelector("span:last-child")!.textContent = existingTour?.steps.length
-    ? `播放导读（${existingTour.steps.length} 步）`
-    : "播放导读（无导览）";
-
-  // Tour status dot — 仅在"非生成中"时由 updateChrome 更新；
-  // generating 状态由 tour.ts 在生成中临时切换并恢复，避免 updateChrome 抢走脉冲态。
-  const dot = tourStatusDotEl();
-  if (dot.dataset.state !== "generating") {
-    dot.dataset.state = existingTour?.steps.length ? "ready" : "none";
-  }
+  docuTourGenerateLabelEl().textContent = hasTour ? "重新生成" : "生成导览";
+  docuTourPlayEl().hidden = !hasTour;
+  docuTourPlayEl().disabled = !hasTour;
+  docuTourPlayEl().querySelector("span:last-child")!.textContent = hasTour
+    ? `播放导览（${existingTour!.steps.length} 步）`
+    : "播放导览";
   closeEl().disabled = !doc;
   // 顶部的主按钮统一显示「保存」：草稿状态下点击仍走 saveDocumentAs 创建文件，
   // 但视觉/语义上对用户都是"保存"动作（与 sidebar-foot 一致）。
@@ -101,14 +114,10 @@ export function updateChrome() {
   modeSourceEl().disabled = !doc;
 
   if (!doc) {
-    docCardEl().dataset.state = "empty";
-    docCardEl().classList.remove("active");
-    docCardEl().querySelector<HTMLElement>(".doc-card-title")!.textContent = "未打开文档";
-    docCardEl().querySelector<HTMLElement>(".doc-card-meta")!.textContent = "新建、打开或导入 Markdown";
     assetSectionEl().hidden = true;
+    docuTourSectionEl().hidden = true;
     outlineSectionEl().hidden = true;
-    resizer1El().hidden = true;
-    resizer2El().hidden = true;
+    sidebarOutlineAssetResizerEl().hidden = true;
     assetListEl().innerHTML = "";
     emptyEl().hidden = false;
     if (!state.isBootstrappingSession) persistSessionSnapshot();
@@ -121,29 +130,33 @@ export function updateChrome() {
   const draftWithContent = Boolean(doc.isDraft && doc.dirty);
   sidebarNewEl().hidden = draftWithContent;
   sidebarSaveEl().hidden = !draftWithContent;
-  docCardEl().dataset.state = doc.dirty ? "dirty" : (doc.isDraft ? "draft" : "active");
-  docCardEl().classList.add("active");
-  docCardEl().querySelector<HTMLElement>(".doc-card-title")!.textContent = displayDocTitle(doc);
-  docCardEl().querySelector<HTMLElement>(".doc-card-meta")!.textContent =
-    (doc.path ? formatPathHint(doc.path) : "未保存草稿")
-    + (doc.dirty ? " · 未保存" : "");
 
   outlineSectionEl().hidden = false;
-  assetSectionEl().hidden = false;
-  resizer1El().hidden = false;
-  resizer2El().hidden = false;
+  // 资源区无内容时折叠：空区域只会降低 sidebar 信息密度。
+  const hasAssets = doc.assets.length > 0;
+  assetSectionEl().hidden = !hasAssets;
+  sidebarOutlineAssetResizerEl().hidden = !hasAssets;
 
   assetCountEl().textContent = String(doc.assets.length);
-  if (doc.assets.length) {
+  if (hasAssets) {
     assetListEl().innerHTML = doc.assets.map(assetItem).join("");
   } else {
-    assetListEl().innerHTML = `<div class="empty-list">无嵌入资源</div>`;
+    assetListEl().innerHTML = "";
   }
 
-  if (doc.isDraft) {
-    setStatus("这是未保存草稿，保存后才会生成 .aimd 文件", "info");
-  } else if (doc.dirty) {
-    setStatus("未保存的修改", "warn");
+  // 把当前文档的稳定状态推到底部 status-pill。setStatus 的临时反馈（保存中 /
+  // 已保存 / 失败）窗口期内 statusTimer 非 null，这里不抢；timer 回调结束后
+  // 会自己根据 dirty 回退到稳定态。
+  if (state.statusTimer == null) {
+    if (doc.isDraft && !doc.dirty) {
+      setStatus("这是未保存草稿，保存后才会生成 .aimd 文件", "info");
+    } else if (doc.dirty) {
+      statusEl().textContent = "未保存的修改";
+      statusPillEl().dataset.tone = "warn";
+    } else {
+      statusEl().textContent = "就绪";
+      statusPillEl().dataset.tone = "idle";
+    }
   }
   persistSessionSnapshot();
 }

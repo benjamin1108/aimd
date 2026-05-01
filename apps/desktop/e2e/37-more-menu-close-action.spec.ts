@@ -1,9 +1,9 @@
 /**
  * 37-more-menu-close-action.spec.ts
  *
- * 钉住 P0-1 修复：#close 按钮移入 ⋯ 菜单后，必须通过展开菜单才能触发。
+ * 钉住 #close 按钮移入 ⋯ 菜单后，必须通过展开菜单才能触发。
  * 同时验证：
- * - 关闭文档按钮具有危险样式 class（action-menu-item--danger）
+ * - 关闭并不是破坏性动作，所以 #close 不再带 action-menu-item--danger
  * - 菜单中有分隔线（action-menu-sep）
  * - 展开后 #close 可见并可点击
  */
@@ -55,13 +55,13 @@ test.describe("⋯ 菜单关闭文档入口", () => {
     await expect(page.locator("#close")).toBeVisible();
   });
 
-  test("#close 具有危险样式 class", async ({ page }) => {
+  test("#close 不带危险样式 class（关闭并非破坏性动作）", async ({ page }) => {
     await installTauriMock(page);
     await page.goto("/");
     await page.locator("#empty-open").click();
 
     await page.locator("#more-menu-toggle").click();
-    await expect(page.locator("#close")).toHaveClass(/action-menu-item--danger/);
+    await expect(page.locator("#close")).not.toHaveClass(/action-menu-item--danger/);
   });
 
   test("菜单中有分隔线 action-menu-sep", async ({ page }) => {

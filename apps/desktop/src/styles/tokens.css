@@ -67,20 +67,50 @@
 
 * {
   box-sizing: border-box;
+}
+
+/* 默认允许选中文本：用户可能要复制路径、状态、错误信息、设置值。
+   只在明确属于 UI chrome 的容器（侧边栏导航、工具栏、菜单、状态栏）禁选，
+   防止双击 / 拖选触发不必要的高亮。reader / preview / source / inputs
+   不受影响，已能正常选中。 */
+.sidebar,
+.sidebar *,
+.workspace-head,
+.workspace-head *,
+.doc-toolbar,
+.doc-toolbar *,
+.format-toolbar,
+.format-toolbar *,
+.action-menu,
+.action-menu *,
+.workspace-foot,
+.workspace-foot *,
+.docutour-control,
+.docutour-control *,
+.empty-state .launch-actions,
+.empty-state .launch-actions * {
   user-select: none;
 }
 
+/* 但是 chrome 区域里的输入控件、标题文字、文档正文仍要可选：
+   用户经常要复制文档标题或粘贴路径到 API key 输入框。
+   reader / preview / source 都属于"内容区"，强制可选。 */
+.workspace-head .doc-title,
+.workspace-head .doc-path,
+.sidebar .recent-item-title,
+.sidebar .recent-item-meta,
+.sidebar .outline-text,
+.sidebar .asset-id,
+#reader,
+#reader *,
+.preview,
+.preview *,
+.aimd,
+.aimd *,
 textarea,
 input,
 [contenteditable],
 [contenteditable] * {
-  user-select: text;
-}
-
-#reader,
-#reader *,
-.preview,
-.preview * {
   user-select: text;
 }
 

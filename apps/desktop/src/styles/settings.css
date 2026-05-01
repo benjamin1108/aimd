@@ -1,25 +1,28 @@
-/* Settings window — fixed-size 640x720 (windows.rs locks it non-resizable).
-   Layout is one long column with grouped sections separated by hairlines —
-   no card-in-card nesting. */
+/* Settings window — 双栏布局：左侧 nav 切分节，右侧表单。
+   窗口本身锁定为 760×620 不可拉伸；内容超长由 .settings-content 内的滚动承担。 */
 
 .settings-shell {
   display: block;
   width: 100%;
-  min-height: 100dvh;
-  padding: 0;
+  height: 100dvh;
   background: var(--bg-panel);
+  overflow: hidden;
 }
 
 .settings-panel {
-  display: flex;
-  flex-direction: column;
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr) auto;
   width: 100%;
-  min-height: 100dvh;
+  height: 100%;
   background: var(--bg-panel);
 }
 
 .settings-head {
-  padding: 22px 28px 16px;
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 22px 28px 14px;
   border-bottom: 1px solid var(--hairline);
 }
 
@@ -30,53 +33,90 @@
   color: var(--ink-strong);
 }
 
-.settings-head p {
+.settings-head-sub {
   margin: 4px 0 0;
   color: var(--ink-muted);
   font-size: 12.5px;
 }
 
-.settings-form {
+.settings-body {
+  display: grid;
+  grid-template-columns: 168px minmax(0, 1fr);
+  min-height: 0;
+}
+
+.settings-nav {
   display: flex;
   flex-direction: column;
-  flex: 1 1 auto;
-  padding: 0;
+  gap: 2px;
+  padding: 18px 12px 18px 22px;
+  border-right: 1px solid var(--hairline);
+  background: var(--bg-soft);
 }
 
-.settings-group {
+.settings-nav-item {
   display: flex;
-  flex-direction: column;
-  gap: 12px;
-  padding: 18px 28px 18px;
-  margin: 0;
-  border: 0;
-  border-bottom: 1px solid var(--hairline);
-}
-
-.settings-group:last-of-type {
-  flex: 1 1 auto;
-}
-
-.settings-group-label {
-  padding: 0;
-  margin: 0 0 2px;
+  align-items: center;
+  height: 32px;
+  padding: 0 12px;
+  border-radius: 7px;
   color: var(--ink-muted);
-  font-size: 11px;
-  font-weight: 600;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
+  font-size: 13px;
+  font-weight: 500;
+  letter-spacing: -0.005em;
+  text-align: left;
+  transition: background var(--t-fast) var(--ease),
+              color var(--t-fast) var(--ease);
 }
 
-.settings-group-desc {
-  margin: -4px 0 4px;
+.settings-nav-item:hover {
+  color: var(--ink);
+  background: rgba(31, 22, 11, 0.04);
+}
+
+.settings-nav-item.is-active {
+  color: var(--ink-strong);
+  font-weight: 600;
+  background: rgba(31, 22, 11, 0.08);
+}
+
+.settings-content {
+  position: relative;
+  min-height: 0;
+  overflow-y: auto;
+  scrollbar-width: thin;
+  scrollbar-color: var(--hairline-strong) transparent;
+}
+
+.settings-section {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  padding: 22px 28px 28px;
+  max-width: 560px;
+}
+
+.settings-section[hidden] { display: none; }
+
+.settings-section-head {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-bottom: 4px;
+}
+
+.settings-section-head h2 {
+  margin: 0;
+  color: var(--ink-strong);
+  font: 600 14.5px/1.2 var(--font-display);
+  letter-spacing: -0.01em;
+}
+
+.settings-section-head p {
+  margin: 0;
   color: var(--ink-muted);
   font-size: 12px;
-}
-
-.field-row {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 14px;
+  line-height: 1.5;
 }
 
 .field {
@@ -84,6 +124,10 @@
   flex-direction: column;
   gap: 6px;
   min-width: 0;
+}
+
+.field.is-disabled {
+  opacity: 0.55;
 }
 
 .field-label {
@@ -101,6 +145,12 @@
   font-size: 11px;
   font-style: normal;
   font-weight: 500;
+}
+
+.field-hint {
+  color: var(--ink-muted);
+  font-size: 11.5px;
+  line-height: 1.45;
 }
 
 .field input,
@@ -124,47 +174,84 @@
   box-shadow: 0 0 0 3px rgba(31, 22, 11, 0.08);
 }
 
-.field-hint {
-  color: var(--ink-muted);
+.field input:focus-visible,
+.field select:focus-visible {
+  border-color: rgba(31, 22, 11, 0.34);
+  box-shadow: 0 0 0 3px rgba(31, 22, 11, 0.18);
+}
+
+.field-error {
+  color: var(--tone-danger);
   font-size: 11.5px;
-  font-weight: 400;
-  line-height: 1.45;
+  font-weight: 500;
 }
 
-.field-hint strong {
-  color: var(--tone-warn);
-  font-weight: 600;
+.field-error[hidden] {
+  display: none !important;
 }
 
-.deps-row {
+/* API Key 显隐：input 自身在 password / text 之间切换；上面叠一层 prefix + ••• + suffix
+   浮层（仅在未聚焦时可见），让用户在不揭示明文的前提下确认"这是哪一把 key"。
+   pointer-events: none 让点击穿透到 input。 */
+.api-key-wrap {
+  position: relative;
+  width: 100%;
+}
+
+.api-key-input {
+  padding-right: 38px !important;
+  font-family: var(--font-mono);
+  font-size: 12.5px;
+  letter-spacing: 0;
+}
+
+.api-key-mask {
+  /* 内缩 1px 让 input 的 1px 边框继续可见。
+     padding 对齐 input 自己的 content padding (左 10、右 38 给眼睛按钮)，
+     border-radius 比 input 的 8px 小 1px，正好贴在 input 内沿。 */
+  position: absolute;
+  inset: 1px;
   display: flex;
   align-items: center;
-  gap: 10px;
+  padding: 0 38px 0 10px;
+  pointer-events: none;
+  background: #fff;
+  border-radius: 7px;
+  color: var(--ink);
+  font: 12.5px/1 var(--font-mono);
+  letter-spacing: 0;
+  white-space: nowrap;
+  overflow: hidden;
 }
 
-.deps-status {
-  flex: 1 1 auto;
-  padding: 9px 12px;
-  border-radius: 8px;
-  font-size: 12px;
-  font-weight: 500;
-  background: rgba(31, 22, 11, 0.04);
+.api-key-wrap[data-state="visible"] .api-key-mask {
+  display: none;
+}
+
+.api-key-reveal {
+  position: absolute;
+  top: 50%;
+  right: 4px;
+  transform: translateY(-50%);
+  display: grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  border-radius: 6px;
   color: var(--ink-muted);
+  background: transparent;
+  transition: background var(--t-fast) var(--ease),
+              color var(--t-fast) var(--ease);
 }
 
-.deps-status--ok {
-  background: rgba(47, 111, 79, 0.09);
-  color: var(--tone-success);
+.api-key-reveal:hover {
+  background: rgba(31, 22, 11, 0.06);
+  color: var(--ink);
 }
 
-.deps-status--warn {
-  background: rgba(167, 107, 30, 0.09);
-  color: var(--tone-warn);
-}
-
-.deps-status--error {
-  background: rgba(192, 57, 43, 0.09);
-  color: var(--tone-danger);
+.api-key-reveal[aria-pressed="true"] {
+  color: var(--ink-strong);
+  background: rgba(31, 22, 11, 0.08);
 }
 
 .settings-actions {
@@ -182,4 +269,22 @@
   color: var(--tone-success);
   font-size: 12px;
   font-weight: 600;
+}
+
+@media (max-width: 720px) {
+  .settings-body { grid-template-columns: minmax(0, 1fr); }
+  .settings-nav {
+    flex-direction: row;
+    gap: 4px;
+    padding: 8px 14px;
+    border-right: 0;
+    border-bottom: 1px solid var(--hairline);
+  }
+  .settings-nav-item { flex: 1 1 auto; justify-content: center; }
+}
+
+@media (max-height: 620px) {
+  .settings-head { padding: 14px 24px 10px; }
+  .settings-section { padding: 14px 24px; gap: 12px; }
+  .settings-actions { padding: 10px 24px 12px; }
 }

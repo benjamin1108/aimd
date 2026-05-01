@@ -163,6 +163,14 @@ pub async fn open_in_new_window(app: AppHandle, path: Option<String>) -> Result<
     Ok(())
 }
 
+/// 兜底关闭当前窗口：前端 `getCurrentWindow().close()` 在部分 webview / Tauri 版本下
+/// 偶现静默失败，导致设置窗的"取消按钮"点了没反应。前端在那条路径失败时 invoke 这个，
+/// 走真实的 Window::close()。
+#[tauri::command]
+pub fn close_current_window(window: tauri::Window) -> Result<(), String> {
+    window.close().map_err(|err| format!("close window: {err}"))
+}
+
 #[tauri::command]
 pub async fn open_settings_window(app: AppHandle) -> Result<(), String> {
     let label = "settings";
@@ -172,14 +180,33 @@ pub async fn open_settings_window(app: AppHandle) -> Result<(), String> {
         let _ = target.set_focus();
         return Ok(());
     }
-    WebviewWindowBuilder::new(&app, label, WebviewUrl::App("settings.html".into()))
+    // macOS 上隐藏 WebView 不一定会及时推进页面初始化；如果等 settings/main.ts
+    // 自己 show()，用户会遇到第一次点击只创建隐藏窗口、第二次点击才显示的问题。
+    let result = WebviewWindowBuilder::new(&app, label, WebviewUrl::App("settings.html".into()))
         .title("AIMD 设置")
-        .inner_size(640.0, 720.0)
-        .min_inner_size(640.0, 720.0)
-        .max_inner_size(640.0, 720.0)
+        // 设置窗口锁尺寸：内容已经被切成两节，不需要变形；用户拉伸只会出现大白屏。
+        // 长度超出时由 .settings-content 内的滚动条承担。
+        .inner_size(760.0, 620.0)
         .resizable(false)
-        .build()
-        .map_err(|e| e.to_string())?;
+        .build();
+    let target = match result {
+        Ok(target) => target,
+        Err(err) => {
+            // 兜底：上一个设置窗刚 close，Destroyed 事件还没派发完，
+            // get_webview_window 拿不到旧窗口但 builder 仍然认为同 label 已注册，
+            // 于是抛 "a window with label `settings` already exists"。再 get 一次，
+            // 命中就 show 旧窗口；仍拿不到才视作真错。
+            if let Some(existing) = app.get_webview_window(label) {
+                let _ = existing.unminimize();
+                let _ = existing.show();
+                let _ = existing.set_focus();
+                return Ok(());
+            }
+            return Err(err.to_string());
+        }
+    };
+    let _ = target.show();
+    let _ = target.set_focus();
     Ok(())
 }
 
@@ -191,7 +218,10 @@ mod tests {
     #[test]
     fn strips_verbatim_drive_prefix() {
         let p = PathBuf::from(r"\\?\C:\Users\benjamin\Desktop\未命名文档.aimd");
-        assert_eq!(display_path(&p), r"C:\Users\benjamin\Desktop\未命名文档.aimd");
+        assert_eq!(
+            display_path(&p),
+            r"C:\Users\benjamin\Desktop\未命名文档.aimd"
+        );
     }
 
     #[test]
