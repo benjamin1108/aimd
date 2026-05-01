@@ -13,6 +13,11 @@
  */
 import { test, expect, Page } from "@playwright/test";
 
+async function clickClose(page: Page) {
+  await page.locator("#more-menu-toggle").click();
+  await page.locator("#close").click();
+}
+
 async function installMock(page: Page) {
   await page.addInitScript(() => {
     type Args = Record<string, unknown> | undefined;
@@ -113,7 +118,7 @@ test.describe("B. 关闭文档回 launch shell 时，panel 必须恢复单列布
     ).toContain("460px");
 
     // newDocument() 把 dirty 标为 true，会调 confirm_discard_changes（mock 返回 "discard"）
-    await page.locator("#close").click();
+    await clickClose(page);
     await expect(page.locator("#empty")).toBeVisible();
 
     const state = await page.evaluate(() => {

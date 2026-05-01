@@ -1,3 +1,5 @@
+mod docutour;
+mod menu;
 mod windows;
 
 use aimd_core::manifest::{Asset, Manifest, ROLE_CONTENT_IMAGE};
@@ -17,9 +19,7 @@ use std::fs;
 use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Mutex;
-#[cfg(any(target_os = "macos", target_os = "ios"))]
-use tauri::Manager;
-use tauri::{RunEvent, State, WindowEvent};
+use tauri::{Emitter, Manager, RunEvent, State, WindowEvent};
 
 static MAIN_INITIALIZED: AtomicBool = AtomicBool::new(false);
 
@@ -733,9 +733,17 @@ pub fn run() {
         .manage(PendingOpenPaths::default())
         .manage(windows::WindowPending::default())
         .manage(windows::OpenedWindows::default())
-        .setup(|_| {
+        .setup(|app| {
+            let menu = menu::build_app_menu(app)?;
+            app.set_menu(menu)?;
             self_register_aimd_handler();
             Ok(())
+        })
+        .on_menu_event(|app, event| {
+            let id = event.id().0.as_str();
+            if menu::MENU_EVENT_IDS.contains(&id) {
+                let _ = app.emit("aimd-menu", id);
+            }
         })
         .invoke_handler(tauri::generate_handler![
             choose_aimd_file,
@@ -751,6 +759,8 @@ pub fn run() {
             save_aimd_as,
             render_markdown,
             render_markdown_standalone,
+            docutour::generate_docu_tour,
+            docutour::check_litellm_deps,
             add_image,
             add_image_bytes,
             import_markdown,
@@ -763,6 +773,7 @@ pub fn run() {
             save_markdown,
             confirm_upgrade_to_aimd,
             windows::open_in_new_window,
+            windows::open_settings_window,
             windows::focus_doc_window,
             windows::register_window_path,
             windows::unregister_current_window_path,

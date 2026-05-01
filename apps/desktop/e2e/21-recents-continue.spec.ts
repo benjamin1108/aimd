@@ -6,6 +6,11 @@
  */
 import { test, expect, Page } from "@playwright/test";
 
+async function clickClose(page: Page) {
+  await page.locator("#more-menu-toggle").click();
+  await page.locator("#close").click();
+}
+
 const MOCK_PATH = "/mock/docs/sample.aimd";
 const MOCK_PATH_B = "/mock/docs/other.aimd";
 const MOCK_PATH_WIN = "C:\\Users\\用 户\\我的 文档\\测试.aimd";
@@ -201,7 +206,7 @@ test("场景B: session恢复后关闭文档, 再点继续, 文档应该被重新
   await expect(page.locator("#empty")).toBeHidden();
 
   // 关闭文档 → empty 重新可见，recents 重新可见
-  await page.locator("#close").click();
+  await clickClose(page);
   await expect(page.locator("#empty")).toBeVisible();
 
   // 点"继续"（recents[0]，badge="继续"）
@@ -244,7 +249,7 @@ test("场景C: dirty session恢复后关闭(放弃修改), 点继续, 应该从�
   await expect(page.locator("#doc-title")).toHaveText("样例文档", { timeout: 5000 });
 
   // 关闭文档（mock 把 confirm_discard_changes 直接返 "discard"）
-  await page.locator("#close").click();
+  await clickClose(page);
   await expect(page.locator("#empty")).toBeVisible();
 
   // 点继续 → 从磁盘加载干净版本
@@ -273,7 +278,7 @@ test("场景D: 打开B再关闭, recents里点A, A应该被打开", async ({ pag
   await expect(page.locator("#doc-title")).toHaveText("另一份文档", { timeout: 5000 });
 
   // 关闭 B → empty 重新可见
-  await page.locator("#close").click();
+  await clickClose(page);
   await expect(page.locator("#empty")).toBeVisible();
 
   // recents 现在是 [B, A]（B 因 rememberOpenedPath 被推到 index 0）

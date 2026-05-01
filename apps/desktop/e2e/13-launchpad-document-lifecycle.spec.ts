@@ -119,6 +119,11 @@ async function installTauriMock(
   }, seed);
 }
 
+async function clickClose(page: import("@playwright/test").Page) {
+  await page.locator("#more-menu-toggle").click();
+  await page.locator("#close").click();
+}
+
 test.describe("Launchpad and document lifecycle", () => {
   test("new document enters draft flow and saves via save-as", async ({ page }) => {
     await installTauriMock(page);
@@ -151,14 +156,14 @@ test.describe("Launchpad and document lifecycle", () => {
       w.__TAURI_INTERNALS__.invoke = async (cmd: string, a: unknown) =>
         cmd === "confirm_discard_changes" ? w.__discardChoice : orig(cmd, a);
     });
-    await page.locator("#close").click();
+    await clickClose(page);
     await expect(page.locator("#editor-wrap")).toBeVisible();
 
     // 放弃：返回 "discard"，文档关闭
     await page.evaluate(() => {
       (window as any).__discardChoice = "discard";
     });
-    await page.locator("#close").click();
+    await clickClose(page);
     await expect(page.locator("#empty")).toBeVisible();
     await expect(page.locator("#doc-actions")).toBeHidden();
   });
@@ -173,7 +178,7 @@ test.describe("Launchpad and document lifecycle", () => {
     await expect(page.locator("#doc-title")).toHaveText("样例文档");
     await expect(page.locator("#reader h1")).toHaveText("样例文档");
 
-    await page.locator("#close").click();
+    await clickClose(page);
     await expect(page.locator("#recent-section")).toBeVisible();
     await expect(page.locator(".recent-item").first()).toContainText("sample");
 

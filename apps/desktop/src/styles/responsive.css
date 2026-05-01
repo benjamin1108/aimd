@@ -1,0 +1,75 @@
+/* Responsive collapse — three breakpoints (1020 / 900 / 760).
+   .doc-meta { flex: 0 0 auto } at 760 重置 column-flex 下 240px 误变高度的问题。 */
+
+@media (max-width: 1020px) {
+  .reader { padding: 32px 36px 60px; }
+  .empty-state {
+    grid-template-columns: minmax(0, 1fr);
+    align-items: start;
+  }
+  .recent-section {
+    max-width: 620px;
+  }
+}
+
+@media (max-width: 900px) {
+  .panel {
+    grid-template-columns: 220px minmax(0, 1fr);
+  }
+  .reader { padding: 28px 28px 56px; }
+  .editor-split { grid-template-columns: minmax(0, 1fr); }
+  .preview-pane { display: none; }
+}
+
+@media (max-width: 760px) {
+  .app-frame { padding: 8px; }
+  .panel { grid-template-columns: minmax(0, 1fr); border-radius: 12px; }
+  .sidebar { display: none; }
+  .doc-path { max-width: 50vw; }
+  .workspace-head {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 8px;
+  }
+  .doc-meta {
+    flex: 0 0 auto;
+  }
+  .starter-actions,
+  .head-actions {
+    width: 100%;
+    justify-content: flex-end;
+  }
+  .doc-toolbar {
+    flex-wrap: wrap;
+    gap: 8px;
+    padding: 8px 12px;
+  }
+  .doc-toolbar-spacer {
+    display: none;
+  }
+  .mode-switch {
+    flex: 1 1 100%;
+  }
+  .mode-btn {
+    flex: 1 1 0;
+    justify-content: center;
+  }
+  .toolbar-select-label,
+  .tour-menu-wrap {
+    flex: 1 1 0;
+  }
+  .toolbar-select,
+  #tour-menu-toggle {
+    width: 100%;
+  }
+  .empty-state {
+    padding: 28px 22px 36px;
+  }
+  .empty-state h2 {
+    font-size: 30px;
+  }
+  .launch-actions {
+    flex-direction: column;
+    align-items: stretch;
+  }
+}

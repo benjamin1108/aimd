@@ -1,0 +1,123 @@
+/* Debug console — floating modal that captures console.log + window errors.
+   Has minimized mode where it docks to bottom-right. */
+
+.debug-modal {
+  position: fixed;
+  inset: 0;
+  z-index: 9500;
+  display: block;
+  padding: 20px;
+  background: transparent;
+  pointer-events: none;
+}
+
+.debug-modal[hidden] {
+  display: none;
+}
+
+.debug-panel {
+  position: fixed;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr);
+  width: min(860px, 100%);
+  height: min(620px, calc(100dvh - 40px));
+  border: 1px solid rgba(31, 22, 11, 0.16);
+  border-radius: 12px;
+  overflow: hidden;
+  background: #10100e;
+  box-shadow: 0 26px 70px -28px rgba(0, 0, 0, 0.72);
+  pointer-events: auto;
+}
+
+.debug-modal.minimized .debug-panel {
+  left: auto !important;
+  top: auto !important;
+  right: 16px;
+  bottom: 16px;
+  width: 320px;
+  height: auto;
+  transform: none !important;
+}
+
+.debug-modal.minimized .debug-list {
+  display: none;
+}
+
+.debug-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  padding: 14px 16px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  background: #181713;
+  color: #f4efe6;
+  cursor: move;
+}
+
+.debug-head h2 {
+  margin: 0;
+  font: 650 14px/1.2 var(--font-display);
+}
+
+.debug-head p {
+  margin: 3px 0 0;
+  color: rgba(244, 239, 230, 0.62);
+  font-size: 12px;
+}
+
+.debug-actions {
+  display: flex;
+  gap: 8px;
+  flex: 0 0 auto;
+}
+
+.debug-list {
+  min-height: 0;
+  overflow: auto;
+  padding: 10px;
+  font-family: var(--font-mono);
+  scrollbar-width: thin;
+}
+
+.debug-empty {
+  padding: 14px;
+  color: rgba(244, 239, 230, 0.52);
+  font-size: 12px;
+}
+
+.debug-entry {
+  padding: 9px 10px;
+  border-left: 3px solid rgba(244, 239, 230, 0.24);
+  background: rgba(255, 255, 255, 0.035);
+}
+
+.debug-entry + .debug-entry {
+  margin-top: 8px;
+}
+
+.debug-entry[data-level="warn"] {
+  border-left-color: #d6a442;
+}
+
+.debug-entry[data-level="error"] {
+  border-left-color: #df665a;
+}
+
+.debug-entry-meta {
+  margin-bottom: 5px;
+  color: rgba(244, 239, 230, 0.55);
+  font-size: 10.5px;
+}
+
+.debug-entry pre {
+  margin: 0;
+  white-space: pre-wrap;
+  word-break: break-word;
+  color: #f4efe6;
+  font: 12px/1.55 var(--font-mono);
+  user-select: text;
+}
