@@ -10,13 +10,12 @@ document.querySelector<HTMLDivElement>("#app")!.innerHTML = APP_HTML;
 import { state } from "./core/state";
 import {
   markdownEl, inlineEditorEl, modeReadEl, modeEditEl, modeSourceEl,
-  saveEl, saveAsEl, closeEl, docuTourGenerateEl, docuTourPlayEl,
-  moreMenuToggleEl, moreMenuEl, tourMenuToggleEl, tourMenuEl,
+  saveEl, saveAsEl, closeEl,
 } from "./core/dom";
-import { setMode, refreshSourceBanner } from "./ui/mode";
+import { setMode } from "./ui/mode";
 import { updateChrome } from "./ui/chrome";
 import { bindFormatToolbar } from "./editor/format-toolbar";
-import { bindWidthSwitch, setWidth } from "./ui/width";
+import { bindWidthSwitch } from "./ui/width";
 import { bindSidebarResizers, bindSidebarHrResizer } from "./ui/resizers";
 import { bindImageLightbox } from "./ui/lightbox";
 import { showFileContextMenu } from "./ui/context-menu";
@@ -35,32 +34,8 @@ import {
   onWindowDragOver, onWindowDragLeave, onWindowDrop,
 } from "./drag/window-drop";
 import { persistSessionSnapshot, restoreSession } from "./session/snapshot";
-import { generateDocuTour, startDocuTour, stopDocuTour } from "./docutour/tour";
-import { installDebugConsole, openDebugConsole } from "./debug/console";
-
-installDebugConsole();
 
 const $ = <T extends HTMLElement>(selector: string) => document.querySelector<T>(selector)!;
-
-function bindMenuToggle(toggle: HTMLButtonElement, menu: HTMLElement) {
-  toggle.addEventListener("click", (event) => {
-    event.stopPropagation();
-    const nextHidden = !menu.hidden;
-    moreMenuEl().hidden = true;
-    tourMenuEl().hidden = true;
-    moreMenuToggleEl().setAttribute("aria-expanded", "false");
-    tourMenuToggleEl().setAttribute("aria-expanded", "false");
-    menu.hidden = nextHidden;
-    toggle.setAttribute("aria-expanded", String(!nextHidden));
-  });
-}
-
-function closeActionMenus() {
-  moreMenuEl().hidden = true;
-  tourMenuEl().hidden = true;
-  moreMenuToggleEl().setAttribute("aria-expanded", "false");
-  tourMenuToggleEl().setAttribute("aria-expanded", "false");
-}
 
 $("#head-new").addEventListener("click", () => { void newDocument(); });
 $("#head-open").addEventListener("click", () => { void chooseAndOpen(); });
@@ -77,26 +52,17 @@ modeReadEl().addEventListener("click", () => setMode("read"));
 modeEditEl().addEventListener("click", () => setMode("edit"));
 modeSourceEl().addEventListener("click", () => setMode("source"));
 saveEl().addEventListener("click", saveDocument);
-saveAsEl().addEventListener("click", () => { closeActionMenus(); void saveDocumentAs(); });
-docuTourGenerateEl().addEventListener("click", () => { closeActionMenus(); void generateDocuTour(); });
-docuTourPlayEl().addEventListener("click", () => { closeActionMenus(); startDocuTour(); });
-bindMenuToggle(moreMenuToggleEl(), moreMenuEl());
-bindMenuToggle(tourMenuToggleEl(), tourMenuEl());
+saveAsEl().addEventListener("click", saveDocumentAs);
 $<HTMLButtonElement>("#new-window").addEventListener("click", () => {
-  closeActionMenus();
   void invoke("open_in_new_window", { path: null });
 });
-closeEl().addEventListener("click", () => { closeActionMenus(); void closeDocument(); });
-document.addEventListener("click", (event) => {
-  if (!(event.target as HTMLElement).closest(".more-menu-wrap, .tour-menu-wrap")) closeActionMenus();
-});
+closeEl().addEventListener("click", () => { void closeDocument(); });
 
 markdownEl().addEventListener("input", () => {
   if (!state.doc) return;
   state.doc.markdown = markdownEl().value;
   state.doc.dirty = true;
   updateChrome();
-  refreshSourceBanner();
   scheduleRender();
 });
 
@@ -156,8 +122,6 @@ document.addEventListener("keydown", (event) => {
     event.preventDefault();
     void chooseAndOpen();
   }
-  if (event.key === "Escape") stopDocuTour();
-  if (event.key === "Escape") closeActionMenus();
 });
 
 // Block the system context menu in production (image right-click "Save Image
@@ -186,27 +150,6 @@ window.addEventListener("DOMContentLoaded", async () => {
   try {
     await listen<string>("aimd-open-file", (event) => {
       void routeOpenedPath(event.payload, { skipConfirm: false });
-    });
-    const menuHandlers: Record<string, () => void> = {
-      "settings":          () => { void invoke("open_settings_window"); },
-      "debug-console":     () => { openDebugConsole(); },
-      "new-document":      () => { void newDocument(); },
-      "open-document":     () => { void chooseAndOpen(); },
-      "save-document":     () => { void saveDocument(); },
-      "save-document-as":  () => { void saveDocumentAs(); },
-      "new-window":        () => { void invoke("open_in_new_window", { path: null }); },
-      "close-document":    () => { void closeDocument(); },
-      "mode-read":         () => { setMode("read"); },
-      "mode-edit":         () => { setMode("edit"); },
-      "mode-source":       () => { setMode("source"); },
-      "width-normal":      () => { setWidth("normal"); },
-      "width-wide":        () => { setWidth("wide"); },
-      "width-ultra":       () => { setWidth("ultra"); },
-      "generate-tour":     () => { void generateDocuTour(); },
-      "play-tour":         () => { startDocuTour(); },
-    };
-    await listen<string>("aimd-menu", (event) => {
-      menuHandlers[event.payload]?.();
     });
   } catch {
     // Ignore event binding failures outside the Tauri shell.

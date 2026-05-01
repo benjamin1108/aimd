@@ -11,11 +11,6 @@
  */
 import { test, expect, Page } from "@playwright/test";
 
-async function clickClose(page: Page) {
-  await page.locator("#more-menu-toggle").click();
-  await page.locator("#close").click();
-}
-
 async function installMock(page: Page) {
   await page.addInitScript(() => {
     type Args = Record<string, unknown> | undefined;
@@ -66,7 +61,7 @@ test.describe("A. sidebar-foot 在 dirty draft 下用 '保存' 替换 '新建'",
 
     // 直接 newDocument 后状态就是 isDraft=true && dirty=true，跳到下面用例覆盖。
     // 这里改成断言"已保存文档下"的对照：sidebar-new 显示，sidebar-save 隐藏。
-    await clickClose(page);
+    await page.locator("#close").click();
     await page.locator("#empty-open").click();
     await expect(page.locator("#doc-title")).toHaveText("已保存文档");
 

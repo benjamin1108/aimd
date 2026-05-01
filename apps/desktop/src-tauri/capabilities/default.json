@@ -2,6 +2,6 @@
   "$schema": "../gen/schemas/desktop-schema.json",
   "identifier": "default",
   "description": "Default permissions for the AIMD desktop window",
-  "windows": ["main", "doc-*", "settings"],
+  "windows": ["main", "doc-*"],
   "permissions": ["core:default"]
 }

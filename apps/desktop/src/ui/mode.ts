@@ -2,33 +2,11 @@ import { state } from "../core/state";
 import {
   emptyEl, readerEl, inlineEditorEl, editorWrapEl, formatToolbarEl,
   modeReadEl, modeEditEl, modeSourceEl,
-  sourceBannerEl, sourceBannerTextEl,
 } from "../core/dom";
 import type { Mode } from "../core/types";
 import { paintPaneIfStale } from "./outline";
 import { updateChrome } from "./chrome";
 import { flushInline } from "../editor/inline";
-import { summarizeFrontmatter } from "../docutour/frontmatter";
-
-export function refreshSourceBanner() {
-  const banner = sourceBannerEl();
-  if (!state.doc || state.mode !== "source") {
-    banner.hidden = true;
-    return;
-  }
-  const summary = summarizeFrontmatter(state.doc.markdown);
-  if (!summary.hasFrontmatter) {
-    banner.hidden = true;
-    return;
-  }
-  const tourPart = summary.hasDocuTour
-    ? `，含 <strong>Docu-Tour 导览数据（${summary.docuTourSteps} 步）</strong>`
-    : "";
-  sourceBannerTextEl().innerHTML =
-    `<strong>源码视图</strong>：开头 ${summary.yamlLineCount} 行是 Front-matter${tourPart}。`
-    + ` 这些通常由阅读 / 编辑模式自动维护，可手改但建议从顶部菜单操作。`;
-  banner.hidden = false;
-}
 
 export function setMode(mode: Mode) {
   // Flush from the mode we are leaving.
@@ -54,6 +32,5 @@ export function setMode(mode: Mode) {
     el.classList.toggle("active", mode === m);
     el.setAttribute("aria-selected", String(mode === m));
   }
-  refreshSourceBanner();
   updateChrome();
 }

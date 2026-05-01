@@ -12,11 +12,6 @@
 
 import { test, expect, Page } from "@playwright/test";
 
-async function clickClose(page: Page) {
-  await page.locator("#more-menu-toggle").click();
-  await page.locator("#close").click();
-}
-
 async function installTauriMock(page: Page) {
   await page.addInitScript(() => {
     type Args = Record<string, unknown> | undefined;
@@ -266,7 +261,7 @@ test.describe("C. 打开 markdown 文档关闭行为边界", () => {
       };
     });
 
-    await clickClose(page);
+    await page.locator("#close").click();
     await expect(page.locator("#empty")).toBeVisible();
     const calls = await page.evaluate(() => (window as any).__discardCalled);
     expect(calls).toBe(0);
@@ -296,7 +291,7 @@ test.describe("C. 打开 markdown 文档关闭行为边界", () => {
       };
     });
 
-    await clickClose(page);
+    await page.locator("#close").click();
     // 应该走原生确认对话框（invoke 被调用一次）
     const calls = await page.evaluate(() => (window as any).__discardCalled);
     expect(calls).toBe(1);

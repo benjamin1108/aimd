@@ -53,31 +53,3 @@ export type Mode = "read" | "edit" | "source";
 export type MarkdownDraft = { markdown: string; title: string; html: string };
 
 export type AssetEntry = { name: string; size: number; mime: string };
-
-export type DocuTourStep = {
-  targetId: string;
-  narration: string;
-};
-
-export type DocuTourScript = {
-  version: 1;
-  title?: string;
-  steps: DocuTourStep[];
-};
-
-export type DocuTourAnchor = {
-  id: string;
-  kind: string;
-  text: string;
-};
-
-export type ModelProvider = "dashscope" | "gemini";
-
-export type DocuTourModelConfig = {
-  provider: ModelProvider;
-  model: string;
-  apiKey: string;
-  apiBase?: string;
-  maxSteps: number;
-  language: string;
-};

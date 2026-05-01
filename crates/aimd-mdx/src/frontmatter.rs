@@ -74,14 +74,10 @@ pub fn extract_frontmatter(src: &[u8]) -> (&[u8], &[u8], bool) {
 /// Unsupported syntax falls back to a <pre><code> block.
 pub fn render_frontmatter_html(yaml: &[u8]) -> String {
     let src = std::str::from_utf8(yaml).unwrap_or("");
-    let visible_src = strip_internal_yaml(src);
-    if visible_src.trim().is_empty() {
-        return String::new();
-    }
-    let pairs = parse_simple_yaml(&visible_src);
+    let pairs = parse_simple_yaml(src);
     if pairs.is_empty() {
         let mut out = String::from("<section class=\"aimd-frontmatter\"><pre><code>");
-        html_escape_into(&mut out, &visible_src);
+        html_escape_into(&mut out, src);
         out.push_str("</code></pre></section>\n");
         return out;
     }
@@ -95,31 +91,6 @@ pub fn render_frontmatter_html(yaml: &[u8]) -> String {
     }
     out.push_str("</dl>\n</section>\n");
     out
-}
-
-fn strip_internal_yaml(src: &str) -> String {
-    let lines: Vec<&str> = src.split('\n').collect();
-    let mut out = Vec::new();
-    let mut i = 0;
-    while i < lines.len() {
-        let line = lines[i].trim_end_matches('\r');
-        let trimmed = line.trim();
-        if trimmed == "aimd_docu_tour: |" || trimmed.starts_with("aimd_docu_tour:") {
-            i += 1;
-            while i < lines.len() {
-                let sub = lines[i].trim_end_matches('\r');
-                if sub.is_empty() || sub.starts_with(' ') || sub.starts_with('\t') {
-                    i += 1;
-                } else {
-                    break;
-                }
-            }
-            continue;
-        }
-        out.push(line);
-        i += 1;
-    }
-    out.join("\n")
 }
 
 fn html_escape_into(out: &mut String, s: &str) {
@@ -150,17 +121,6 @@ fn parse_simple_yaml(src: &str) -> Vec<(String, String)> {
             _ => continue,
         };
         let key = line[..colon_idx].trim().to_string();
-        if key == "aimd_docu_tour" {
-            while i < lines.len() {
-                let sub = lines[i].trim_end_matches('\r');
-                if sub.is_empty() || sub.starts_with(' ') || sub.starts_with('\t') {
-                    i += 1;
-                } else {
-                    break;
-                }
-            }
-            continue;
-        }
         let value = line[colon_idx + 1..].trim();
 
         if !value.is_empty() {
@@ -283,21 +243,5 @@ mod tests {
             "ISO timestamp truncated: {}",
             html
         );
-    }
-
-    #[test]
-    fn test_docu_tour_frontmatter_is_hidden() {
-        let fm = b"aimd_docu_tour: |\n  eyJzdGVwcyI6W119\n";
-        let html = render_frontmatter_html(fm);
-        assert_eq!(html, "");
-    }
-
-    #[test]
-    fn test_docu_tour_frontmatter_keeps_visible_keys() {
-        let fm = b"title: Test\naimd_docu_tour: |\n  eyJzdGVwcyI6W119\ntags:\n  - a\n";
-        let html = render_frontmatter_html(fm);
-        assert!(html.contains("<dt>title</dt>"), "title missing: {}", html);
-        assert!(html.contains("<dt>tags</dt>"), "tags missing: {}", html);
-        assert!(!html.contains("eyJzdGVwcyI6W119"), "tour leaked: {}", html);
     }
 }

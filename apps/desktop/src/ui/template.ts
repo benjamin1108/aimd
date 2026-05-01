@@ -90,75 +90,47 @@ export const APP_HTML = `
           </div>
 
           <div class="head-actions" id="doc-actions" hidden>
-            <button id="save" class="primary-btn" type="button" disabled>
-              <span class="primary-btn-icon">${ICONS.save}</span>
-              <span id="save-label">保存</span>
-            </button>
-            <div class="more-menu-wrap">
-              <button id="more-menu-toggle" class="ghost-btn icon-only" type="button" title="更多文档操作" aria-haspopup="menu" aria-expanded="false">⋯</button>
-              <div id="more-menu" class="action-menu" role="menu" hidden>
-                <div class="action-menu-group-label">文件</div>
-                <button id="save-as" class="action-menu-item" type="button" disabled>
-                  <span class="action-menu-icon">${ICONS.folder}</span>
-                  <span>另存为...</span>
-                </button>
-                <button id="new-window" class="action-menu-item" type="button">
-                  <span class="action-menu-icon">${ICONS.plus}</span>
-                  <span>新窗口打开</span>
-                </button>
-                <hr class="action-menu-sep" role="separator">
-                <div class="action-menu-group-label">危险</div>
-                <button id="close" class="action-menu-item action-menu-item--danger" type="button" disabled>
-                  <span class="action-menu-icon">${ICONS.close}</span>
-                  <span>关闭文档</span>
-                </button>
-              </div>
+            <div class="mode-switch" role="tablist">
+              <button id="mode-read" class="mode-btn" role="tab" aria-selected="true" type="button" disabled>
+                <span class="mode-btn-icon">${ICONS.read}</span>
+                <span>阅读</span>
+              </button>
+              <button id="mode-edit" class="mode-btn" role="tab" aria-selected="false" type="button" disabled>
+                <span class="mode-btn-icon">${ICONS.edit}</span>
+                <span>编辑</span>
+              </button>
+              <button id="mode-source" class="mode-btn" role="tab" aria-selected="false" type="button" disabled>
+                <span class="mode-btn-icon">${ICONS.source}</span>
+                <span>源码</span>
+              </button>
+            </div>
+
+            <div class="width-switch" role="tablist">
+              <button id="width-normal" class="mode-btn" role="tab" aria-selected="true" type="button" title="常规宽度" data-width="normal">常规</button>
+              <button id="width-wide"   class="mode-btn" role="tab" aria-selected="false" type="button" title="加宽" data-width="wide">加宽</button>
+              <button id="width-ultra"  class="mode-btn" role="tab" aria-selected="false" type="button" title="超宽" data-width="ultra">超宽</button>
+            </div>
+
+            <div class="quick-actions">
+              <button id="save" class="primary-btn" type="button" disabled>
+                <span class="primary-btn-icon">${ICONS.save}</span>
+                <span id="save-label">保存</span>
+              </button>
+              <button id="save-as" class="secondary-btn" type="button" disabled>
+                <span class="secondary-btn-icon">${ICONS.folder}</span>
+                <span>另存为</span>
+              </button>
+              <button id="new-window" class="secondary-btn" type="button" title="新窗口 (⌘⇧N)">
+                <span class="secondary-btn-icon">${ICONS.plus}</span>
+                <span>新窗口</span>
+              </button>
+              <button id="close" class="secondary-btn" type="button" disabled>
+                <span class="secondary-btn-icon">${ICONS.close}</span>
+                <span>关闭文档</span>
+              </button>
             </div>
           </div>
         </header>
-
-        <div class="doc-toolbar" id="doc-toolbar" hidden>
-          <div class="mode-switch" role="tablist">
-            <button id="mode-read" class="mode-btn" role="tab" aria-selected="true" type="button" disabled>
-              <span>阅读</span>
-            </button>
-            <button id="mode-edit" class="mode-btn" role="tab" aria-selected="false" type="button" disabled>
-              <span>编辑</span>
-            </button>
-            <button id="mode-source" class="mode-btn" role="tab" aria-selected="false" type="button" disabled>
-              <span>源码</span>
-            </button>
-          </div>
-
-          <div class="doc-toolbar-spacer"></div>
-
-          <label class="toolbar-select-label">
-            <span>宽度</span>
-            <select id="width-select" class="toolbar-select" aria-label="阅读宽度">
-              <option value="normal">常规</option>
-              <option value="wide">加宽</option>
-              <option value="ultra">超宽</option>
-            </select>
-          </label>
-
-          <div class="tour-menu-wrap">
-            <button id="tour-menu-toggle" class="secondary-btn" type="button" aria-haspopup="menu" aria-expanded="false">
-              <span class="secondary-btn-icon">${ICONS.sparkle}</span>
-              <span>导览</span>
-              <span id="tour-status-dot" class="tour-status-dot" data-state="none" aria-hidden="true"></span>
-            </button>
-            <div id="tour-menu" class="action-menu" role="menu" hidden>
-              <button id="docutour-play" class="action-menu-item" type="button" disabled>
-                <span class="action-menu-icon">${ICONS.play}</span>
-                <span>播放导读</span>
-              </button>
-              <button id="docutour-generate" class="action-menu-item" type="button" disabled>
-                <span class="action-menu-icon">${ICONS.sparkle}</span>
-                <span>生成/更新导览</span>
-              </button>
-            </div>
-          </div>
-        </div>
 
         <div class="format-toolbar" id="format-toolbar" hidden>
           <div class="ft-group">
@@ -237,10 +209,6 @@ export const APP_HTML = `
 
           <div id="editor-wrap" class="editor-split" hidden>
             <div class="editor-pane">
-              <div id="source-banner" class="source-banner" hidden>
-                <span class="source-banner-icon">${ICONS.info}</span>
-                <span class="source-banner-text" id="source-banner-text"></span>
-              </div>
               <div class="pane-tag">Markdown</div>
               <textarea id="markdown" spellcheck="false"></textarea>
             </div>

@@ -1,10 +1,5 @@
 import { test, expect, Page } from "@playwright/test";
 
-async function clickClose(page: Page) {
-  await page.locator("#more-menu-toggle").click();
-  await page.locator("#close").click();
-}
-
 async function installTauriMock(page: Page) {
   await page.addInitScript(() => {
     type Args = Record<string, unknown> | undefined;
@@ -292,7 +287,7 @@ test.describe("2. Open Markdown as document", () => {
     await page.locator("#empty-open").click();
     await expect(page.locator("#doc-actions")).toBeVisible();
 
-    await clickClose(page);
+    await page.locator("#close").click();
 
     await expect(page.locator("#empty")).toBeVisible();
     await expect(page.locator("#doc-actions")).toBeHidden();

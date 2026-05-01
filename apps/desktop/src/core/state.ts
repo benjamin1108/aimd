@@ -16,10 +16,6 @@ export const ICONS = {
   source: `<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"><path d="m5.5 4-3 4 3 4M10.5 4l3 4-3 4"/></svg>`,
   save: `<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3.5v9a1 1 0 0 0 1 1h8a1 1 0 0 0 1-1V5.5L11 3H4a1 1 0 0 0-1 .5z"/><path d="M5 3.5V7h6V3.5M5 13.5V10h6v3.5"/></svg>`,
   close: `<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><path d="m4 4 8 8M12 4 4 12"/></svg>`,
-  play: `<svg viewBox="0 0 16 16" fill="none"><path d="M5 3.7v8.6a.8.8 0 0 0 1.2.7l6.5-4.3a.8.8 0 0 0 0-1.4L6.2 3A.8.8 0 0 0 5 3.7Z" fill="currentColor"/></svg>`,
-  sparkle: `<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.35" stroke-linecap="round" stroke-linejoin="round"><path d="M8.5 1.8 9.8 5l3.4 1.2-3.4 1.3-1.3 3.4-1.3-3.4-3.4-1.3L7.2 5z"/><path d="M3.2 9.8 3.8 11l1.2.5-1.2.5-.6 1.3-.5-1.3-1.2-.5 1.2-.5z"/></svg>`,
-  settings: `<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.35" stroke-linecap="round" stroke-linejoin="round"><circle cx="8" cy="8" r="2.2"/><path d="M9.2 1.8 9.6 3a5 5 0 0 1 1.1.5l1.2-.5 1.3 2.2-1 .8c.1.4.1.7.1 1.1s0 .7-.1 1.1l1 .8-1.3 2.2-1.2-.5a5 5 0 0 1-1.1.5l-.4 1.2H6.8l-.4-1.2a5 5 0 0 1-1.1-.5l-1.2.5L2.8 9l1-.8A5 5 0 0 1 3.7 7c0-.4 0-.7.1-1.1l-1-.8 1.3-2.2 1.2.5A5 5 0 0 1 6.4 3l.4-1.2z"/></svg>`,
-  console: `<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.35" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="3" width="12" height="10" rx="1.4"/><path d="m4.5 6 2 2-2 2M8 10h3.5"/></svg>`,
   bold: `<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M5 3h4.2a2.3 2.3 0 0 1 0 4.6H5zM5 7.6h4.6a2.4 2.4 0 0 1 0 4.8H5zM5 3v9.4"/></svg>`,
   italic: `<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M10 3H6.5M9.5 13H6M9 3l-3 10"/></svg>`,
   strike: `<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M2.5 8h11M11 5.5C11 4 9.7 3 8 3 6 3 5 4 5 5c0 2 6 1.5 6 4 0 1.3-1.4 2.4-3 2.4-2 0-3-1-3-2.4"/></svg>`,
@@ -31,7 +27,6 @@ export const ICONS = {
   quote: `<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"><path d="M3 5.5C3 4.7 3.7 4 4.5 4H6v2.5L4.5 9H3V5.5zM10 5.5C10 4.7 10.7 4 11.5 4H13v2.5L11.5 9H10V5.5z"/><path d="M3 12h10"/></svg>`,
   code: `<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="m5.5 4-3 4 3 4M10.5 4l3 4-3 4"/></svg>`,
   link: `<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"><path d="M7 9.4 9.4 7M6.7 5.6 8.2 4a2.6 2.6 0 0 1 3.7 3.7l-1.4 1.5M9.5 10.4 8 12a2.6 2.6 0 0 1-3.7-3.7L5.6 7"/></svg>`,
-  info: `<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"><circle cx="8" cy="8" r="6"/><path d="M8 7.4v3.4M8 5.4v.1"/></svg>`,
 };
 
 export const state: {

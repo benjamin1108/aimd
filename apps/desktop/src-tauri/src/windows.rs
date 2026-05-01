@@ -163,26 +163,6 @@ pub async fn open_in_new_window(app: AppHandle, path: Option<String>) -> Result<
     Ok(())
 }
 
-#[tauri::command]
-pub async fn open_settings_window(app: AppHandle) -> Result<(), String> {
-    let label = "settings";
-    if let Some(target) = app.get_webview_window(label) {
-        let _ = target.unminimize();
-        let _ = target.show();
-        let _ = target.set_focus();
-        return Ok(());
-    }
-    WebviewWindowBuilder::new(&app, label, WebviewUrl::App("settings.html".into()))
-        .title("AIMD 设置")
-        .inner_size(640.0, 720.0)
-        .min_inner_size(640.0, 720.0)
-        .max_inner_size(640.0, 720.0)
-        .resizable(false)
-        .build()
-        .map_err(|e| e.to_string())?;
-    Ok(())
-}
-
 #[cfg(test)]
 mod tests {
     use super::display_path;

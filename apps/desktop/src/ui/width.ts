@@ -12,8 +12,6 @@ export function setWidth(name: WidthName) {
     btn.classList.toggle("active", btn.dataset.width === name);
     btn.setAttribute("aria-selected", String(btn.dataset.width === name));
   });
-  const select = document.querySelector<HTMLSelectElement>("#width-select");
-  if (select) select.value = name;
 }
 
 export function bindWidthSwitch() {
@@ -23,8 +21,4 @@ export function bindWidthSwitch() {
   document.querySelector("#width-normal")?.addEventListener("click", () => setWidth("normal"));
   document.querySelector("#width-wide")?.addEventListener("click", () => setWidth("wide"));
   document.querySelector("#width-ultra")?.addEventListener("click", () => setWidth("ultra"));
-  document.querySelector<HTMLSelectElement>("#width-select")?.addEventListener("change", (event) => {
-    const value = (event.currentTarget as HTMLSelectElement).value;
-    setWidth(value === "wide" || value === "ultra" ? value : "normal");
-  });
 }
