@@ -1,0 +1,93 @@
+/* Auxiliary overlays — file context menu (right-click on sidebar items) +
+   link popover (BUG-013: 替代 WKWebView 屏蔽的 window.prompt) */
+
+.file-ctx-menu {
+  position: fixed;
+  z-index: 9000;
+  min-width: 168px;
+  background: var(--bg-panel, #fff);
+  border: 1px solid var(--hairline-strong);
+  border-radius: 8px;
+  box-shadow: 0 8px 24px -8px rgba(31, 22, 11, 0.22), 0 2px 6px -2px rgba(31, 22, 11, 0.10);
+  padding: 4px 0;
+  outline: none;
+}
+
+.file-ctx-item {
+  display: block;
+  width: 100%;
+  padding: 7px 14px;
+  background: none;
+  border: 0;
+  text-align: left;
+  font-size: 13px;
+  color: var(--ink, #1d1a14);
+  cursor: pointer;
+  line-height: 1.4;
+  user-select: none;
+}
+
+.file-ctx-item:hover {
+  background: var(--bg-sidebar-hover, #ece4d2);
+}
+
+/* Link popover */
+
+.link-popover {
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  z-index: 9000;
+  background: var(--bg-panel);
+  border: 1px solid var(--hairline-strong);
+  border-radius: 10px;
+  box-shadow: var(--shadow-panel);
+  padding: 16px 18px 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  min-width: 320px;
+}
+
+.link-popover[hidden] { display: none; }
+
+.link-popover-label {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--ink-muted);
+  letter-spacing: 0.02em;
+}
+
+.link-popover-input {
+  width: 100%;
+  box-sizing: border-box;
+  padding: 7px 10px;
+  border: 1px solid var(--hairline-strong);
+  border-radius: 6px;
+  background: var(--bg-soft);
+  font-size: 13px;
+  color: var(--ink);
+  outline: none;
+}
+
+.link-popover-input:focus {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 2px rgba(31, 22, 11, 0.1);
+}
+
+.link-popover-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.link-popover-actions .danger-btn {
+  margin-right: auto;
+  color: var(--danger, #c0392b);
+  border-color: var(--danger, #c0392b);
+}
+
+.link-popover-actions .danger-btn:hover {
+  background: rgba(192, 57, 43, 0.08);
+}

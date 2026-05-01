@@ -12,6 +12,11 @@
  */
 import { test, expect, Page } from "@playwright/test";
 
+async function clickClose(page: Page) {
+  await page.locator("#more-menu-toggle").click();
+  await page.locator("#close").click();
+}
+
 async function installMock(
   page: Page,
   opts: { discardChoice?: "save" | "discard" | "cancel" } = {},
@@ -73,7 +78,7 @@ test.describe("A. 顶部主按钮 label", () => {
     await expect(page.locator("#save-label")).toHaveText("保存");
 
     // 已保存文档下也是「保存」
-    await page.locator("#close").click();
+    await clickClose(page);
     await expect(page.locator("#empty")).toBeVisible();
     await page.locator("#empty-open").click();
     await expect(page.locator("#save-label")).toHaveText("保存");
@@ -87,7 +92,7 @@ test.describe("B. ensureCanDiscardChanges 走 Rust 对话框", () => {
     await page.locator("#empty-new").click();
     await expect(page.locator("#inline-editor")).toBeVisible();
 
-    await page.locator("#close").click();
+    await clickClose(page);
     await expect(page.locator("#empty")).toBeVisible();
 
     const calls = await page.evaluate(() => (window as any).__discardCalls);
@@ -101,7 +106,7 @@ test.describe("B. ensureCanDiscardChanges 走 Rust 对话框", () => {
     await page.goto("/");
     await page.locator("#empty-new").click();
 
-    await page.locator("#close").click();
+    await clickClose(page);
 
     await expect(page.locator("#inline-editor")).toBeVisible();
     await expect(page.locator("#doc-actions")).toBeVisible();
@@ -113,7 +118,7 @@ test.describe("B. ensureCanDiscardChanges 走 Rust 对话框", () => {
     await page.goto("/");
     await page.locator("#empty-new").click();
 
-    await page.locator("#close").click();
+    await clickClose(page);
 
     await expect(page.locator("#empty")).toBeVisible();
     await expect(page.locator("#doc-actions")).toBeHidden();
@@ -135,7 +140,7 @@ test.describe("B. ensureCanDiscardChanges 走 Rust 对话框", () => {
       };
     });
 
-    await page.locator("#close").click();
+    await clickClose(page);
 
     await expect.poll(() => page.evaluate(() => (window as any).__savedAs)).toBe(1);
     // 落盘后 isDraft=false / dirty=false，关闭照常进行
@@ -148,7 +153,7 @@ test.describe("B. ensureCanDiscardChanges 走 Rust 对话框", () => {
     await page.locator("#empty-open").click();
     await expect(page.locator("#doc-title")).toHaveText("已保存文档");
 
-    await page.locator("#close").click();
+    await clickClose(page);
     await expect(page.locator("#empty")).toBeVisible();
 
     const calls = await page.evaluate(() => (window as any).__discardCalls);

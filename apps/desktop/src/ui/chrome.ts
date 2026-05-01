@@ -4,13 +4,15 @@ import {
   docCardEl, outlineSectionEl, assetSectionEl, assetListEl, assetCountEl,
   resizer1El, resizer2El, starterActionsEl, docActionsEl, sidebarFootEl,
   sidebarNewEl, sidebarSaveEl, saveEl, saveLabelEl, saveAsEl, closeEl,
-  modeReadEl, modeEditEl, modeSourceEl,
+  modeReadEl, modeEditEl, modeSourceEl, docuTourGenerateEl, docuTourPlayEl, docToolbarEl,
+  tourStatusDotEl,
 } from "../core/dom";
 import type { AimdAsset, AimdDocument } from "../core/types";
 import { fileStem, extractHeadingTitle } from "../util/path";
 import { escapeAttr, escapeHTML } from "../util/escape";
 import { renderRecentList } from "./recents";
 import { persistSessionSnapshot } from "../session/snapshot";
+import { extractDocuTour } from "../docutour/frontmatter";
 
 export function displayDocTitle(doc: AimdDocument): string {
   return extractHeadingTitle(doc.markdown) || doc.title || fileStem(doc.path) || "未命名文档";
@@ -65,6 +67,7 @@ export function updateChrome() {
   if (!doc) panelEl().style.gridTemplateColumns = "";
   starterActionsEl().hidden = Boolean(doc);
   docActionsEl().hidden = !doc;
+  docToolbarEl().hidden = !doc;
   sidebarFootEl().hidden = !doc;
 
   titleEl().textContent = doc ? displayDocTitle(doc) : "AIMD Desktop";
@@ -73,6 +76,22 @@ export function updateChrome() {
     : "正文、图片和元信息始终在一起";
   saveEl().disabled = !doc || (!doc.dirty && !doc.isDraft);
   saveAsEl().disabled = !doc;
+  const existingTour = doc ? extractDocuTour(doc.markdown) : null;
+  docuTourGenerateEl().disabled = !doc;
+  docuTourGenerateEl().querySelector("span:last-child")!.textContent = existingTour
+    ? "更新导览"
+    : "生成导览";
+  docuTourPlayEl().disabled = !doc || !existingTour?.steps.length;
+  docuTourPlayEl().querySelector("span:last-child")!.textContent = existingTour?.steps.length
+    ? `播放导读（${existingTour.steps.length} 步）`
+    : "播放导读（无导览）";
+
+  // Tour status dot — 仅在"非生成中"时由 updateChrome 更新；
+  // generating 状态由 tour.ts 在生成中临时切换并恢复，避免 updateChrome 抢走脉冲态。
+  const dot = tourStatusDotEl();
+  if (dot.dataset.state !== "generating") {
+    dot.dataset.state = existingTour?.steps.length ? "ready" : "none";
+  }
   closeEl().disabled = !doc;
   // 顶部的主按钮统一显示「保存」：草稿状态下点击仍走 saveDocumentAs 创建文件，
   // 但视觉/语义上对用户都是"保存"动作（与 sidebar-foot 一致）。

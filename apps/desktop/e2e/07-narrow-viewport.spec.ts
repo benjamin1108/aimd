@@ -95,6 +95,21 @@ test.describe("Narrow viewport (< 760px) layout", () => {
     await expect(page.locator("#reader h1")).toHaveText("AIMD 样例");
   });
 
+  test("at 600px workspace-head does not exceed 120px when a doc is open", async ({ page }) => {
+    await page.setViewportSize({ width: 600, height: 800 });
+    await installTauriMock(page);
+    await page.goto("/");
+    await page.locator("#empty-open").click();
+    await expect(page.locator("#reader")).toBeVisible();
+
+    const headHeight = await page.locator(".workspace-head").evaluate(
+      (el) => el.getBoundingClientRect().height,
+    );
+    // Before fix: flex: 1 1 240px on .doc-meta in column-direction caused ~300px
+    // After fix: flex: 0 0 auto resets the height to content-only (~70px)
+    expect(headHeight).toBeLessThan(120);
+  });
+
   test("at 900px the source-mode preview pane is hidden", async ({ page }) => {
     // Cross-check the intermediate breakpoint the CSS ships:
     //   @media (max-width: 900px) { .preview-pane { display: none } }

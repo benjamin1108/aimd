@@ -1,0 +1,250 @@
+/* Doc toolbar contents — toolbar-select, mode-switch, action-menu (⋯/导览),
+   tour status dot, source-mode metadata banner, starter / quick actions. */
+
+.toolbar-select-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  color: var(--ink-muted);
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.toolbar-select {
+  height: 30px;
+  min-width: 78px;
+  border: 1px solid var(--hairline-strong);
+  border-radius: 8px;
+  padding: 0 28px 0 10px;
+  background: rgba(255, 255, 255, 0.9);
+  color: var(--ink);
+  font: 12.5px/1 var(--font-sans);
+  outline: none;
+}
+
+.toolbar-select:focus {
+  border-color: rgba(31, 22, 11, 0.28);
+  box-shadow: 0 0 0 3px rgba(31, 22, 11, 0.07);
+}
+
+.more-menu-wrap,
+.tour-menu-wrap {
+  position: relative;
+}
+
+.secondary-btn.icon-only {
+  width: 32px;
+  padding: 0;
+  font-size: 18px;
+  line-height: 1;
+}
+
+/* Tour menu trigger 上的状态点：
+   - 默认隐藏（.tour-status-dot[data-state="none"] 不渲染圆点）
+   - data-state="ready"：蓝色，"已存在导览"
+   - data-state="generating"：脉冲，"正在生成"
+*/
+#tour-menu-toggle {
+  position: relative;
+}
+
+.tour-status-dot {
+  display: none;
+  position: absolute;
+  top: 5px;
+  right: 5px;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--tone-info);
+  box-shadow: 0 0 0 2px var(--bg-panel);
+}
+
+.tour-status-dot[data-state="ready"] { display: block; }
+.tour-status-dot[data-state="generating"] {
+  display: block;
+  background: var(--tone-warn);
+  animation: tour-dot-pulse 1.4s var(--ease) infinite;
+}
+
+@keyframes tour-dot-pulse {
+  0%, 100% { transform: scale(1); opacity: 1; }
+  50%      { transform: scale(1.25); opacity: 0.55; }
+}
+
+/* Source-mode metadata banner — 出现在 textarea 上方，提示
+   front-matter 行数。不强制折叠（textarea 不支持），但通过明确告知
+   把"刺眼"变成"知情" 。 */
+.source-banner {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0 0 10px;
+  padding: 8px 12px;
+  border: 1px solid var(--hairline);
+  border-radius: 8px;
+  background: rgba(58, 79, 110, 0.06);
+  color: var(--tone-info);
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+.source-banner[hidden] { display: none !important; }
+
+.source-banner-icon {
+  display: grid;
+  place-items: center;
+  width: 16px;
+  height: 16px;
+  flex: 0 0 auto;
+}
+
+.source-banner-text {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.source-banner-text strong {
+  color: var(--ink-strong);
+  font-weight: 600;
+}
+
+/* Action menu (shared by ⋯ menu and 导览 menu) */
+
+.action-menu {
+  position: absolute;
+  top: calc(100% + 6px);
+  right: 0;
+  z-index: 8000;
+  min-width: 188px;
+  padding: 5px;
+  border: 1px solid var(--hairline-strong);
+  border-radius: 9px;
+  background: var(--bg-panel);
+  box-shadow: 0 14px 32px -18px rgba(31, 22, 11, 0.28), 0 4px 10px -8px rgba(31, 22, 11, 0.18);
+}
+
+.action-menu[hidden] { display: none !important; }
+
+.action-menu-item {
+  display: grid;
+  grid-template-columns: 18px minmax(0, 1fr);
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  min-height: 32px;
+  padding: 6px 9px;
+  border-radius: 7px;
+  color: var(--ink);
+  text-align: left;
+  font-size: 12.5px;
+}
+
+.action-menu-item:hover:not(:disabled) {
+  background: var(--bg-sidebar-hover);
+}
+
+.action-menu-item:disabled {
+  opacity: 0.48;
+}
+
+.action-menu-sep {
+  margin: 4px 0;
+  border: none;
+  border-top: 1px solid var(--hairline);
+}
+
+.action-menu-group-label {
+  padding: 6px 9px 2px;
+  color: var(--ink-faint);
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.action-menu-item--danger {
+  color: var(--tone-danger, #c0392b);
+}
+
+.action-menu-item--danger .action-menu-icon {
+  color: var(--tone-danger, #c0392b);
+}
+
+.action-menu-item--danger:hover:not(:disabled) {
+  background: rgba(192, 57, 43, 0.08);
+}
+
+.action-menu-icon {
+  display: grid;
+  place-items: center;
+  color: var(--ink-muted);
+}
+
+.action-menu-icon svg {
+  width: 13px;
+  height: 13px;
+}
+
+.starter-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+/* Mode switch (segmented) — text-only, icons removed for visual calm.
+   Three short labels carry hierarchy via weight + a subtle elevated
+   background on the active segment. */
+
+.mode-switch {
+  display: inline-flex;
+  padding: 3px;
+  border-radius: 9px;
+  background: rgba(31, 22, 11, 0.05);
+}
+
+.mode-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  height: 26px;
+  min-width: 56px;
+  padding: 0 12px;
+  border-radius: 7px;
+  color: var(--ink-muted);
+  font-size: 12.5px;
+  font-weight: 500;
+  letter-spacing: -0.005em;
+  transition: background var(--t-fast) var(--ease),
+              color var(--t-fast) var(--ease),
+              box-shadow var(--t-fast) var(--ease);
+}
+
+.mode-btn-icon { display: none; }
+
+.mode-btn:hover:not(:disabled):not(.active) {
+  color: var(--ink);
+}
+
+.mode-btn.active {
+  background: var(--bg-panel);
+  color: var(--ink-strong);
+  font-weight: 600;
+  box-shadow:
+    0 1px 0 rgba(255, 255, 255, 0.6) inset,
+    0 1px 2px rgba(31, 22, 11, 0.1),
+    0 4px 10px -6px rgba(31, 22, 11, 0.18);
+}
+
+.mode-btn:disabled {
+  opacity: 0.45;
+}
+
+.quick-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}

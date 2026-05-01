@@ -1,0 +1,117 @@
+/* AIMD Desktop — design tokens + base resets.
+   Warm-neutral palette inspired by reference style. */
+
+:root {
+  --reader-max: 880px;
+
+  /* Surface colors */
+  --bg-window-1: #d8e3ef;
+  --bg-window-2: #eef0ec;
+  --bg-window-3: #f6f1e6;
+  --bg-panel: #ffffff;
+  --bg-sidebar: #f4efe6;
+  --bg-sidebar-hover: #ece4d2;
+  --bg-sidebar-active: #ddd2bc;
+  --bg-soft: #faf7f1;
+  --bg-code: #f3efe6;
+
+  /* Ink */
+  --ink: #1d1a14;
+  --ink-strong: #0f0d09;
+  --ink-muted: #756d5f;
+  --ink-faint: #a39a89;
+  --ink-on-accent: #fafaf7;
+
+  /* Accent — single, deep, desaturated */
+  --accent: #1d1a14;
+  --accent-hover: #322c20;
+  --accent-soft: #2b2519;
+
+  /* Status tones */
+  --tone-success: #2f6f4f;
+  --tone-warn: #a76b1e;
+  --tone-info: #3a4f6e;
+  --tone-loading: #5b6470;
+  --tone-danger: #c0392b;
+
+  /* Lines & shadows */
+  --hairline: rgba(31, 22, 11, 0.07);
+  --hairline-strong: rgba(31, 22, 11, 0.13);
+  --shadow-panel: 0 30px 60px -25px rgba(35, 28, 14, 0.32),
+                  0 12px 28px -18px rgba(35, 28, 14, 0.18),
+                  inset 0 1px 0 rgba(255, 255, 255, 0.5);
+  --shadow-card: 0 1px 0 rgba(255, 255, 255, 0.6) inset,
+                 0 6px 14px -10px rgba(31, 22, 11, 0.15);
+
+  /* Motion */
+  --ease: cubic-bezier(0.16, 1, 0.3, 1);
+  --t-fast: 140ms;
+  --t-med: 220ms;
+  --t-slow: 360ms;
+
+  /* Type */
+  --font-sans: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Helvetica Neue",
+               "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei UI", system-ui, sans-serif;
+  --font-display: -apple-system, BlinkMacSystemFont, "SF Pro Display", "Helvetica Neue",
+                  "PingFang SC", "Hiragino Sans GB", system-ui, sans-serif;
+  --font-mono: ui-monospace, "SF Mono", "JetBrains Mono", Menlo, Consolas, monospace;
+
+  color: var(--ink);
+  font-family: var(--font-sans);
+  font-size: 14px;
+  font-feature-settings: "ss01", "cv11", "tnum";
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  letter-spacing: -0.005em;
+}
+
+* {
+  box-sizing: border-box;
+  user-select: none;
+}
+
+textarea,
+input,
+[contenteditable],
+[contenteditable] * {
+  user-select: text;
+}
+
+#reader,
+#reader *,
+.preview,
+.preview * {
+  user-select: text;
+}
+
+/* `display: grid|flex` on workspace children would otherwise override the
+   global `hidden` attribute, causing hidden panes to keep intercepting events. */
+[hidden] {
+  display: none !important;
+}
+
+html, body {
+  margin: 0;
+  height: 100%;
+}
+
+body {
+  min-height: 100dvh;
+  overflow: hidden;
+  background:
+    radial-gradient(120% 90% at 12% -10%, var(--bg-window-1) 0%, transparent 60%),
+    radial-gradient(140% 90% at 110% 110%, var(--bg-window-3) 0%, transparent 60%),
+    var(--bg-window-2);
+}
+
+button {
+  border: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+}
+
+button:disabled {
+  cursor: not-allowed;
+}
