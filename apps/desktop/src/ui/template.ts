@@ -145,17 +145,6 @@ export const APP_HTML = `
           </div>
 
           <div class="doc-toolbar-spacer"></div>
-
-          <div class="toolbar-group toolbar-group--tour" id="tour-actions">
-            <button id="docutour-play" class="secondary-btn" type="button" hidden>
-              <span class="secondary-btn-icon">${ICONS.play}</span>
-              <span>播放导览</span>
-            </button>
-            <button id="docutour-generate" class="ghost-btn" type="button" disabled>
-              <span class="secondary-btn-icon">${ICONS.sparkle}</span>
-              <span id="docutour-generate-label">生成导览</span>
-            </button>
-          </div>
         </div>
 
         <div class="format-toolbar" id="format-toolbar" hidden>

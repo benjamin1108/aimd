@@ -36,7 +36,6 @@ import {
   onWindowDragOver, onWindowDragLeave, onWindowDrop,
 } from "./drag/window-drop";
 import { persistSessionSnapshot, restoreSession } from "./session/snapshot";
-import { generateDocuTour, startDocuTour, stopDocuTour } from "./docutour/tour";
 import { installDebugConsole, openDebugConsole, onDebugChange } from "./debug/console";
 
 installDebugConsole();
@@ -88,8 +87,6 @@ modeEditEl().addEventListener("click", () => setMode("edit"));
 modeSourceEl().addEventListener("click", () => setMode("source"));
 saveEl().addEventListener("click", saveDocument);
 saveAsEl().addEventListener("click", () => { closeActionMenus(); void saveDocumentAs(); });
-docuTourGenerateEl().addEventListener("click", () => { void generateDocuTour(); });
-docuTourPlayEl().addEventListener("click", () => { startDocuTour(); });
 bindMenuToggle(moreMenuToggleEl(), moreMenuEl());
 $<HTMLButtonElement>("#new-window").addEventListener("click", () => {
   closeActionMenus();
@@ -165,7 +162,6 @@ document.addEventListener("keydown", (event) => {
     event.preventDefault();
     void chooseAndOpen();
   }
-  if (event.key === "Escape") stopDocuTour();
   if (event.key === "Escape") closeActionMenus();
 });
 
@@ -219,8 +215,6 @@ window.addEventListener("DOMContentLoaded", async () => {
       "width-normal":      () => { setWidth("normal"); },
       "width-wide":        () => { setWidth("wide"); },
       "width-ultra":       () => { setWidth("ultra"); },
-      "generate-tour":     () => { void generateDocuTour(); },
-      "play-tour":         () => { startDocuTour(); },
     };
     await listen<string>("aimd-menu", (event) => {
       menuHandlers[event.payload]?.();

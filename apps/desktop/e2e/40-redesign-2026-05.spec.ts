@@ -44,13 +44,11 @@ async function installMock(page: Page, opts: SetupOpts = {}) {
       dirty: isDirty,
     };
     let stored: any = {
-      docutour: {
-        provider: "dashscope",
-        model: "qwen3.6-plus",
-        apiKey: "sk-test-1234567890abcdef",
-        apiBase: "",
-        maxSteps: 6,
-        language: "zh-CN",
+      ai: {
+        activeProvider: "dashscope",
+        providers: {
+          dashscope: { model: "qwen3.6-plus", apiKey: "sk-test-1234567890abcdef", apiBase: "" },
+        },
       },
     };
     const handlers: Record<string, (a: Args) => unknown> = {
@@ -93,26 +91,6 @@ test.describe("工具栏：导览直显，无嵌套菜单 / 无状态点", () =>
     await expect(page.locator(".toolbar-group-label")).toHaveCount(0);
     // 但分组 wrapper 仍在，模式开关 / 导览动作各自归属。
     await expect(page.locator(".toolbar-group--mode")).toBeVisible();
-    await expect(page.locator(".toolbar-group--tour")).toBeVisible();
-  });
-
-  test("无导览：仅生成按钮可见", async ({ page }) => {
-    await installMock(page, { withTour: false });
-    await page.goto("/");
-    await page.locator("#empty-open").click();
-    await expect(page.locator("#docutour-generate")).toBeVisible();
-    await expect(page.locator("#docutour-generate")).toContainText("生成导览");
-    await expect(page.locator("#docutour-play")).toBeHidden();
-  });
-
-  test('有导览：播放按钮显示步数；生成按钮变成"重新生成"', async ({ page }) => {
-    await installMock(page, { withTour: true });
-    await page.goto("/");
-    await page.locator("#empty-open").click();
-    await expect(page.locator("#docutour-play")).toBeVisible();
-    await expect(page.locator("#docutour-play")).toContainText("播放导览");
-    await expect(page.locator("#docutour-play")).toContainText("2 步");
-    await expect(page.locator("#docutour-generate")).toContainText("重新生成");
   });
 });
 
@@ -165,18 +143,6 @@ test.describe("保存按钮：干净时灰，脏时亮", () => {
 });
 
 test.describe("设置：双栏 IA + API Key 半遮罩", () => {
-  test("默认显示模型分节，导览分节 hidden；点击切换", async ({ page }) => {
-    await installMock(page);
-    await page.goto("/settings.html");
-    await expect(page.locator(".settings-section[data-section=\"model\"]")).toBeVisible();
-    await expect(page.locator(".settings-section[data-section=\"tour\"]")).toBeHidden();
-
-    await page.locator(".settings-nav-item[data-section=\"tour\"]").click();
-    await expect(page.locator(".settings-section[data-section=\"tour\"]")).toBeVisible();
-    await expect(page.locator(".settings-section[data-section=\"model\"]")).toBeHidden();
-    await expect(page.locator("#max-steps")).toBeVisible();
-  });
-
   test("API Key 默认半遮罩：mask 文本含 prefix4 + ••• + suffix4", async ({ page }) => {
     await installMock(page);
     await page.goto("/settings.html");
@@ -220,13 +186,11 @@ test.describe("设置：双栏 IA + API Key 半遮罩", () => {
     await page.addInitScript(() => {
       type Args = Record<string, unknown> | undefined;
       let stored: any = {
-        docutour: {
-          provider: "dashscope",
-          model: "qwen3.6-plus",
-          apiKey: "   ",
-          apiBase: "",
-          maxSteps: 6,
-          language: "zh-CN",
+        ai: {
+          activeProvider: "dashscope",
+          providers: {
+            dashscope: { model: "qwen3.6-plus", apiKey: "   ", apiBase: "" },
+          },
         },
       };
       const handlers: Record<string, (a: Args) => unknown> = {
@@ -244,16 +208,6 @@ test.describe("设置：双栏 IA + API Key 半遮罩", () => {
     await expect(page.locator("#api-key")).toHaveValue("");
     await expect(page.locator(".api-key-wrap")).toHaveAttribute("data-state", "visible");
     await expect(page.locator(".api-key-mask")).toHaveText("");
-  });
-
-  test("导览输出语言只给中/英两个 select 选项", async ({ page }) => {
-    await installMock(page);
-    await page.goto("/settings.html");
-    await page.locator(".settings-nav-item[data-section=\"tour\"]").click();
-    const opts = page.locator("#language option");
-    await expect(opts).toHaveCount(2);
-    const values = await opts.evaluateAll((els) => els.map((o) => (o as HTMLOptionElement).value));
-    expect(values).toEqual(["zh-CN", "en-US"]);
   });
 
   test("无修改时保存按钮 disabled；编辑后 enabled", async ({ page }) => {

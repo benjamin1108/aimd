@@ -85,8 +85,6 @@
 .action-menu *,
 .workspace-foot,
 .workspace-foot *,
-.docutour-control,
-.docutour-control *,
 .empty-state .launch-actions,
 .empty-state .launch-actions * {
   user-select: none;

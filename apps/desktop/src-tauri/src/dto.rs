@@ -9,7 +9,6 @@ use aimd_core::reader::Reader;
 use aimd_mdx::extract_title;
 use aimd_render::render;
 use serde::{Deserialize, Serialize};
-use serde_json::Value;
 use sha2::{Digest, Sha256};
 use std::fs;
 use std::path::{Path, PathBuf};
@@ -26,8 +25,6 @@ pub struct DocumentDTO {
     pub html: String,
     pub manifest: Manifest,
     pub assets: Vec<AssetDTO>,
-    #[serde(rename = "docuTour", skip_serializing_if = "Option::is_none")]
-    pub docu_tour: Option<Value>,
     pub dirty: bool,
 }
 
@@ -187,10 +184,6 @@ pub fn document_dto_from_reader(
         .collect();
     let abs = fs::canonicalize(file).unwrap_or_else(|_| file.to_path_buf());
     let abs = windows::display_path(&abs);
-    let docu_tour = reader
-        .read_file("metadata/docutour.json")
-        .ok()
-        .and_then(|bytes| serde_json::from_slice::<Value>(&bytes).ok());
     Ok(DocumentDTO {
         path: abs,
         title: reader.manifest.title.clone(),
@@ -198,7 +191,6 @@ pub fn document_dto_from_reader(
         html,
         manifest: reader.manifest.clone(),
         assets,
-        docu_tour,
         dirty: false,
     })
 }

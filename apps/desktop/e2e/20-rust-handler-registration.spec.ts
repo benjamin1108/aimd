@@ -26,6 +26,10 @@ const LIB_RS = path.resolve(
   __dirname,
   "../src-tauri/src/lib.rs",
 );
+const DOCUMENTS_RS = path.resolve(
+  __dirname,
+  "../src-tauri/src/documents.rs",
+);
 
 const TAURI_CONF = path.resolve(__dirname, "../src-tauri/tauri.conf.json");
 const INFO_PLIST = path.resolve(__dirname, "../src-tauri/Info.plist");
@@ -112,11 +116,11 @@ test.describe("Rust invoke_handler 命令注册校验", () => {
 });
 
 test.describe("MD 文件关联源码校验", () => {
-  test('lib.rs 包含 md / markdown / mdx 扩展名标识符', () => {
-    const src = fs.readFileSync(LIB_RS, "utf-8");
-    expect(src, 'lib.rs 缺少 "md" 扩展名标识符').toContain('"md"');
-    expect(src, 'lib.rs 缺少 "markdown" 扩展名标识符').toContain('"markdown"');
-    expect(src, 'lib.rs 缺少 "mdx" 扩展名标识符').toContain('"mdx"');
+  test('documents.rs 包含 md / markdown / mdx 扩展名标识符', () => {
+    const src = fs.readFileSync(DOCUMENTS_RS, "utf-8");
+    expect(src, 'documents.rs 缺少 "md" 扩展名标识符').toContain('"md"');
+    expect(src, 'documents.rs 缺少 "markdown" 扩展名标识符').toContain('"markdown"');
+    expect(src, 'documents.rs 缺少 "mdx" 扩展名标识符').toContain('"mdx"');
   });
 
   test('tauri.conf.json 包含 Markdown Document 文件关联', () => {

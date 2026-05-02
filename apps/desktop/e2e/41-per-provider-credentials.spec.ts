@@ -10,7 +10,7 @@
 import { test, expect, Page } from "@playwright/test";
 
 type Stored = {
-  docutour:
+  ai:
     | {
         // 新格式
         activeProvider: string;
@@ -57,14 +57,12 @@ async function installMock(page: Page, initial: Stored, opts?: { onSave?: (v: an
 test.describe("per-provider 凭证 — 切 provider 不串台", () => {
   test("dashscope 和 gemini 的 apiKey 各自独立显示", async ({ page }) => {
     await installMock(page, {
-      docutour: {
+      ai: {
         activeProvider: "dashscope",
         providers: {
           dashscope: { model: "qwen3.6-plus", apiKey: "sk-only-dashscope", apiBase: "" },
           gemini: { model: "gemini-3-pro-preview", apiKey: "g-only-gemini", apiBase: "" },
         },
-        maxSteps: 6,
-        language: "zh-CN",
       },
     });
     await page.goto("/settings.html");
@@ -84,14 +82,12 @@ test.describe("per-provider 凭证 — 切 provider 不串台", () => {
 
   test("一边只有 key、另一边为空：切到空那边 input 干净", async ({ page }) => {
     await installMock(page, {
-      docutour: {
+      ai: {
         activeProvider: "dashscope",
         providers: {
           dashscope: { model: "qwen3.6-plus", apiKey: "only-this-one", apiBase: "" },
           gemini: { model: "gemini-3-pro-preview", apiKey: "", apiBase: "" },
         },
-        maxSteps: 6,
-        language: "zh-CN",
       },
     });
     await page.goto("/settings.html");
@@ -107,14 +103,12 @@ test.describe("per-provider 凭证 — 切 provider 不串台", () => {
     await installMock(
       page,
       {
-        docutour: {
+        ai: {
           activeProvider: "dashscope",
           providers: {
             dashscope: { model: "qwen3.6-plus", apiKey: "kA", apiBase: "" },
             gemini: { model: "gemini-3-pro-preview", apiKey: "", apiBase: "" },
           },
-          maxSteps: 6,
-          language: "zh-CN",
         },
       },
       { onSave: (v) => { received = v; } },
@@ -128,54 +122,10 @@ test.describe("per-provider 凭证 — 切 provider 不串台", () => {
     // 保存
     await page.locator("#save-settings").click();
 
-    await expect.poll(() => received?.docutour?.providers?.dashscope?.apiKey).toBe("kA-updated");
-    expect(received?.docutour?.providers?.gemini?.apiKey).toBe("kB-new");
-    expect(received?.docutour?.activeProvider).toBe("gemini");
+    await expect.poll(() => received?.ai?.providers?.dashscope?.apiKey).toBe("kA-updated");
+    expect(received?.ai?.providers?.gemini?.apiKey).toBe("kB-new");
+    expect(received?.ai?.activeProvider).toBe("gemini");
   });
 });
 
-test.describe("老格式 settings.json 兼容", () => {
-  test("顶层 provider/apiKey 自动迁移：dashscope 那边继承 key，gemini 保持空", async ({ page }) => {
-    await installMock(page, {
-      docutour: {
-        provider: "dashscope",
-        model: "qwen3.6-plus",
-        apiKey: "sk-legacy-existing",
-        apiBase: "",
-        maxSteps: 6,
-        language: "zh-CN",
-      } as any,
-    });
-    await page.goto("/settings.html");
 
-    // 默认显示 dashscope，key 是迁移过来的
-    await expect(page.locator("#provider")).toHaveValue("dashscope");
-    await expect(page.locator("#api-key")).toHaveValue("sk-legacy-existing");
-
-    // 切到 gemini —— 应当是空的（迁移没把 dashscope 的 key 复制给 gemini）
-    await page.locator("#provider").selectOption("gemini");
-    await expect(page.locator("#api-key")).toHaveValue("");
-  });
-
-  test("老格式 provider=gemini：迁移后 gemini 那格继承 key，dashscope 保持空", async ({ page }) => {
-    await installMock(page, {
-      docutour: {
-        provider: "gemini",
-        model: "gemini-3-pro-preview",
-        apiKey: "g-legacy",
-        apiBase: "",
-        maxSteps: 6,
-        language: "zh-CN",
-      } as any,
-    });
-    await page.goto("/settings.html");
-
-    // 应当 active=gemini，key 显示为 g-legacy
-    await expect(page.locator("#provider")).toHaveValue("gemini");
-    await expect(page.locator("#api-key")).toHaveValue("g-legacy");
-
-    // 切 dashscope → 空
-    await page.locator("#provider").selectOption("dashscope");
-    await expect(page.locator("#api-key")).toHaveValue("");
-  });
-});

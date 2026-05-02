@@ -9,7 +9,6 @@ import { rewriteAssetURLs } from "../document/assets";
 import { escapeAttr, escapeHTML } from "../util/escape";
 import { setStatus } from "./chrome";
 import { persistSessionSnapshot } from "../session/snapshot";
-import { assignDocuTourAnchors } from "../docutour/anchors";
 
 export function scheduleRender() {
   if (state.renderTimer) window.clearTimeout(state.renderTimer);
@@ -54,8 +53,6 @@ export function applyHTML(html: string) {
     tagAssetImages(readerEl(), state.doc.assets);
     tagAssetImages(previewEl(), state.doc.assets);
   }
-  assignDocuTourAnchors(readerEl());
-  assignDocuTourAnchors(previewEl());
   state.outline = extractOutlineFromHTML(renderedHTML);
   if (state.doc) {
     state.doc.html = previewEl().innerHTML;
@@ -149,16 +146,13 @@ export function paintPaneIfStale(mode: Mode) {
     tmpEdit.querySelectorAll(".aimd-frontmatter").forEach((el) => el.remove());
     inlineEditorEl().innerHTML = tmpEdit.innerHTML;
     tagAssetImages(inlineEditorEl(), state.doc.assets);
-    assignDocuTourAnchors(inlineEditorEl());
     state.inlineDirty = false;
   } else if (mode === "read") {
     readerEl().innerHTML = state.doc.html;
     tagAssetImages(readerEl(), state.doc.assets);
-    assignDocuTourAnchors(readerEl());
   } else {
     previewEl().innerHTML = state.doc.html;
     tagAssetImages(previewEl(), state.doc.assets);
-    assignDocuTourAnchors(previewEl());
   }
   state.paintedVersion[mode] = state.htmlVersion;
 }

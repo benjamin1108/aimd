@@ -9,7 +9,7 @@ use crate::dto::{document_dto_from_reader, resolve_title, DocumentDTO, MarkdownD
 use crate::windows;
 use aimd_core::manifest::{Manifest, ROLE_CONTENT_IMAGE};
 use aimd_core::reader::Reader;
-use aimd_core::rewrite::{referenced_asset_ids, rewrite_file, PackageFile, RewriteOptions};
+use aimd_core::rewrite::{referenced_asset_ids, rewrite_file, RewriteOptions};
 use aimd_core::writer;
 use aimd_render::render;
 use chrono::Utc;
@@ -21,7 +21,6 @@ use std::sync::Mutex;
 use tauri::State;
 
 pub static MAIN_INITIALIZED: AtomicBool = AtomicBool::new(false);
-const DOCUTOUR_METADATA_PATH: &str = "metadata/docutour.json";
 
 #[derive(Default)]
 pub struct PendingOpenPaths(pub Mutex<Vec<String>>);
@@ -104,28 +103,6 @@ pub fn save_aimd(path: String, markdown: String) -> Result<Value, String> {
 }
 
 #[tauri::command]
-pub fn save_docu_tour(path: String, markdown: String, script: Value) -> Result<Value, String> {
-    let file = Path::new(&path);
-    let data = serde_json::to_vec_pretty(&script).map_err(|e| format!("docutour json: {e}"))?;
-    rewrite_file(
-        file,
-        RewriteOptions {
-            markdown: markdown.as_bytes().to_vec(),
-            delete_assets: None,
-            add_assets: Vec::new(),
-            add_files: vec![PackageFile {
-                path: DOCUTOUR_METADATA_PATH.to_string(),
-                data,
-            }],
-            delete_files: std::collections::HashSet::new(),
-            gc_unreferenced: false,
-        },
-    )
-    .map_err(|e| format!("save_docu_tour rewrite: {e}"))?;
-    open_aimd(path)
-}
-
-#[tauri::command]
 pub fn save_aimd_as(
     path: Option<String>,
     save_path: String,
@@ -176,9 +153,6 @@ pub fn save_aimd_as(
                 &asset.role
             };
             w.add_asset(&asset.id, filename, &data, role)?;
-        }
-        if let Ok(data) = reader.read_file(DOCUTOUR_METADATA_PATH) {
-            w.add_file(DOCUTOUR_METADATA_PATH, &data)?;
         }
         Ok(())
     })

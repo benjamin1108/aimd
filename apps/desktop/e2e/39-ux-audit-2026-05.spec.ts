@@ -27,13 +27,11 @@ async function installMock(page: Page, opts?: { onSaveSettings?: (v: unknown) =>
   await page.addInitScript(({ doc, hasSaveCallback }) => {
     type Args = Record<string, unknown> | undefined;
     let stored: any = {
-      docutour: {
-        provider: "dashscope",
-        model: "qwen3.6-plus",
-        apiKey: "existing-key",
-        apiBase: "",
-        maxSteps: 6,
-        language: "zh-CN",
+      ai: {
+        activeProvider: "dashscope",
+        providers: {
+          dashscope: { model: "qwen3.6-plus", apiKey: "existing-key", apiBase: "" },
+        },
       },
     };
     const handlers: Record<string, (a: Args) => unknown> = {
@@ -81,7 +79,6 @@ test.describe("P1 — 主 UI 信息架构", () => {
     await page.goto("/");
     await page.locator("#empty-open").click();
     await expect(page.locator(".toolbar-group--mode")).toBeVisible();
-    await expect(page.locator(".toolbar-group--tour")).toBeVisible();
   });
 
   test("已保存文档：底部 #status 是'就绪'，#save 处于 disabled", async ({ page }) => {
@@ -120,7 +117,6 @@ test.describe("P0-1 — 设置取消按钮 + 后端持久化", () => {
     await page.goto("/settings.html");
     await expect(page.locator("#api-key")).toHaveValue("existing-key");
     await expect(page.locator("#provider")).toHaveValue("dashscope");
-    await expect(page.locator("#max-steps")).toHaveValue("6");
   });
 
   test("取消按钮不写后端：#cancel 仅关窗，不调 save_settings", async ({ page }) => {
@@ -147,14 +143,10 @@ test.describe("P0-1 — 设置取消按钮 + 后端持久化", () => {
     await installMock(page, { onSaveSettings: (v) => { received = v; } });
     await page.goto("/settings.html");
     await page.locator("#api-key").fill("new-key-123");
-    // 步数字段被挪到"导览"分节里，要先切到导览 tab 才能 fill。
-    await page.locator(".settings-nav-item[data-section=\"tour\"]").click();
-    await page.locator("#max-steps").fill("8");
     await page.locator("#save-settings").click();
-    // 新格式：apiKey 落在 providers[activeProvider] 下，maxSteps 仍是 docutour 顶层字段。
-    await expect.poll(() => received?.docutour?.providers?.dashscope?.apiKey).toBe("new-key-123");
-    expect(received?.docutour?.activeProvider).toBe("dashscope");
-    expect(received?.docutour?.maxSteps).toBe(8);
+    // 新格式：apiKey 落在 providers[activeProvider] 下。
+    await expect.poll(() => received?.ai?.providers?.dashscope?.apiKey).toBe("new-key-123");
+    expect(received?.ai?.activeProvider).toBe("dashscope");
   });
 
   test("Esc 等同于取消：不写后端", async ({ page }) => {

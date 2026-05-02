@@ -5,7 +5,6 @@
 mod assets;
 mod dialogs;
 mod documents;
-mod docutour;
 mod dto;
 mod llm;
 mod macos_assoc;
@@ -62,7 +61,6 @@ pub fn run() {
             documents::open_aimd,
             documents::create_aimd,
             documents::save_aimd,
-            documents::save_docu_tour,
             documents::save_aimd_as,
             documents::render_markdown,
             documents::render_markdown_standalone,
@@ -75,7 +73,6 @@ pub fn run() {
             assets::list_aimd_assets,
             assets::read_aimd_asset,
             assets::replace_aimd_asset,
-            docutour::generate_docu_tour,
             settings::load_settings,
             settings::save_settings,
             windows::open_in_new_window,

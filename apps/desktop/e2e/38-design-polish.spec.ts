@@ -116,24 +116,6 @@ test.describe("导览按钮：直显，不嵌套，无状态点", () => {
     await expect(page.locator("#tour-status-dot")).toHaveCount(0);
     await expect(page.locator(".tour-status-dot")).toHaveCount(0);
   });
-
-  test('无导览：仅 #docutour-generate 可见，文案"生成导览"', async ({ page }) => {
-    await installTauriMock(page, { withTour: false });
-    await page.goto("/");
-    await page.locator("#empty-open").click();
-    await expect(page.locator("#docutour-play")).toBeHidden();
-    await expect(page.locator("#docutour-generate")).toBeVisible();
-    await expect(page.locator("#docutour-generate")).toContainText("生成导览");
-  });
-
-  test('有导览：#docutour-play 显示步数，生成按钮变"重新生成"', async ({ page }) => {
-    await installTauriMock(page, { withTour: true });
-    await page.goto("/");
-    await page.locator("#empty-open").click();
-    await expect(page.locator("#docutour-play")).toBeVisible();
-    await expect(page.locator("#docutour-play")).toContainText("播放导览");
-    await expect(page.locator("#docutour-generate")).toContainText("重新生成");
-  });
 });
 
 test.describe("源码模式 metadata banner", () => {
@@ -143,17 +125,6 @@ test.describe("源码模式 metadata banner", () => {
     await page.locator("#empty-open").click();
     await page.locator("#mode-source").click();
     await expect(page.locator("#source-banner")).toBeHidden();
-  });
-
-  test("含 frontmatter + Docu-Tour 时进入源码模式显示 banner，文案包含 Docu-Tour 步数", async ({ page }) => {
-    await installTauriMock(page, { withTour: true });
-    await page.goto("/");
-    await page.locator("#empty-open").click();
-    await page.locator("#mode-source").click();
-    await expect(page.locator("#source-banner")).toBeVisible();
-    await expect(page.locator("#source-banner-text")).toContainText("Front-matter");
-    await expect(page.locator("#source-banner-text")).toContainText("Docu-Tour");
-    await expect(page.locator("#source-banner-text")).toContainText("步");
   });
 
   test("从源码模式切回阅读模式后 banner 自动隐藏", async ({ page }) => {

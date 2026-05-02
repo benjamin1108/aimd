@@ -8,7 +8,6 @@ import type { Mode } from "../core/types";
 import { paintPaneIfStale } from "./outline";
 import { updateChrome } from "./chrome";
 import { flushInline } from "../editor/inline";
-import { summarizeFrontmatter } from "../docutour/frontmatter";
 
 export function refreshSourceBanner() {
   const banner = sourceBannerEl();
@@ -16,17 +15,18 @@ export function refreshSourceBanner() {
     banner.hidden = true;
     return;
   }
-  const summary = summarizeFrontmatter(state.doc.markdown);
-  if (!summary.hasFrontmatter) {
+  const lines = state.doc.markdown.split("\n");
+  if (lines[0] !== "---") {
     banner.hidden = true;
     return;
   }
-  const tourPart = summary.hasDocuTour
-    ? `，含 <strong>Docu-Tour 导览数据（${summary.docuTourSteps} 步）</strong>`
-    : "";
+  const endIndex = lines.indexOf("---", 1);
+  if (endIndex === -1) {
+    banner.hidden = true;
+    return;
+  }
   sourceBannerTextEl().innerHTML =
-    `<strong>源码视图</strong>：开头 ${summary.yamlLineCount} 行是 Front-matter${tourPart}。`
-    + ` 这些通常由阅读 / 编辑模式自动维护，可手改但建议从顶部菜单操作。`;
+    `<strong>源码视图</strong>：开头 ${endIndex + 1} 行是 Front-matter。这些通常由阅读 / 编辑模式自动维护，可手改但建议从顶部菜单操作。`;
   banner.hidden = false;
 }
 
@@ -48,12 +48,15 @@ export function setMode(mode: Mode) {
   // state.doc.html updated while editing, and applyHTML keeps reader/preview
   // in sync on open / save / source-mode render — so most mode hops have
   // nothing to repaint and stay snappy on long documents.
-  if (hasDoc) paintPaneIfStale(mode);
+  if (hasDoc) {
+    paintPaneIfStale(mode);
+    if (mode === "source") refreshSourceBanner();
+  }
 
   for (const [el, m] of [[modeReadEl(), "read"], [modeEditEl(), "edit"], [modeSourceEl(), "source"]] as const) {
     el.classList.toggle("active", mode === m);
     el.setAttribute("aria-selected", String(mode === m));
   }
-  refreshSourceBanner();
+
   updateChrome();
 }

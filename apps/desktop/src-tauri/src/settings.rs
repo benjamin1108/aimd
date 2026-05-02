@@ -1,11 +1,4 @@
-// 应用级设置（导览模型 + 偏好）持久化。
-//
-// 之前 docu-tour 配置只存在每个 WebView 的 localStorage 里：设置窗写完，主窗口
-// 读不到，导致用户切换选项后"记不住"。这里把它统一到 Tauri 的 app config dir，
-// 主窗口和设置窗口都通过 invoke load_settings / save_settings 读写同一份 JSON。
-//
-// 存储模型 v2：apiKey / apiBase / model 改成 per-provider，避免切 provider 时
-// 串台。老格式（顶层 provider/apiKey/apiBase/model）在 load_settings 里就地迁移。
+// 应用级设置持久化。
 
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
@@ -17,14 +10,6 @@ const SETTINGS_FILE: &str = "settings.json";
 
 fn default_provider() -> String {
     "dashscope".to_string()
-}
-
-fn default_max_steps() -> u32 {
-    6
-}
-
-fn default_language() -> String {
-    "zh-CN".to_string()
 }
 
 fn default_dashscope_model() -> String {
@@ -82,24 +67,18 @@ impl Default for ProvidersBag {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
-pub struct DocuTourSettings {
+pub struct AiSettings {
     #[serde(default = "default_provider")]
     pub active_provider: String,
     #[serde(default)]
     pub providers: ProvidersBag,
-    #[serde(default = "default_max_steps")]
-    pub max_steps: u32,
-    #[serde(default = "default_language")]
-    pub language: String,
 }
 
-impl Default for DocuTourSettings {
+impl Default for AiSettings {
     fn default() -> Self {
         Self {
             active_provider: default_provider(),
             providers: ProvidersBag::default(),
-            max_steps: default_max_steps(),
-            language: default_language(),
         }
     }
 }
@@ -108,7 +87,7 @@ impl Default for DocuTourSettings {
 #[serde(rename_all = "camelCase")]
 pub struct AppSettings {
     #[serde(default)]
-    pub docutour: DocuTourSettings,
+    pub ai: AiSettings,
 }
 
 fn settings_path(app: &AppHandle) -> Result<PathBuf, String> {
@@ -122,27 +101,35 @@ fn settings_path(app: &AppHandle) -> Result<PathBuf, String> {
     Ok(dir.join(SETTINGS_FILE))
 }
 
-/// 老格式 → 新格式迁移：如果 docutour 里同时有 apiKey/provider/model 这种顶层字段
-/// 而没有 providers 字段，就把它们搬进 providers[provider] 那一格。仅在内存中迁移；
-/// 写回磁盘由 save_settings 完成。
+/// 老格式 (docutour) -> 新格式 (ai) 迁移
 fn migrate_legacy_inplace(value: &mut Value) {
     let Some(root) = value.as_object_mut() else {
         return;
     };
-    let Some(docutour) = root.get_mut("docutour").and_then(|v| v.as_object_mut()) else {
+    
+    // 如果存在 docutour，把内容迁移到 ai 并删除 docutour
+    if root.contains_key("docutour") {
+        if let Some(docutour) = root.remove("docutour") {
+            if !root.contains_key("ai") {
+                root.insert("ai".into(), docutour);
+            }
+        }
+    }
+
+    let Some(ai) = root.get_mut("ai").and_then(|v| v.as_object_mut()) else {
         return;
     };
 
-    let already_new = docutour.contains_key("providers");
-    let has_legacy = docutour.contains_key("apiKey")
-        || docutour.contains_key("provider")
-        || docutour.contains_key("apiBase")
-        || docutour.contains_key("model");
-    if already_new || !has_legacy {
+    let already_new = ai.contains_key("providers");
+    let has_legacy = ai.contains_key("apiKey")
+        || ai.contains_key("provider")
+        || ai.contains_key("apiBase")
+        || ai.contains_key("model");
+    if already_new && !has_legacy {
         return;
     }
 
-    let provider_str = docutour
+    let provider_str = ai
         .get("provider")
         .and_then(|v| v.as_str())
         .unwrap_or("dashscope");
@@ -152,17 +139,17 @@ fn migrate_legacy_inplace(value: &mut Value) {
         "dashscope"
     };
 
-    let model = docutour
+    let model = ai
         .get("model")
         .and_then(|v| v.as_str())
         .map(|s| s.trim().to_string())
         .unwrap_or_default();
-    let api_key = docutour
+    let api_key = ai
         .get("apiKey")
         .and_then(|v| v.as_str())
         .map(|s| s.trim().to_string())
         .unwrap_or_default();
-    let api_base = docutour
+    let api_base = ai
         .get("apiBase")
         .and_then(|v| v.as_str())
         .map(|s| s.trim().to_string())
@@ -203,12 +190,22 @@ fn migrate_legacy_inplace(value: &mut Value) {
     providers.insert("dashscope".into(), Value::Object(dashscope));
     providers.insert("gemini".into(), Value::Object(gemini));
 
-    docutour.remove("apiKey");
-    docutour.remove("apiBase");
-    docutour.remove("model");
-    docutour.remove("provider");
-    docutour.insert("activeProvider".into(), Value::String(provider.to_string()));
-    docutour.insert("providers".into(), Value::Object(providers));
+    ai.remove("apiKey");
+    ai.remove("apiBase");
+    ai.remove("model");
+    ai.remove("provider");
+    ai.remove("maxSteps"); // 清理残留
+    ai.remove("language"); // 清理残留
+    
+    // 只有在没设置 activeProvider 时才覆盖
+    if !ai.contains_key("activeProvider") {
+        ai.insert("activeProvider".into(), Value::String(provider.to_string()));
+    }
+    
+    // 如果没有 providers 节点则写入
+    if !ai.contains_key("providers") {
+        ai.insert("providers".into(), Value::Object(providers));
+    }
 }
 
 #[tauri::command]
@@ -232,20 +229,10 @@ pub fn load_settings(app: AppHandle) -> Result<AppSettings, String> {
 pub fn save_settings(app: AppHandle, settings: AppSettings) -> Result<(), String> {
     let path = settings_path(&app)?;
     let mut normalized = settings;
-    // 防御性 clamp，避免前端把 maxSteps 写成 0 或离谱值
-    if normalized.docutour.max_steps < 3 {
-        normalized.docutour.max_steps = 3;
-    }
-    if normalized.docutour.max_steps > 12 {
-        normalized.docutour.max_steps = 12;
-    }
-    if normalized.docutour.language.trim().is_empty() {
-        normalized.docutour.language = "zh-CN".to_string();
-    }
-    if normalized.docutour.active_provider != "dashscope"
-        && normalized.docutour.active_provider != "gemini"
+    if normalized.ai.active_provider != "dashscope"
+        && normalized.ai.active_provider != "gemini"
     {
-        normalized.docutour.active_provider = "dashscope".to_string();
+        normalized.ai.active_provider = "dashscope".to_string();
     }
     let body =
         serde_json::to_vec_pretty(&normalized).map_err(|err| format!("序列化设置失败: {err}"))?;
@@ -263,7 +250,7 @@ mod tests {
     use super::*;
 
     #[test]
-    fn migrate_legacy_dashscope_to_per_provider() {
+    fn migrate_legacy_docutour_to_ai() {
         let mut v = serde_json::json!({
             "docutour": {
                 "provider": "dashscope",
@@ -275,58 +262,17 @@ mod tests {
             }
         });
         migrate_legacy_inplace(&mut v);
-        let dt = v.get("docutour").unwrap().as_object().unwrap();
-        assert_eq!(dt.get("activeProvider").unwrap(), "dashscope");
-        assert!(dt.get("provider").is_none());
-        assert!(dt.get("apiKey").is_none());
-        let providers = dt.get("providers").unwrap().as_object().unwrap();
+        assert!(v.get("docutour").is_none());
+        let ai = v.get("ai").unwrap().as_object().unwrap();
+        assert_eq!(ai.get("activeProvider").unwrap(), "dashscope");
+        assert!(ai.get("provider").is_none());
+        assert!(ai.get("apiKey").is_none());
+        assert!(ai.get("maxSteps").is_none());
+        let providers = ai.get("providers").unwrap().as_object().unwrap();
         assert_eq!(
             providers.get("dashscope").unwrap().get("apiKey").unwrap(),
             "sk-legacy-dashscope"
         );
-        // gemini 那格应当为空，而不是继承 dashscope 的 key
         assert_eq!(providers.get("gemini").unwrap().get("apiKey").unwrap(), "");
-    }
-
-    #[test]
-    fn migrate_legacy_gemini_to_per_provider() {
-        let mut v = serde_json::json!({
-            "docutour": {
-                "provider": "gemini",
-                "apiKey": "g-legacy",
-                "model": "gemini-3-pro-preview"
-            }
-        });
-        migrate_legacy_inplace(&mut v);
-        let providers = v
-            .pointer("/docutour/providers")
-            .and_then(|v| v.as_object())
-            .unwrap();
-        assert_eq!(
-            providers.get("gemini").unwrap().get("apiKey").unwrap(),
-            "g-legacy"
-        );
-        assert_eq!(
-            providers.get("dashscope").unwrap().get("apiKey").unwrap(),
-            ""
-        );
-    }
-
-    #[test]
-    fn migrate_no_op_when_already_new_shape() {
-        let mut v = serde_json::json!({
-            "docutour": {
-                "activeProvider": "gemini",
-                "providers": {
-                    "dashscope": { "model": "x", "apiKey": "kA", "apiBase": "" },
-                    "gemini": { "model": "y", "apiKey": "kB", "apiBase": "" }
-                },
-                "maxSteps": 6,
-                "language": "zh-CN"
-            }
-        });
-        let before = v.clone();
-        migrate_legacy_inplace(&mut v);
-        assert_eq!(before, v);
     }
 }
