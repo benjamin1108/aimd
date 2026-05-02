@@ -66,8 +66,8 @@ export async function optimizeDocumentAssets(
 
       await invoke("replace_aimd_asset", {
         path,
-        oldName: entry.name,
-        newName: entry.name,
+        oldName: baseName,
+        newName: baseName,
         bytes: Array.from(compressed.data),
       });
 

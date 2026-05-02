@@ -67,11 +67,11 @@ pub fn initial_open_path(
 #[tauri::command]
 pub fn open_aimd(path: String) -> Result<Value, String> {
     let file = Path::new(&path);
-    let reader = Reader::open(file).map_err(|e| e.to_string())?;
-    let md_bytes = reader.main_markdown().map_err(|e| e.to_string())?;
+    let reader = Reader::open(file).map_err(|e| format!("open_aimd Reader::open failed for {:?}: {}", file, e))?;
+    let md_bytes = reader.main_markdown().map_err(|e| format!("open_aimd main_markdown failed: {}", e))?;
     let markdown = String::from_utf8_lossy(&md_bytes).to_string();
     let dto = document_dto_from_reader(file, &reader, &markdown)?;
-    serde_json::to_value(dto).map_err(|e| e.to_string())
+    serde_json::to_value(dto).map_err(|e| format!("open_aimd json error: {}", e))
 }
 
 #[tauri::command]

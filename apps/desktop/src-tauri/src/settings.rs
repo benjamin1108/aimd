@@ -83,11 +83,31 @@ impl Default for AiSettings {
     }
 }
 
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct WebClipSettings {
+    #[serde(default)]
+    pub llm_enabled: bool,
+    #[serde(default = "default_provider")]
+    pub provider: String,
+}
+
+impl Default for WebClipSettings {
+    fn default() -> Self {
+        Self {
+            llm_enabled: false,
+            provider: default_provider(),
+        }
+    }
+}
+
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct AppSettings {
     #[serde(default)]
     pub ai: AiSettings,
+    #[serde(default)]
+    pub web_clip: WebClipSettings,
 }
 
 fn settings_path(app: &AppHandle) -> Result<PathBuf, String> {

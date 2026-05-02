@@ -204,6 +204,10 @@ export const APP_HTML = `
                 <span class="secondary-btn-icon">${ICONS.folder}</span>
                 <span>打开 .aimd</span>
               </button>
+              <button id="empty-import-web" class="secondary-btn" type="button">
+                <span class="secondary-btn-icon">${ICONS.link}</span>
+                <span>一键网页提取</span>
+              </button>
             </div>
 
             <section class="recent-section" id="recent-section" hidden>

@@ -31,6 +31,7 @@ import {
   routeOpenedPath, openDocument,
 } from "./document/lifecycle";
 import { saveDocument, saveDocumentAs } from "./document/persist";
+import { importWebClip } from "./document/web-clip";
 import { optimizeDocumentAssets } from "./document/optimize";
 import {
   onWindowDragOver, onWindowDragLeave, onWindowDrop,
@@ -78,6 +79,7 @@ $("body").addEventListener("drop", onWindowDrop);
 $("body").addEventListener("dragleave", onWindowDragLeave);
 $("#empty-open").addEventListener("click", chooseAndOpen);
 $("#empty-new").addEventListener("click", () => { void newDocument(); });
+$("#empty-import-web").addEventListener("click", () => { void importWebClip(); });
 $("#sidebar-new").addEventListener("click", () => { void newDocument(); });
 $("#sidebar-save").addEventListener("click", () => { void saveDocument(); });
 $("#sidebar-open").addEventListener("click", chooseAndOpen);

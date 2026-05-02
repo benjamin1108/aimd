@@ -5,6 +5,7 @@ import "../styles.css";
 import {
   cloneSettings,
   DEFAULT_AI_SETTINGS,
+  DEFAULT_WEB_CLIP_SETTINGS,
   loadAppSettings,
   saveAppSettings,
   defaultModelForProvider,
@@ -54,6 +55,7 @@ root.innerHTML = `
       <div class="settings-body">
         <aside class="settings-nav" role="tablist" aria-label="设置分类">
           <button type="button" class="settings-nav-item is-active" data-section="model" role="tab" aria-selected="true">模型</button>
+          <button type="button" class="settings-nav-item" data-section="webclip" role="tab" aria-selected="false">一键提取</button>
         </aside>
 
         <div class="settings-content">
@@ -97,6 +99,27 @@ root.innerHTML = `
               <input id="api-base" type="url" autocomplete="off" spellcheck="false" placeholder="留空使用 Provider 官方接入点" />
             </label>
           </section>
+
+          <section class="settings-section" data-section="webclip" role="tabpanel" aria-labelledby="settings-tab-webclip" hidden>
+            <header class="settings-section-head">
+              <h2>一键提取 (Web Clip)</h2>
+              <p>配置网页提取时的行为与大模型排版。</p>
+            </header>
+
+            <label class="field" style="flex-direction: row; align-items: center; gap: 8px; cursor: pointer;">
+              <input type="checkbox" id="webclip-llm-enabled" style="margin: 0; width: 16px; height: 16px;" />
+              <span class="field-label" style="margin: 0;">开启大模型智能排版与清洗</span>
+            </label>
+            <p style="font-size: 13px; color: var(--text-muted); margin-bottom: 16px;">启用后，提取到的网页内容将发送给配置的大模型进行深度排版、摘要和去除杂质。这可能会增加一些等待时间。</p>
+
+            <label class="field">
+              <span class="field-label">使用已配置的模型 (Provider)</span>
+              <select id="webclip-provider">
+                <option value="dashscope">DashScope（通义千问）</option>
+                <option value="gemini">Gemini（Google）</option>
+              </select>
+            </label>
+          </section>
         </div>
       </div>
 
@@ -122,6 +145,8 @@ const apiKeyMaskEl = $<HTMLElement>(".api-key-mask");
 const apiKeyRevealEl = $<HTMLButtonElement>("#api-key-reveal");
 const apiKeyErrorEl = $<HTMLElement>("#api-key-error");
 const apiBaseEl = $<HTMLInputElement>("#api-base");
+const webClipLlmEnabledEl = $<HTMLInputElement>("#webclip-llm-enabled");
+const webClipProviderEl = $<HTMLSelectElement>("#webclip-provider");
 const saveStateEl = $<HTMLElement>("#save-state");
 const saveButtonEl = $<HTMLButtonElement>("#save-settings");
 const cancelButtonEl = $<HTMLButtonElement>("#cancel");
@@ -139,6 +164,26 @@ let draft: Record<ModelProvider, ProviderCredential> = {
   dashscope: { ...DEFAULT_AI_SETTINGS.providers.dashscope },
   gemini: { ...DEFAULT_AI_SETTINGS.providers.gemini },
 };
+let webClipConfig = { ...DEFAULT_WEB_CLIP_SETTINGS };
+
+function switchTab(sectionId: string) {
+  navItems.forEach((btn) => {
+    const active = btn.dataset.section === sectionId;
+    btn.classList.toggle("is-active", active);
+    btn.setAttribute("aria-selected", String(active));
+  });
+  sections.forEach((sec) => {
+    const active = sec.dataset.section === sectionId;
+    sec.classList.toggle("is-active", active);
+    sec.hidden = !active;
+  });
+}
+
+navItems.forEach((btn) => {
+  btn.addEventListener("click", () => {
+    switchTab(btn.dataset.section!);
+  });
+});
 
 function renderModelOptions(provider: ModelProvider, selectedModel: string) {
   const customValue = customModelValue();
@@ -167,6 +212,8 @@ function readCredFromForm(): ProviderCredential {
 
 function captureFormToDraft() {
   draft[activeProvider] = readCredFromForm();
+  webClipConfig.llmEnabled = webClipLlmEnabledEl.checked;
+  webClipConfig.provider = webClipProviderEl.value as ModelProvider;
 }
 
 function loadProviderToForm(provider: ModelProvider) {
@@ -180,12 +227,20 @@ function loadProviderToForm(provider: ModelProvider) {
   refreshApiKeyMask();
 }
 
-function fill(settings: AiSettings) {
+function fill(settings: AppSettings) {
   draft = {
-    dashscope: { ...settings.providers.dashscope },
-    gemini: { ...settings.providers.gemini },
+    dashscope: { ...settings.ai.providers.dashscope },
+    gemini: { ...settings.ai.providers.gemini },
   };
-  activeProvider = settings.activeProvider;
+  activeProvider = settings.ai.activeProvider;
+  
+  webClipConfig = {
+    llmEnabled: settings.webClip?.llmEnabled ?? false,
+    provider: settings.webClip?.provider ?? "dashscope",
+  };
+  webClipLlmEnabledEl.checked = webClipConfig.llmEnabled;
+  webClipProviderEl.value = webClipConfig.provider;
+
   loadProviderToForm(activeProvider);
   saveStateEl.textContent = "";
   saveButtonEl.disabled = true;
@@ -193,14 +248,20 @@ function fill(settings: AiSettings) {
   baseline = serialize();
 }
 
-function readSettings(): AiSettings {
+function readSettings(): AppSettings {
   captureFormToDraft();
   return {
-    activeProvider,
-    providers: {
-      dashscope: { ...draft.dashscope },
-      gemini: { ...draft.gemini },
+    ai: {
+      activeProvider,
+      providers: {
+        dashscope: { ...draft.dashscope },
+        gemini: { ...draft.gemini },
+      },
     },
+    webClip: {
+      llmEnabled: webClipConfig.llmEnabled,
+      provider: webClipConfig.provider,
+    }
   };
 }
 
@@ -257,7 +318,7 @@ apiKeyRevealEl.addEventListener("click", () => {
   refreshApiKeyMask();
 });
 
-[apiBaseEl, modelEl].forEach((el) => {
+[apiBaseEl, modelEl, webClipLlmEnabledEl, webClipProviderEl].forEach((el) => {
   el.addEventListener("input", syncSaveButton);
   el.addEventListener("change", syncSaveButton);
 });
@@ -268,9 +329,9 @@ async function bootstrap() {
     initial = await loadAppSettings();
   } catch (err) {
     console.error("load settings failed", err);
-    initial = { ai: cloneSettings(DEFAULT_AI_SETTINGS) };
+    initial = { ai: cloneSettings(DEFAULT_AI_SETTINGS), webClip: { ...DEFAULT_WEB_CLIP_SETTINGS } };
   }
-  fill(initial.ai);
+  fill(initial);
 
   try {
     const win = getCurrentWindow();
@@ -317,7 +378,7 @@ formEl.addEventListener("submit", async (event) => {
   event.preventDefault();
   if (saving) return;
   const next = readSettings();
-  const activeCred = next.providers[next.activeProvider];
+  const activeCred = next.ai.providers[next.ai.activeProvider];
   apiKeyErrorEl.hidden = Boolean(activeCred.apiKey);
   if (!activeCred.apiKey) {
     apiKeyErrorEl.textContent = "请填写 API Key";
@@ -329,7 +390,7 @@ formEl.addEventListener("submit", async (event) => {
   saveButtonEl.disabled = true;
   saveStateEl.textContent = "保存中…";
   try {
-    await saveAppSettings({ ai: next });
+    await saveAppSettings(next);
     saveStateEl.textContent = "已保存";
     saveButtonEl.textContent = "保存";
     baseline = serialize();

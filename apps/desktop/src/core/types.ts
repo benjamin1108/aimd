@@ -17,6 +17,7 @@ export type AimdDocument = {
   assets: AimdAsset[];
   dirty: boolean;
   isDraft?: boolean;
+  draftSourcePath?: string;
   format: "aimd" | "markdown";
 };
 
@@ -68,4 +69,9 @@ export type ProviderCredential = {
 export type AiSettings = {
   activeProvider: ModelProvider;
   providers: Record<ModelProvider, ProviderCredential>;
+};
+
+export type WebClipSettings = {
+  llmEnabled: boolean;
+  provider: ModelProvider;
 };

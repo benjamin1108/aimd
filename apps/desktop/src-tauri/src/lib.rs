@@ -6,6 +6,7 @@ mod assets;
 mod dialogs;
 mod documents;
 mod dto;
+mod importer;
 mod llm;
 mod macos_assoc;
 mod menu;
@@ -81,6 +82,14 @@ pub fn run() {
             documents::import_markdown,
             documents::convert_md_to_draft,
             documents::save_markdown,
+            importer::start_url_extraction,
+            importer::web_clip_raw_extracted,
+            importer::web_clip_accept,
+            importer::close_extractor_window,
+            importer::extract_complete,
+            importer::show_extractor_window,
+            importer::save_web_clip,
+            importer::refine_markdown,
             assets::add_image,
             assets::add_image_bytes,
             assets::read_image_bytes,

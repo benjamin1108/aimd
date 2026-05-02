@@ -58,8 +58,27 @@
 
 .debug-actions {
   display: flex;
+  align-items: center;
   gap: 8px;
   flex: 0 0 auto;
+}
+
+.debug-level-field {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: rgba(244, 239, 230, 0.7);
+  font-size: 12px;
+}
+
+.debug-level-field select {
+  height: 28px;
+  min-width: 86px;
+  border: 1px solid rgba(244, 239, 230, 0.18);
+  border-radius: 6px;
+  background: rgba(255, 255, 255, 0.08);
+  color: #f4efe6;
+  font: 12px/1 var(--font-mono);
 }
 
 .debug-list {
@@ -92,6 +111,14 @@
 
 .debug-entry[data-level="error"] {
   border-left-color: #df665a;
+}
+
+.debug-entry[data-level="debug"] {
+  border-left-color: #7e8a9a;
+}
+
+.debug-entry[data-level="info"] {
+  border-left-color: #5fa7d8;
 }
 
 .debug-entry-meta {

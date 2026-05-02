@@ -71,7 +71,7 @@ export async function saveDocumentAs() {
   saveAsEl().disabled = true;
   try {
     const doc = await invoke<AimdDocument>("save_aimd_as", {
-      path: state.doc.path || null,
+      path: state.doc.path || state.doc.draftSourcePath || null,
       savePath,
       markdown: state.doc.markdown,
       title: displayDocTitle(state.doc),

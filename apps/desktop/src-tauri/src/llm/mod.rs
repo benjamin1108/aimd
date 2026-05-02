@@ -26,6 +26,18 @@ pub struct GenerateJsonResponse {
     pub value: Value,
 }
 
+#[derive(Debug, Clone)]
+pub struct GenerateTextRequest {
+    pub system: String,
+    pub user: String,
+    pub temperature: f32,
+}
+
+#[derive(Debug, Clone)]
+pub struct GenerateTextResponse {
+    pub text: String,
+}
+
 pub async fn generate_json(
     config: &ModelConfig,
     request: GenerateJsonRequest,
@@ -37,6 +49,21 @@ pub async fn generate_json(
     match config.provider.as_str() {
         "dashscope" => dashscope::generate_json(config, request).await,
         "gemini" => gemini::generate_json(config, request).await,
+        _ => Err(format!("暂不支持的模型 Provider：{}", config.provider)),
+    }
+}
+
+pub async fn generate_text(
+    config: &ModelConfig,
+    request: GenerateTextRequest,
+) -> Result<GenerateTextResponse, String> {
+    if config.api_key.trim().is_empty() {
+        return Err("缺少模型 API Key".to_string());
+    }
+
+    match config.provider.as_str() {
+        "dashscope" => dashscope::generate_text(config, request).await,
+        "gemini" => gemini::generate_text(config, request).await,
         _ => Err(format!("暂不支持的模型 Provider：{}", config.provider)),
     }
 }

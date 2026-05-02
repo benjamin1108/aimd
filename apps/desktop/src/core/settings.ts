@@ -3,12 +3,14 @@
 import { invoke } from "@tauri-apps/api/core";
 import type {
   AiSettings,
+  WebClipSettings,
   ModelProvider,
   ProviderCredential,
 } from "./types";
 
 export type AppSettings = {
   ai: AiSettings;
+  webClip: WebClipSettings;
 };
 
 export function defaultModelForProvider(provider: ModelProvider) {
@@ -25,6 +27,11 @@ export const DEFAULT_AI_SETTINGS: AiSettings = {
     dashscope: emptyCredFor("dashscope"),
     gemini: emptyCredFor("gemini"),
   },
+};
+
+export const DEFAULT_WEB_CLIP_SETTINGS: WebClipSettings = {
+  llmEnabled: false,
+  provider: "dashscope",
 };
 
 function normalizeProvider(value: unknown): ModelProvider {
@@ -60,6 +67,17 @@ export function coerceSettings(raw: unknown): AiSettings {
   };
 }
 
+export function coerceWebClipSettings(raw: unknown): WebClipSettings {
+  if (!raw || typeof raw !== "object") {
+    return { ...DEFAULT_WEB_CLIP_SETTINGS };
+  }
+  const obj = raw as Record<string, unknown>;
+  return {
+    llmEnabled: Boolean(obj.llmEnabled),
+    provider: normalizeProvider(obj.provider),
+  };
+}
+
 export function cloneSettings(s: AiSettings): AiSettings {
   return {
     activeProvider: s.activeProvider,
@@ -72,15 +90,24 @@ export function cloneSettings(s: AiSettings): AiSettings {
 
 export async function loadAppSettings(): Promise<AppSettings> {
   try {
-    const raw = await invoke<{ ai?: unknown } | null>("load_settings");
-    return { ai: coerceSettings(raw?.ai ?? null) };
+    const raw = await invoke<{ ai?: unknown, webClip?: unknown } | null>("load_settings");
+    return { 
+      ai: coerceSettings(raw?.ai ?? null),
+      webClip: coerceWebClipSettings(raw?.webClip ?? null)
+    };
   } catch {
-    return { ai: cloneSettings(DEFAULT_AI_SETTINGS) };
+    return { 
+      ai: cloneSettings(DEFAULT_AI_SETTINGS),
+      webClip: { ...DEFAULT_WEB_CLIP_SETTINGS }
+    };
   }
 }
 
 export async function saveAppSettings(settings: AppSettings): Promise<void> {
-  const normalized: AppSettings = { ai: coerceSettings(settings.ai) };
+  const normalized: AppSettings = { 
+    ai: coerceSettings(settings.ai),
+    webClip: coerceWebClipSettings(settings.webClip)
+  };
   await invoke("save_settings", { settings: normalized });
 }
 

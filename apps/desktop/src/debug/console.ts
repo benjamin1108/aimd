@@ -1,4 +1,5 @@
-type DebugLevel = "log" | "warn" | "error";
+type DebugLevel = "debug" | "info" | "log" | "warn" | "error";
+type DebugLevelFilter = "all" | DebugLevel;
 
 type DebugEntry = {
   ts: string;
@@ -12,6 +13,8 @@ let installed = false;
 let modal: HTMLElement | null = null;
 let listEl: HTMLElement | null = null;
 let panelEl: HTMLElement | null = null;
+let levelFilterEl: HTMLSelectElement | null = null;
+let levelFilter: DebugLevelFilter = "all";
 
 type ChangeListener = (errorCount: number) => void;
 const listeners = new Set<ChangeListener>();
@@ -32,6 +35,12 @@ function errorEntryCount(): number {
     if (entry.level === "warn" || entry.level === "error") n += 1;
   }
   return n;
+}
+
+function visibleEntries(): DebugEntry[] {
+  return levelFilter === "all"
+    ? entries
+    : entries.filter((entry) => entry.level === levelFilter);
 }
 
 /** 状态栏 #debug-indicator 通过它订阅"错误数"变化；只算 warn / error，
@@ -61,11 +70,12 @@ export function debugLog(level: DebugLevel, ...args: unknown[]) {
 
 function renderEntries() {
   if (!listEl) return;
-  if (!entries.length) {
+  const filtered = visibleEntries();
+  if (!filtered.length) {
     listEl.innerHTML = `<div class="debug-empty">暂无日志</div>`;
     return;
   }
-  listEl.innerHTML = entries.map((entry) => `
+  listEl.innerHTML = filtered.map((entry) => `
     <div class="debug-entry" data-level="${entry.level}">
       <div class="debug-entry-meta">${entry.ts} · ${entry.level.toUpperCase()}</div>
       <pre>${escapeHTML(entry.message)}</pre>
@@ -98,9 +108,19 @@ function activateConsolePatch() {
   if (installed) return;
   installed = true;
   const original = {
+    debug: console.debug.bind(console),
+    info: console.info.bind(console),
     log: console.log.bind(console),
     warn: console.warn.bind(console),
     error: console.error.bind(console),
+  };
+  console.debug = (...args: unknown[]) => {
+    debugLog("debug", ...args);
+    original.debug(...args);
+  };
+  console.info = (...args: unknown[]) => {
+    debugLog("info", ...args);
+    original.info(...args);
   };
   console.log = (...args: unknown[]) => {
     debugLog("log", ...args);
@@ -116,6 +136,29 @@ function activateConsolePatch() {
   };
 }
 
+async function copyVisibleEntries() {
+  const text = visibleEntries()
+    .map((entry) => `${entry.ts} · ${entry.level.toUpperCase()}\n${entry.message}`)
+    .join("\n\n");
+  if (!text) return;
+
+  try {
+    await navigator.clipboard.writeText(text);
+    debugLog("info", `[debug-console] 已复制 ${visibleEntries().length} 条当前过滤日志`);
+    return;
+  } catch {
+    const textarea = document.createElement("textarea");
+    textarea.value = text;
+    textarea.style.position = "fixed";
+    textarea.style.left = "-9999px";
+    document.body.appendChild(textarea);
+    textarea.select();
+    document.execCommand("copy");
+    textarea.remove();
+    debugLog("info", `[debug-console] 已复制 ${visibleEntries().length} 条当前过滤日志`);
+  }
+}
+
 export function openDebugConsole() {
   if (!modal) {
     modal = document.createElement("div");
@@ -128,6 +171,18 @@ export function openDebugConsole() {
             <p>运行时日志、模型调用错误和未捕获异常</p>
           </div>
           <div class="debug-actions">
+            <label class="debug-level-field">
+              <span>级别</span>
+              <select data-debug-level aria-label="日志级别">
+                <option value="all">全部</option>
+                <option value="debug">Debug</option>
+                <option value="info">Info</option>
+                <option value="log">Log</option>
+                <option value="warn">Warn</option>
+                <option value="error">Error</option>
+              </select>
+            </label>
+            <button class="secondary-btn sm" data-debug-copy type="button">复制当前</button>
             <button class="secondary-btn sm" data-debug-clear type="button">清空</button>
             <button class="secondary-btn sm" data-debug-close type="button">关闭</button>
           </div>
@@ -137,7 +192,18 @@ export function openDebugConsole() {
     `;
     panelEl = modal.querySelector<HTMLElement>(".debug-panel");
     listEl = modal.querySelector<HTMLElement>(".debug-list");
+    levelFilterEl = modal.querySelector<HTMLSelectElement>("[data-debug-level]");
+    if (levelFilterEl) {
+      levelFilterEl.value = levelFilter;
+      levelFilterEl.addEventListener("change", () => {
+        levelFilter = (levelFilterEl!.value || "all") as DebugLevelFilter;
+        renderEntries();
+      });
+    }
     modal.querySelector<HTMLElement>("[data-debug-close]")?.addEventListener("click", closeDebugConsole);
+    modal.querySelector<HTMLElement>("[data-debug-copy]")?.addEventListener("click", () => {
+      void copyVisibleEntries();
+    });
     modal.querySelector<HTMLElement>("[data-debug-clear]")?.addEventListener("click", () => {
       entries.length = 0;
       renderEntries();
@@ -164,7 +230,7 @@ function bindDrag() {
   let startTop = 0;
 
   handle.addEventListener("pointerdown", (event) => {
-    if ((event.target as HTMLElement).closest("button")) return;
+    if ((event.target as HTMLElement).closest("button, select, input, textarea, label, option")) return;
     dragging = true;
     const rect = panelEl!.getBoundingClientRect();
     startX = event.clientX;
@@ -187,6 +253,11 @@ function bindDrag() {
 
   handle.addEventListener("pointerup", (event) => {
     dragging = false;
-    handle.releasePointerCapture(event.pointerId);
+    if (handle.hasPointerCapture(event.pointerId)) handle.releasePointerCapture(event.pointerId);
+  });
+
+  handle.addEventListener("pointercancel", (event) => {
+    dragging = false;
+    if (handle.hasPointerCapture(event.pointerId)) handle.releasePointerCapture(event.pointerId);
   });
 }

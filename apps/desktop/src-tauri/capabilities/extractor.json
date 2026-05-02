@@ -1,0 +1,14 @@
+{
+  "$schema": "../gen/schemas/desktop-schema.json",
+  "identifier": "extractor",
+  "description": "Permissions for the remote webview extractor",
+  "windows": ["extractor"],
+  "remote": {
+    "urls": ["http://*/*", "https://*/*"]
+  },
+  "permissions": [
+    "core:window:default",
+    "core:event:default",
+    "core:webview:default"
+  ]
+}

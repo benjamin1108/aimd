@@ -7,6 +7,7 @@ export default defineConfig({
       input: {
         index: resolve(__dirname, "index.html"),
         settings: resolve(__dirname, "settings.html"),
+        extractor: resolve(__dirname, "extractor.html"),
       },
     },
   },

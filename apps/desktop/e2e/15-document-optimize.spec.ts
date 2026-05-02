@@ -175,8 +175,8 @@ test.describe("Document asset optimization", () => {
 
     // Critical assertion (BUG-016 guard): the zip entry name MUST NOT change so
     // that asset://ID references in markdown remain valid without any rewrite.
-    expect(replaceLog[0].oldName).toBe("assets/aimd-paste-123-image.png");
-    expect(replaceLog[0].newName).toBe("assets/aimd-paste-123-image.png");
+    expect(replaceLog[0].oldName).toBe("aimd-paste-123-image.png");
+    expect(replaceLog[0].newName).toBe("aimd-paste-123-image.png");
     expect(replaceLog[0].byteCount).toBeLessThan(largePngSize);
   });
 
@@ -251,8 +251,8 @@ test.describe("Document asset optimization", () => {
 
     // CRITICAL: old == new — the zip entry name was NOT changed.
     // This guarantees asset://aimd-paste-...-001 references remain valid.
-    expect(replaceLog[0].oldName).toBe("assets/aimd-paste-1777432866771939000-image.png");
-    expect(replaceLog[0].newName).toBe("assets/aimd-paste-1777432866771939000-image.png");
+    expect(replaceLog[0].oldName).toBe("aimd-paste-1777432866771939000-image.png");
+    expect(replaceLog[0].newName).toBe("aimd-paste-1777432866771939000-image.png");
 
     // The markdown must be unchanged — no save_aimd call needed.
     // (triggerOptimizeOnOpen no longer calls save_aimd because markdown is unchanged)
