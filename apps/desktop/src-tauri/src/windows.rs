@@ -154,12 +154,18 @@ pub async fn open_in_new_window(app: AppHandle, path: Option<String>) -> Result<
             }
         }
     }
-    WebviewWindowBuilder::new(&app, &label, WebviewUrl::App("index.html".into()))
+    let builder = WebviewWindowBuilder::new(&app, &label, WebviewUrl::App("index.html".into()))
         .title("AIMD Desktop")
         .inner_size(1180.0, 820.0)
-        .min_inner_size(860.0, 620.0)
-        .build()
-        .map_err(|e| e.to_string())?;
+        .min_inner_size(860.0, 620.0);
+
+    #[cfg(not(target_os = "macos"))]
+    let builder = {
+        let menu = crate::menu::build_app_menu(&app).map_err(|e| e.to_string())?;
+        builder.menu(menu)
+    };
+
+    builder.build().map_err(|e| e.to_string())?;
     Ok(())
 }
 

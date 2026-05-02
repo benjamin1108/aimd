@@ -12,10 +12,13 @@ mod menu;
 mod settings;
 mod windows;
 
+#[cfg(any(target_os = "macos", target_os = "ios"))]
 use std::sync::atomic::Ordering;
 use tauri::{Emitter, Manager, RunEvent, WindowEvent};
 
-use documents::{is_supported_doc_extension, PendingOpenPaths, MAIN_INITIALIZED};
+#[cfg(any(target_os = "macos", target_os = "ios"))]
+use documents::MAIN_INITIALIZED;
+use documents::{is_supported_doc_extension, PendingOpenPaths};
 
 pub fn run() {
     let builder = tauri::Builder::default();
@@ -38,7 +41,18 @@ pub fn run() {
         .manage(windows::OpenedWindows::default())
         .setup(|app| {
             let menu = menu::build_app_menu(app)?;
+            // macOS 必须用 app.set_menu 才能显示全局菜单。
+            // Windows/Linux 如果用 app.set_menu 共享同一个菜单实例，在某些 Tauri 版本下
+            // 关闭次级窗口（如设置）会导致主窗口菜单句柄失效或编码乱码（hover 时触发 redraw 异常）。
+            // 解决方案：非 macOS 下不在 app 级别设菜单，改为在每个窗口创建时单独设置。
+            #[cfg(target_os = "macos")]
             app.set_menu(menu)?;
+
+            #[cfg(not(target_os = "macos"))]
+            if let Some(main) = app.get_webview_window("main") {
+                main.set_menu(menu)?;
+            }
+
             macos_assoc::register_default_handlers();
             Ok(())
         })
