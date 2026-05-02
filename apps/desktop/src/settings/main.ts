@@ -19,6 +19,11 @@ import type {
 
 const CUSTOM_MODEL_VALUE = "__custom__";
 export type ModelOption = { value: string; label: string; };
+type ModelConnectionTestResult = {
+  ok: boolean;
+  latencyMs: number;
+  message: string;
+};
 
 export const MODEL_OPTIONS: Record<ModelProvider, ModelOption[]> = {
   dashscope: [
@@ -98,6 +103,11 @@ root.innerHTML = `
               <span class="field-label">API Base <em class="field-optional">可选</em></span>
               <input id="api-base" type="url" autocomplete="off" spellcheck="false" placeholder="留空使用 Provider 官方接入点" />
             </label>
+
+            <div class="connection-test-row">
+              <button id="test-connection" class="secondary-btn" type="button">测试连接</button>
+              <span id="connection-test-state" class="connection-test-state" aria-live="polite"></span>
+            </div>
           </section>
 
           <section class="settings-section" data-section="webclip" role="tabpanel" aria-labelledby="settings-tab-webclip" hidden>
@@ -151,10 +161,13 @@ const saveStateEl = $<HTMLElement>("#save-state");
 const saveButtonEl = $<HTMLButtonElement>("#save-settings");
 const cancelButtonEl = $<HTMLButtonElement>("#cancel");
 const resetModelBtn = $<HTMLButtonElement>("#reset-model");
+const testConnectionBtn = $<HTMLButtonElement>("#test-connection");
+const connectionTestStateEl = $<HTMLElement>("#connection-test-state");
 const navItems = root.querySelectorAll<HTMLButtonElement>(".settings-nav-item");
 const sections = root.querySelectorAll<HTMLElement>(".settings-section");
 
 let saving = false;
+let testingConnection = false;
 let closing = false;
 let revealApiKey = false;
 let baseline = "";
@@ -216,6 +229,11 @@ function captureFormToDraft() {
   webClipConfig.provider = webClipProviderEl.value as ModelProvider;
 }
 
+function clearConnectionTestState() {
+  connectionTestStateEl.textContent = "";
+  connectionTestStateEl.removeAttribute("data-tone");
+}
+
 function loadProviderToForm(provider: ModelProvider) {
   activeProvider = provider;
   providerEl.value = provider;
@@ -224,6 +242,7 @@ function loadProviderToForm(provider: ModelProvider) {
   apiKeyEl.value = cred.apiKey;
   apiBaseEl.value = cred.apiBase;
   apiKeyErrorEl.hidden = true;
+  clearConnectionTestState();
   refreshApiKeyMask();
 }
 
@@ -271,6 +290,7 @@ function serialize(): string {
 
 function syncSaveButton() {
   saveButtonEl.disabled = saving || serialize() === baseline;
+  testConnectionBtn.disabled = testingConnection;
 }
 
 async function closeWindow() {
@@ -310,6 +330,7 @@ apiKeyEl.addEventListener("focus", refreshApiKeyMask);
 apiKeyEl.addEventListener("blur", refreshApiKeyMask);
 apiKeyEl.addEventListener("input", () => {
   refreshApiKeyMask();
+  clearConnectionTestState();
   syncSaveButton();
 });
 apiKeyRevealEl.addEventListener("click", () => {
@@ -319,8 +340,14 @@ apiKeyRevealEl.addEventListener("click", () => {
 });
 
 [apiBaseEl, modelEl, webClipLlmEnabledEl, webClipProviderEl].forEach((el) => {
-  el.addEventListener("input", syncSaveButton);
-  el.addEventListener("change", syncSaveButton);
+  el.addEventListener("input", () => {
+    clearConnectionTestState();
+    syncSaveButton();
+  });
+  el.addEventListener("change", () => {
+    clearConnectionTestState();
+    syncSaveButton();
+  });
 });
 
 async function bootstrap() {
@@ -355,12 +382,53 @@ modelSelectEl.addEventListener("change", () => {
     modelEl.placeholder = defaultModelForProvider(activeProvider);
     modelEl.focus();
   }
+  clearConnectionTestState();
   syncSaveButton();
 });
 
 resetModelBtn.addEventListener("click", () => {
   renderModelOptions(activeProvider, defaultModelForProvider(activeProvider));
+  clearConnectionTestState();
   syncSaveButton();
+});
+
+testConnectionBtn.addEventListener("click", async () => {
+  if (testingConnection) return;
+
+  const cred = readCredFromForm();
+  apiKeyErrorEl.hidden = Boolean(cred.apiKey);
+  if (!cred.apiKey) {
+    apiKeyErrorEl.textContent = "请填写 API Key";
+    apiKeyErrorEl.hidden = false;
+    apiKeyEl.focus();
+    return;
+  }
+
+  testingConnection = true;
+  testConnectionBtn.disabled = true;
+  connectionTestStateEl.dataset.tone = "loading";
+  connectionTestStateEl.textContent = "测试中...";
+
+  try {
+    const result = await invoke<ModelConnectionTestResult>("test_model_connection", {
+      config: {
+        provider: activeProvider,
+        model: cred.model,
+        apiKey: cred.apiKey,
+        apiBase: cred.apiBase,
+      },
+    });
+    connectionTestStateEl.dataset.tone = result.ok ? "success" : "error";
+    connectionTestStateEl.textContent = result.ok
+      ? `连接正常，延迟 ${result.latencyMs} ms`
+      : `连接失败，延迟 ${result.latencyMs} ms：${result.message}`;
+  } catch (err) {
+    connectionTestStateEl.dataset.tone = "error";
+    connectionTestStateEl.textContent = err instanceof Error ? err.message : "测试连接失败";
+  } finally {
+    testingConnection = false;
+    syncSaveButton();
+  }
 });
 
 cancelButtonEl.addEventListener("click", () => {

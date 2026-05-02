@@ -22,8 +22,9 @@ const SAVED_DOC = {
   dirty: false,
 };
 
-async function installMock(page: Page, opts?: { onSaveSettings?: (v: unknown) => void }) {
+async function installMock(page: Page, opts?: { onSaveSettings?: (v: unknown) => void; onTestConnection?: (v: unknown) => void }) {
   const onSaveSettings = opts?.onSaveSettings;
+  const onTestConnection = opts?.onTestConnection;
   await page.addInitScript(({ doc, hasSaveCallback }) => {
     type Args = Record<string, unknown> | undefined;
     let stored: any = {
@@ -50,6 +51,10 @@ async function installMock(page: Page, opts?: { onSaveSettings?: (v: unknown) =>
         }
         return null;
       },
+      test_model_connection: (a) => {
+        (window as any).__connectionTestedFromMock?.((a as any)?.config ?? null);
+        return { ok: true, latencyMs: 123, message: "连接正常" };
+      },
     };
     (window as any).__TAURI_INTERNALS__ = {
       invoke: async (cmd: string, a?: Args) => (handlers[cmd] ? handlers[cmd](a) : null),
@@ -60,6 +65,11 @@ async function installMock(page: Page, opts?: { onSaveSettings?: (v: unknown) =>
   if (onSaveSettings) {
     await page.exposeFunction("__settingsSavedFromMock", (value: unknown) => {
       onSaveSettings(value);
+    });
+  }
+  if (onTestConnection) {
+    await page.exposeFunction("__connectionTestedFromMock", (value: unknown) => {
+      onTestConnection(value);
     });
   }
 }
@@ -178,5 +188,19 @@ test.describe("P0-1 — 设置取消按钮 + 后端持久化", () => {
     // 再次编辑应该重新激活保存按钮。
     await page.locator("#api-key").fill("second-edit");
     await expect(saveBtn).toBeEnabled();
+  });
+
+  test("测试连接：使用当前表单配置并显示 OK 与延迟", async ({ page }) => {
+    let tested: any = null;
+    await installMock(page, { onTestConnection: (v) => { tested = v; } });
+    await page.goto("/settings.html");
+    await page.locator("#api-base").fill("https://example.test/v1");
+    await page.locator("#test-connection").click();
+
+    await expect.poll(() => tested?.provider).toBe("dashscope");
+    expect(tested?.model).toBe("qwen3.6-plus");
+    expect(tested?.apiKey).toBe("existing-key");
+    expect(tested?.apiBase).toBe("https://example.test/v1");
+    await expect(page.locator("#connection-test-state")).toHaveText("连接正常，延迟 123 ms");
   });
 });

@@ -29,6 +29,12 @@ interface ExtractPayload {
   diagnostics?: ExtractDiagnostic[];
 }
 
+interface WebClipImageLocalization {
+  markdown: string;
+  images: ImagePayload[];
+  localizedCount: number;
+}
+
 function countMarkdownImages(markdown: string): number {
   return (markdown.match(/!\[[^\]]*]\([^)]+\)/g) || []).length;
 }
@@ -114,10 +120,28 @@ export async function importWebClip() {
       let markdown = turndownService.turndown(payload.content);
       const title = payload.title || "Untitled Web Clip";
       markdown = ensureMarkdownTitle(markdown, title);
+      let images = payload.images || [];
       console.debug("[web-clip] turndown finished", {
         markdownChars: markdown.length,
         imageRefs: countMarkdownImages(markdown),
       });
+
+      if (images.length > 0) {
+        setStatus("正在本地化图片...", "loading");
+        const imageStartedAt = performance.now();
+        const localized = await invoke<WebClipImageLocalization>("localize_web_clip_images", {
+          markdown,
+          images,
+        });
+        markdown = localized.markdown;
+        images = localized.images;
+        console.info("[web-clip] image localization finished", {
+          elapsedMs: Math.round(performance.now() - imageStartedAt),
+          localizedCount: localized.localizedCount,
+          imageCount: images.length,
+          imageRefs: countMarkdownImages(markdown),
+        });
+      }
 
       // Check if LLM refinement is enabled
       const settings = await loadAppSettings();
@@ -164,12 +188,12 @@ export async function importWebClip() {
       const doc = await invoke<AimdDocument>("save_web_clip", {
         title: title,
         markdown: markdown,
-        images: payload.images || [],
+        images,
       });
       console.info("[web-clip] save_web_clip finished", {
         elapsedMs: Math.round(performance.now() - saveStartedAt),
         markdownChars: markdown.length,
-        imageCount: payload.images?.length ?? 0,
+        imageCount: images.length,
       });
 
       setStatus("就绪", "idle");

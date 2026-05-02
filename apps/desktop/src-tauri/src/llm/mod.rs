@@ -4,6 +4,7 @@ mod gemini;
 
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
+use std::time::Instant;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -36,6 +37,47 @@ pub struct GenerateTextRequest {
 #[derive(Debug, Clone)]
 pub struct GenerateTextResponse {
     pub text: String,
+}
+
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ModelConnectionTestResult {
+    pub ok: bool,
+    pub latency_ms: u64,
+    pub message: String,
+}
+
+#[tauri::command]
+pub async fn test_model_connection(config: ModelConfig) -> Result<ModelConnectionTestResult, String> {
+    let started = Instant::now();
+    let result = generate_text(
+        &config,
+        GenerateTextRequest {
+            system: "You are a connection health check. Reply with OK only.".to_string(),
+            user: "OK".to_string(),
+            temperature: 0.0,
+        },
+    )
+    .await;
+    let latency_ms = started.elapsed().as_millis().min(u64::MAX as u128) as u64;
+
+    Ok(match result {
+        Ok(response) if !response.text.trim().is_empty() => ModelConnectionTestResult {
+            ok: true,
+            latency_ms,
+            message: "连接正常".to_string(),
+        },
+        Ok(_) => ModelConnectionTestResult {
+            ok: false,
+            latency_ms,
+            message: "模型返回空内容".to_string(),
+        },
+        Err(err) => ModelConnectionTestResult {
+            ok: false,
+            latency_ms,
+            message: err,
+        },
+    })
 }
 
 pub async fn generate_json(

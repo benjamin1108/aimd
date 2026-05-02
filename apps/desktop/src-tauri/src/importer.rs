@@ -31,6 +31,37 @@ pub struct ExtractDiagnostic {
     pub data: Option<Value>,
 }
 
+#[derive(Deserialize, Serialize, Clone, Debug)]
+#[serde(rename_all = "camelCase")]
+pub struct WebClipImageLocalization {
+    pub markdown: String,
+    pub images: Vec<ImagePayload>,
+    pub localized_count: usize,
+}
+
+#[tauri::command]
+pub async fn localize_web_clip_images(
+    markdown: String,
+    images: Vec<ImagePayload>,
+) -> Result<WebClipImageLocalization, String> {
+    let image_client = image_download_client()?;
+    let (markdown, images, localized_count, replacement_hits) =
+        localize_images_in_markdown(markdown, images, &image_client).await;
+
+    println!(
+        "[web-clip] localize_web_clip_images localized={} replacementHits={} markdownChars={}",
+        localized_count,
+        replacement_hits,
+        markdown.chars().count()
+    );
+
+    Ok(WebClipImageLocalization {
+        markdown,
+        images,
+        localized_count,
+    })
+}
+
 #[tauri::command]
 pub async fn save_web_clip(
     title: String,
@@ -53,22 +84,22 @@ pub async fn save_web_clip(
 
     let mf = Manifest::new(title);
     let mut updated_markdown = markdown.clone();
-    
-    // Create the initial file with markdown
+
     let mut assets_to_add = Vec::new();
-    
-    // We map each image url to its new local asset ID and replace it in the markdown
-    let mut md_replacements = Vec::new();
-    
-    let image_client = reqwest::Client::builder()
-        .timeout(Duration::from_secs(12))
-        .user_agent("Mozilla/5.0 (compatible; AIMD Web Clipper)")
-        .build()
-        .map_err(|err| format!("创建图片下载客户端失败: {err}"))?;
+    let mut replacement_hits = 0usize;
+    let needs_download = images.iter().any(|img| img.data.is_empty());
+    let image_client = if needs_download {
+        Some(image_download_client()?)
+    } else {
+        None
+    };
 
     for (i, img) in images.iter().enumerate() {
         let data = if img.data.is_empty() {
-            match fetch_image_bytes(&image_client, &img.url).await {
+            let Some(client) = image_client.as_ref() else {
+                continue;
+            };
+            match fetch_image_bytes(client, &img.url).await {
                 Ok(bytes) => {
                     println!(
                         "[web-clip] backend image fetch ok url={} bytes={}",
@@ -93,28 +124,10 @@ pub async fn save_web_clip(
         let ext = image_ext_from_bytes(&data);
         let filename = format!("image-{}.{}", i, ext);
         let id = aimd_core::rewrite::sha256_hex(&data)[0..8].to_string();
-        
-        md_replacements.push((img.url.clone(), format!("asset://{}", id)));
-        
-        assets_to_add.push((id, filename, data));
-    }
-    
-    let mut replacement_hits = 0usize;
-    for (old_url, new_uri) in md_replacements {
-        let before = updated_markdown.matches(&old_url).count();
-        if before > 0 {
-            replacement_hits += before;
-            updated_markdown = updated_markdown.replace(&old_url, &new_uri);
-        }
+        let new_uri = format!("asset://{}", id);
 
-        let escaped_url = old_url.replace('&', "&amp;");
-        if escaped_url != old_url {
-            let before = updated_markdown.matches(&escaped_url).count();
-            if before > 0 {
-                replacement_hits += before;
-                updated_markdown = updated_markdown.replace(&escaped_url, &new_uri);
-            }
-        }
+        replacement_hits += replace_image_url(&mut updated_markdown, &img.url, &new_uri);
+        assets_to_add.push((id, filename, data));
     }
     println!(
         "[web-clip] save_web_clip image mapping downloaded={} assets={} replacementHits={} markdownChars={}",
@@ -143,6 +156,84 @@ pub async fn save_web_clip(
         obj.insert("draftSourcePath".into(), Value::String(draft_source_path));
     }
     Ok(doc)
+}
+
+fn image_download_client() -> Result<reqwest::Client, String> {
+    reqwest::Client::builder()
+        .timeout(Duration::from_secs(12))
+        .user_agent("Mozilla/5.0 (compatible; AIMD Web Clipper)")
+        .build()
+        .map_err(|err| format!("创建图片下载客户端失败: {err}"))
+}
+
+async fn localize_images_in_markdown(
+    mut markdown: String,
+    images: Vec<ImagePayload>,
+    image_client: &reqwest::Client,
+) -> (String, Vec<ImagePayload>, usize, usize) {
+    let mut localized = Vec::with_capacity(images.len());
+    let mut localized_count = 0usize;
+    let mut replacement_hits = 0usize;
+
+    for img in images {
+        if img.url.starts_with("asset://") {
+            localized.push(img);
+            continue;
+        }
+
+        let data = if img.data.is_empty() {
+            match fetch_image_bytes(image_client, &img.url).await {
+                Ok(bytes) => {
+                    println!(
+                        "[web-clip] pre-llm image fetch ok url={} bytes={}",
+                        img.url,
+                        bytes.len()
+                    );
+                    bytes
+                }
+                Err(err) => {
+                    println!("[web-clip] pre-llm image fetch failed url={} error={}", img.url, err);
+                    localized.push(img);
+                    continue;
+                }
+            }
+        } else {
+            img.data.clone()
+        };
+
+        if data.is_empty() {
+            localized.push(img);
+            continue;
+        }
+
+        let id = aimd_core::rewrite::sha256_hex(&data)[0..8].to_string();
+        let asset_uri = format!("asset://{}", id);
+        replacement_hits += replace_image_url(&mut markdown, &img.url, &asset_uri);
+        localized_count += 1;
+        localized.push(ImagePayload { url: img.url, data });
+    }
+
+    (markdown, localized, localized_count, replacement_hits)
+}
+
+fn replace_image_url(markdown: &mut String, old_url: &str, new_uri: &str) -> usize {
+    let mut hits = 0usize;
+    let before = markdown.matches(old_url).count();
+    if before > 0 {
+        hits += before;
+        *markdown = markdown.replace(old_url, new_uri);
+    }
+
+    let escaped_url = old_url.replace('&', "&amp;");
+    if escaped_url != old_url {
+        let before = markdown.matches(&escaped_url).count();
+        if before > 0 {
+            hits += before;
+            *markdown = markdown.replace(&escaped_url, new_uri);
+        }
+    }
+
+    hits
 }
 
 fn image_ext_from_bytes(data: &[u8]) -> &'static str {
@@ -291,7 +382,7 @@ pub async fn refine_markdown(app: AppHandle, markdown: String, provider: String)
 2. 不要新增「摘要」「核心观点」「行动指南」「结论」等原文没有的栏目。可以整理标题层级、空行、列表缩进和明显破损的 Markdown。
 3. 可以删除明显的广告、导航、登录提示、关注引导、推荐阅读、版权噪音；除此之外不要删正文。
 4. 如果标题附近残留了栏目、分类、面包屑、作者、日期、Permalink、Share 等页面元信息，请删除它们。例如文章标题上方的 `Networking & Content Delivery` 分类链接、`by ... on ... Permalink Share` 这类 byline/share 区块不属于正文。
-5. 原文中的图片 Markdown（形如 `![alt](URL)`）必须原样保留在相近位置。不要删除图片，不要改写 URL，不要把 URL 转成链接文字。
+5. 原文中的图片 Markdown（形如 `![alt](asset://id)` 或 `![alt](URL)`）必须原样保留在相近位置。`asset://...` 是本地图片资源引用，绝对不要删除、改写、转义或改成链接文字。
 6. 如果不确定一段内容或一张图片是否属于正文，选择保留。
 7. 直接返回整理后的完整 Markdown，不要包裹 ```markdown 代码块，不要解释你的处理。".to_string(),
         user: markdown,

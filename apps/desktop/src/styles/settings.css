@@ -254,6 +254,34 @@
   background: rgba(31, 22, 11, 0.08);
 }
 
+.connection-test-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 34px;
+}
+
+.connection-test-state {
+  min-width: 0;
+  color: var(--ink-muted);
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 1.35;
+  overflow-wrap: anywhere;
+}
+
+.connection-test-state[data-tone="loading"] {
+  color: var(--ink-muted);
+}
+
+.connection-test-state[data-tone="success"] {
+  color: var(--tone-success);
+}
+
+.connection-test-state[data-tone="error"] {
+  color: var(--tone-danger);
+}
+
 .settings-actions {
   display: flex;
   align-items: center;

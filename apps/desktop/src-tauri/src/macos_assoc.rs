@@ -55,6 +55,9 @@ mod imp {
         }
         for ext in MD_EXTENSIONS {
             if let Some(extension_uti) = preferred_uti_for_extension(ext) {
+                if is_dynamic_uti(&extension_uti) {
+                    continue;
+                }
                 if let Err(err) = set_default_handler(&extension_uti, &bundle_id) {
                     eprintln!("failed to register .{ext} association: {err}");
                 }
@@ -121,5 +124,9 @@ mod imp {
         } else {
             Some(unsafe { TCFType::wrap_under_create_rule(uti) })
         }
+    }
+
+    fn is_dynamic_uti(uti: &CFString) -> bool {
+        uti.to_string().starts_with("dyn.")
     }
 }
