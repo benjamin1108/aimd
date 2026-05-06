@@ -1,5 +1,7 @@
+use crate::dev_log;
 use reqwest::StatusCode;
 use serde_json::{json, Value};
+use std::time::Instant;
 
 use super::{
     parse_json_from_model_text, strip_provider_prefix, GenerateJsonRequest, GenerateJsonResponse,
@@ -30,26 +32,67 @@ pub async fn generate_text(
         ],
         "temperature": request.temperature
     });
+    let started = Instant::now();
+    dev_log::llm("dashscope.generate_text.request", || {
+        json!({
+            "provider": "dashscope",
+            "model": model,
+            "url": url.clone(),
+            "requestBody": body.clone(),
+        })
+    });
 
-    let response = reqwest::Client::new()
+    let response = match reqwest::Client::new()
         .post(url)
         .bearer_auth(config.api_key.trim())
         .json(&body)
         .send()
         .await
-        .map_err(|err| format!("连接 DashScope 失败: {err}"))?;
+    {
+        Ok(response) => response,
+        Err(err) => {
+            let message = format!("连接 DashScope 失败: {err}");
+            dev_log::llm("dashscope.generate_text.transport_error", || {
+                json!({
+                    "provider": "dashscope",
+                    "model": model,
+                    "elapsedMs": started.elapsed().as_millis(),
+                    "error": message,
+                })
+            });
+            return Err(message);
+        }
+    };
 
     let status = response.status();
-    let value = response
-        .json::<Value>()
+    let response_text = response
+        .text()
         .await
         .map_err(|err| format!("读取 DashScope 响应失败: {err}"))?;
+    dev_log::llm("dashscope.generate_text.response", || {
+        json!({
+            "provider": "dashscope",
+            "model": model,
+            "status": status.as_u16(),
+            "elapsedMs": started.elapsed().as_millis(),
+            "responseBody": response_text,
+        })
+    });
+    let value = serde_json::from_str::<Value>(&response_text)
+        .map_err(|err| format!("解析 DashScope 响应失败: {err}"))?;
     if !status.is_success() {
         return Err(format_dashscope_error(status, &value));
     }
 
     let content =
         extract_message_text(&value).ok_or_else(|| format!("DashScope 响应缺少正文: {value}"))?;
+    dev_log::llm("dashscope.generate_text.parsed", || {
+        json!({
+            "provider": "dashscope",
+            "model": model,
+            "text": content,
+        })
+    });
 
     Ok(GenerateTextResponse { text: content })
 }
@@ -77,30 +120,71 @@ pub async fn generate_json(
         "temperature": request.temperature,
         "response_format": { "type": "json_object" }
     });
+    let started = Instant::now();
+    dev_log::llm("dashscope.generate_json.request", || {
+        json!({
+            "provider": "dashscope",
+            "model": model,
+            "url": url.clone(),
+            "requestBody": body.clone(),
+        })
+    });
 
-    let response = reqwest::Client::new()
+    let response = match reqwest::Client::new()
         .post(url)
         .bearer_auth(config.api_key.trim())
         .json(&body)
         .send()
         .await
-        .map_err(|err| format!("连接 DashScope 失败: {err}"))?;
+    {
+        Ok(response) => response,
+        Err(err) => {
+            let message = format!("连接 DashScope 失败: {err}");
+            dev_log::llm("dashscope.generate_json.transport_error", || {
+                json!({
+                    "provider": "dashscope",
+                    "model": model,
+                    "elapsedMs": started.elapsed().as_millis(),
+                    "error": message,
+                })
+            });
+            return Err(message);
+        }
+    };
 
     let status = response.status();
-    let value = response
-        .json::<Value>()
+    let response_text = response
+        .text()
         .await
         .map_err(|err| format!("读取 DashScope 响应失败: {err}"))?;
+    dev_log::llm("dashscope.generate_json.response", || {
+        json!({
+            "provider": "dashscope",
+            "model": model,
+            "status": status.as_u16(),
+            "elapsedMs": started.elapsed().as_millis(),
+            "responseBody": response_text,
+        })
+    });
+    let value = serde_json::from_str::<Value>(&response_text)
+        .map_err(|err| format!("解析 DashScope 响应失败: {err}"))?;
     if !status.is_success() {
         return Err(format_dashscope_error(status, &value));
     }
 
     let content =
         extract_message_text(&value).ok_or_else(|| format!("DashScope 响应缺少正文: {value}"))?;
+    let parsed = parse_json_from_model_text(&content)?;
+    dev_log::llm("dashscope.generate_json.parsed", || {
+        json!({
+            "provider": "dashscope",
+            "model": model,
+            "text": content,
+            "json": parsed.clone(),
+        })
+    });
 
-    Ok(GenerateJsonResponse {
-        value: parse_json_from_model_text(&content)?,
-    })
+    Ok(GenerateJsonResponse { value: parsed })
 }
 
 fn chat_completions_url(base: &str) -> String {

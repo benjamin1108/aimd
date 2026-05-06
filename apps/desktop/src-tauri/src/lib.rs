@@ -3,6 +3,7 @@
 // "Open With" 文件事件。
 
 mod assets;
+mod dev_log;
 mod dialogs;
 mod documents;
 mod dto;
@@ -22,6 +23,8 @@ use documents::MAIN_INITIALIZED;
 use documents::{is_supported_doc_extension, PendingOpenPaths};
 
 pub fn run() {
+    dev_log::init();
+
     let builder = tauri::Builder::default();
 
     #[cfg(any(target_os = "windows", target_os = "linux"))]

@@ -8,6 +8,8 @@ use serde_json::Value;
 use std::time::Duration;
 use tauri::{AppHandle, Emitter, Manager, WebviewUrl, WebviewWindowBuilder};
 
+const WEB_CLIP_REFINE_SYSTEM_PROMPT: &str = include_str!("prompts/web_clip_refine_system.md");
+
 #[derive(Deserialize, Serialize, Clone, Debug)]
 pub struct ImagePayload {
     pub url: String,
@@ -375,16 +377,7 @@ pub async fn refine_markdown(app: AppHandle, markdown: String, provider: String)
     };
 
     let request = GenerateTextRequest {
-        system: "你是一个忠实的 Markdown 正文整理器。你的目标是保留网页正文的完整信息，只做格式清理，不做摘要生成。
-
-硬性规则：
-1. 绝对禁止把全文改写成摘要、导读、要点列表或结论稿。必须保留原文的主要段落、论证过程、例子、数据、引用和细节。
-2. 不要新增「摘要」「核心观点」「行动指南」「结论」等原文没有的栏目。可以整理标题层级、空行、列表缩进和明显破损的 Markdown。
-3. 可以删除明显的广告、导航、登录提示、关注引导、推荐阅读、版权噪音；除此之外不要删正文。
-4. 如果标题附近残留了栏目、分类、面包屑、作者、日期、Permalink、Share 等页面元信息，请删除它们。例如文章标题上方的 `Networking & Content Delivery` 分类链接、`by ... on ... Permalink Share` 这类 byline/share 区块不属于正文。
-5. 原文中的图片 Markdown（形如 `![alt](asset://id)` 或 `![alt](URL)`）必须原样保留在相近位置。`asset://...` 是本地图片资源引用，绝对不要删除、改写、转义或改成链接文字。
-6. 如果不确定一段内容或一张图片是否属于正文，选择保留。
-7. 直接返回整理后的完整 Markdown，不要包裹 ```markdown 代码块，不要解释你的处理。".to_string(),
+        system: WEB_CLIP_REFINE_SYSTEM_PROMPT.to_string(),
         user: markdown,
         temperature: 0.1,
     };
