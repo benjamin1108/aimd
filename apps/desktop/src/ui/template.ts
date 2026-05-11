@@ -23,37 +23,6 @@ export const APP_HTML = `
             </div>
           </section>
 
-          <section class="nav-section nav-section--tour" id="docutour-section" hidden>
-            <div class="section-label">
-              <span>导读</span>
-              <span class="section-count" id="docutour-count">0</span>
-            </div>
-            <div class="section-content">
-              <div id="docutour-panel" class="docutour-panel">
-                <header class="docutour-panel-head">
-                  <div>
-                    <div class="docutour-kicker">AI 导读</div>
-                    <div class="docutour-counter"></div>
-                  </div>
-                  <button class="docutour-exit" data-tour-exit type="button">退出</button>
-                </header>
-                <div class="docutour-progress" aria-hidden="true"><span></span></div>
-                <div class="docutour-content">
-                  <div class="docutour-meta"></div>
-                  <div class="docutour-step-title"></div>
-                  <div class="docutour-why"></div>
-                  <div class="docutour-insight"></div>
-                  <div class="docutour-next"></div>
-                </div>
-                <div class="docutour-sidebar-actions">
-                  <button class="docutour-control-btn" data-tour-prev type="button">上一步</button>
-                  <button class="docutour-control-btn" data-tour-next type="button">下一步</button>
-                </div>
-                <div class="docutour-keyhint">← / → 切换步骤</div>
-              </div>
-            </div>
-          </section>
-
           <button class="sb-resizer" id="sb-resizer-outline-asset" hidden
                   data-above="#outline-section" data-below="#asset-section"
                   aria-label="调整大纲与资源高度"></button>
@@ -117,7 +86,7 @@ export const APP_HTML = `
                 </button>
                 <button id="new-window" class="action-menu-item" type="button">
                   <span class="action-menu-icon">${ICONS.plus}</span>
-                  <span>新窗口打开</span>
+                  <span>在新窗口打开</span>
                 </button>
                 <hr class="action-menu-sep" role="separator">
                 <button id="close" class="action-menu-item" type="button" disabled>

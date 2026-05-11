@@ -4,7 +4,7 @@ import { inlineEditorEl } from "../core/dom";
 import type { AddedAsset } from "../core/types";
 import { setStatus, updateChrome } from "../ui/chrome";
 import { scheduleRender } from "../ui/outline";
-import { upgradeMarkdownToAimd, saveDocumentAs } from "../document/persist";
+import { ensureDraftPackage } from "../document/drafts";
 import {
   compressImageBytes, normalizeAddedAsset,
   insertImageInline,
@@ -82,20 +82,10 @@ export function guessImageExt(mime: string): string {
 
 export async function pasteImageFiles(files: File[], target: "edit" | "source") {
   if (!state.doc) return;
-  if (state.doc.format === "markdown") {
-    const upgraded = await upgradeMarkdownToAimd();
-    if (!upgraded) return;
-  }
-  if (state.doc.isDraft || !state.doc.path) {
-    const confirmed = window.confirm(
-      "图片需要先保存到文件系统，是否现在创建 .aimd 文件？\n取消后可继续编辑，图片将在保存后再粘贴。",
-    );
-    if (!confirmed) return;
-    await saveDocumentAs();
-    if (!state.doc?.path) return;
-  }
   setStatus("正在加入粘贴的图片", "loading");
   try {
+    const targetPath = await ensureDraftPackage();
+    if (!targetPath || !state.doc) return;
     for (const file of files) {
       const rawBuf = await file.arrayBuffer();
       const baseName = (file.name && file.name.length > 0)
@@ -103,7 +93,7 @@ export async function pasteImageFiles(files: File[], target: "edit" | "source") 
         : `pasted-${Date.now()}.${guessImageExt(file.type)}`;
       const compressed = await compressImageBytes(rawBuf, file.type, baseName);
       const added = normalizeAddedAsset(await invoke<AddedAsset>("add_image_bytes", {
-        path: state.doc.path,
+        path: targetPath,
         filename: compressed.filename,
         data: Array.from(compressed.data),
       }));
@@ -114,10 +104,16 @@ export async function pasteImageFiles(files: File[], target: "edit" | "source") 
       }
       state.doc.assets = [...state.doc.assets, added.asset];
       state.doc.dirty = true;
+      if (state.doc.format === "markdown") state.doc.needsAimdSave = true;
     }
     updateChrome();
     if (target === "source") scheduleRender();
-    setStatus("已粘贴图片", "success");
+    setStatus(
+      state.doc.format === "markdown"
+        ? "图片已粘贴，保存时会另存为 .aimd"
+        : "已粘贴图片",
+      "success",
+    );
   } catch (err) {
     console.error(err);
     setStatus("粘贴图片失败", "warn");

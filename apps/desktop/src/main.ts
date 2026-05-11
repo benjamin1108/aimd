@@ -10,7 +10,7 @@ document.querySelector<HTMLDivElement>("#app")!.innerHTML = APP_HTML;
 import { state } from "./core/state";
 import {
   markdownEl, inlineEditorEl, modeReadEl, modeEditEl, modeSourceEl,
-  saveEl, saveAsEl, closeEl, docuTourGenerateEl, docuTourPlayEl,
+  saveEl, saveAsEl, closeEl,
   moreMenuToggleEl, moreMenuEl,
   debugIndicatorEl, debugIndicatorCountEl,
 } from "./core/dom";
@@ -32,6 +32,7 @@ import {
 } from "./document/lifecycle";
 import { saveDocument, saveDocumentAs } from "./document/persist";
 import { importWebClip } from "./document/web-clip";
+import { cleanupOldDrafts } from "./document/drafts";
 import { optimizeDocumentAssets } from "./document/optimize";
 import {
   onWindowDragOver, onWindowDragLeave, onWindowDrop,
@@ -92,7 +93,7 @@ saveAsEl().addEventListener("click", () => { closeActionMenus(); void saveDocume
 bindMenuToggle(moreMenuToggleEl(), moreMenuEl());
 $<HTMLButtonElement>("#new-window").addEventListener("click", () => {
   closeActionMenus();
-  void invoke("open_in_new_window", { path: null });
+  void invoke("open_in_new_window", { path: state.doc?.path || null });
 });
 closeEl().addEventListener("click", () => { closeActionMenus(); void closeDocument(); });
 document.addEventListener("click", (event) => {
@@ -238,6 +239,7 @@ window.addEventListener("DOMContentLoaded", async () => {
     await restoreSession();
   } finally {
     state.isBootstrappingSession = false;
+    void cleanupOldDrafts(state.doc?.draftSourcePath ? [state.doc.draftSourcePath] : []);
     if (!state.doc) updateChrome();
   }
 });

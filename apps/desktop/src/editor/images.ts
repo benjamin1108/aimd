@@ -5,8 +5,8 @@ import type { AddedAsset } from "../core/types";
 import { setStatus } from "../ui/chrome";
 import { updateChrome } from "../ui/chrome";
 import { scheduleRender } from "../ui/outline";
-import { upgradeMarkdownToAimd, saveDocumentAs } from "../document/persist";
 import { normalizeAssets } from "../document/apply";
+import { ensureDraftPackage } from "../document/drafts";
 import { insertAtCursor } from "./inline";
 
 export const IMG_COMPRESS_MAX_SIDE = 2560;
@@ -104,18 +104,12 @@ export function insertImageInline(added: AddedAsset) {
 
 export async function insertImage() {
   if (!state.doc) return;
-  if (state.doc.format === "markdown") {
-    const upgraded = await upgradeMarkdownToAimd();
-    if (!upgraded) return;
-  }
-  if (state.doc.isDraft || !state.doc.path) {
-    await saveDocumentAs();
-    if (!state.doc?.path) return;
-  }
   const imagePath = await invoke<string | null>("choose_image_file");
   if (!imagePath) return;
   setStatus("正在加入图片", "loading");
   try {
+    const targetPath = await ensureDraftPackage();
+    if (!targetPath || !state.doc) return;
     const rawBytes = await invoke<number[]>("read_image_bytes", { imagePath });
     const rawBuf = new Uint8Array(rawBytes).buffer;
     const ext = imagePath.split(".").pop()?.toLowerCase() ?? "png";
@@ -127,7 +121,7 @@ export async function insertImage() {
     const baseName = imagePath.split(/[\\/]/).pop() ?? `image.${ext}`;
     const compressed = await compressImageBytes(rawBuf, mime, baseName);
     const added = normalizeAddedAsset(await invoke<AddedAsset>("add_image_bytes", {
-      path: state.doc.path,
+      path: targetPath,
       filename: compressed.filename,
       data: Array.from(compressed.data),
     }));
@@ -141,9 +135,15 @@ export async function insertImage() {
     }
     state.doc.assets = [...state.doc.assets, added.asset];
     state.doc.dirty = true;
+    if (state.doc.format === "markdown") state.doc.needsAimdSave = true;
     updateChrome();
     if (state.mode === "source") scheduleRender();
-    setStatus("图片已就绪，保存后写入正文", "info");
+    setStatus(
+      state.doc.format === "markdown"
+        ? "图片已加入，保存时会另存为 .aimd"
+        : "图片已就绪，保存后写入正文",
+      "info",
+    );
   } catch (err) {
     console.error(err);
     setStatus("插入图片失败", "warn");

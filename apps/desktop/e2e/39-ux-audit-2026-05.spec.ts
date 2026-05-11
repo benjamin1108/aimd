@@ -6,7 +6,7 @@
  * - P0-1 取消按钮不再走"切换即保存"，关闭窗口前不写后端。
  * - P0-1 设置经后端 load_settings / save_settings 持久化。
  * - P1-1 主 toolbar 不再有 #width-select 控件。
- * - P1-2 toolbar 用 .toolbar-group 显式分组（文档模式 vs 导览）。
+ * - P1-2 toolbar 用 .toolbar-group 显式分组。
  * - P1-3 head-actions 内 #save-state 文字传达"已保存 / 未保存修改"。
  * - P1-4 sidebar 不再渲染 #doc-card / #doc-section（与 header 重复）。
  * - P1-6 空态不再用 .launch-hero / .launch-eyebrow 营销布局。
@@ -84,7 +84,7 @@ test.describe("P1 — 主 UI 信息架构", () => {
     await expect(page.locator(".toolbar-select")).toHaveCount(0);
   });
 
-  test("toolbar 显式分组：.toolbar-group--mode 和 .toolbar-group--tour 都存在", async ({ page }) => {
+  test("toolbar 显式分组：.toolbar-group--mode 存在", async ({ page }) => {
     await installMock(page);
     await page.goto("/");
     await page.locator("#empty-open").click();

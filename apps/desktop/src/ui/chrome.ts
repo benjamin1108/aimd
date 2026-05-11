@@ -5,6 +5,7 @@ import {
   sidebarOutlineAssetResizerEl,
   starterActionsEl, docActionsEl, sidebarFootEl,
   sidebarNewEl, sidebarSaveEl, saveEl, saveLabelEl, saveAsEl, closeEl,
+  newWindowEl,
   modeReadEl, modeEditEl, modeSourceEl, docToolbarEl,
 } from "../core/dom";
 import type { AimdAsset, AimdDocument } from "../core/types";
@@ -87,13 +88,16 @@ export function updateChrome() {
 
   titleEl().textContent = doc ? displayDocTitle(doc) : "AIMD Desktop";
   pathEl().textContent = doc
-    ? (doc.path || "未保存草稿 · 先另存为 .aimd")
+    ? (doc.needsAimdSave
+      ? `${doc.path ? formatPathHint(doc.path) : "Markdown 草稿"} · 保存时另存为 .aimd`
+      : (doc.path || "未保存草稿 · 先另存为 .aimd"))
     : "正文、图片和元信息始终在一起";
   // 保存按钮在文档没有变化时禁用：用户的"按钮亮着但其实没活做"会变成第二种困惑。
   // 草稿状态(isDraft)即使 dirty=false 也要保留可点（点击会触发 saveDocumentAs 创建文件）。
   const canSave = Boolean(doc && (doc.dirty || doc.isDraft));
   saveEl().disabled = !canSave;
   saveAsEl().disabled = !doc;
+  newWindowEl().disabled = !doc?.path;
   closeEl().disabled = !doc;
   // 顶部的主按钮统一显示「保存」：草稿状态下点击仍走 saveDocumentAs 创建文件，
   // 但视觉/语义上对用户都是"保存"动作（与 sidebar-foot 一致）。
@@ -136,7 +140,10 @@ export function updateChrome() {
   // 已保存 / 失败）窗口期内 statusTimer 非 null，这里不抢；timer 回调结束后
   // 会自己根据 dirty 回退到稳定态。
   if (state.statusTimer == null) {
-    if (doc.isDraft && !doc.dirty) {
+    if (doc.needsAimdSave) {
+      statusEl().textContent = "保存时需要另存为 .aimd";
+      statusPillEl().dataset.tone = "info";
+    } else if (doc.isDraft && !doc.dirty) {
       setStatus("这是未保存草稿，保存后才会生成 .aimd 文件", "info");
     } else if (doc.dirty) {
       statusEl().textContent = "未保存的修改";

@@ -446,14 +446,7 @@ formEl.addEventListener("submit", async (event) => {
   event.preventDefault();
   if (saving) return;
   const next = readSettings();
-  const activeCred = next.ai.providers[next.ai.activeProvider];
-  apiKeyErrorEl.hidden = Boolean(activeCred.apiKey);
-  if (!activeCred.apiKey) {
-    apiKeyErrorEl.textContent = "请填写 API Key";
-    apiKeyErrorEl.hidden = false;
-    apiKeyEl.focus();
-    return;
-  }
+  apiKeyErrorEl.hidden = true;
   saving = true;
   saveButtonEl.disabled = true;
   saveStateEl.textContent = "保存中…";

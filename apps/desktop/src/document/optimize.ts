@@ -1,7 +1,8 @@
 import { invoke } from "@tauri-apps/api/core";
 import { state } from "../core/state";
-import type { AssetEntry } from "../core/types";
+import type { AimdDocument, AssetEntry } from "../core/types";
 import { setStatus } from "../ui/chrome";
+import { applyDocument } from "./apply";
 import {
   compressImageBytes, IMG_COMPRESS_THRESHOLD,
 } from "../editor/images";
@@ -26,6 +27,12 @@ export async function triggerOptimizeOnOpen(docPath: string) {
       return;
     }
     if (!state.doc || state.doc.path !== docPath) return;
+    if (!state.doc.dirty) {
+      const refreshed = await invoke<AimdDocument>("open_aimd", { path: docPath });
+      if (state.doc?.path === docPath && !state.doc.dirty) {
+        applyDocument({ ...refreshed, isDraft: false, format: "aimd", dirty: false }, state.mode);
+      }
+    }
     if (result.savedBytes >= OPTIMIZE_TOAST_THRESHOLD) {
       setStatus(`已自动压缩 ${result.optimized} 张图片，节省 ${formatBytes(result.savedBytes)}`, "success");
     } else {

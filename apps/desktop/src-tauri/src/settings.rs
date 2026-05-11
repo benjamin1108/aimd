@@ -236,7 +236,7 @@ pub fn load_settings(app: AppHandle) -> Result<AppSettings, String> {
     }
     let bytes = fs::read(&path).map_err(|err| format!("读取设置失败: {err}"))?;
     let mut value: Value =
-        serde_json::from_slice(&bytes).unwrap_or_else(|_| Value::Object(Default::default()));
+        serde_json::from_slice(&bytes).map_err(|err| format!("设置文件格式无效: {err}"))?;
     if !value.is_object() {
         value = Value::Object(Default::default());
     }

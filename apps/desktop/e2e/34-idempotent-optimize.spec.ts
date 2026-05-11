@@ -136,7 +136,7 @@ async function installMock(page: Page, opts: MockOptions) {
         const data = new Uint8Array(bytes);
         replaceLog.push({ oldName, newName, byteCount: bytes.length, bytes: data });
         // 模拟写回：把 bufKey 对应的 buffer 替换为压缩后的内容，以便下次 read_aimd_asset 返回新版本
-        const meta = s.assetMeta.find((m) => m.name === oldName);
+        const meta = s.assetMeta.find((m) => m.name === oldName || m.name.endsWith(`/${oldName}`));
         if (meta) {
           (window as any)[meta.bufKey] = data.buffer;
           meta.size = bytes.length;
@@ -274,7 +274,7 @@ test.describe("BUG-026 自动优化幂等性", () => {
     );
     // 第一次打开应当压缩该 PNG（节省 >= 50KB 且 >= 10%）
     expect(replaceLogAfterFirst).toHaveLength(1);
-    expect(replaceLogAfterFirst[0].oldName).toBe("assets/large-image.png");
+    expect(replaceLogAfterFirst[0].oldName).toBe("large-image.png");
     // 压缩后文件更小
     expect(replaceLogAfterFirst[0].byteCount).toBeLessThan(pngSize);
 

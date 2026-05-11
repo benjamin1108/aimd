@@ -7,6 +7,7 @@ mod dev_log;
 mod dialogs;
 mod documents;
 mod dto;
+mod drafts;
 mod importer;
 mod llm;
 mod macos_assoc;
@@ -85,6 +86,9 @@ pub fn run() {
             documents::import_markdown,
             documents::convert_md_to_draft,
             documents::save_markdown,
+            drafts::create_aimd_draft,
+            drafts::delete_draft_file,
+            drafts::cleanup_old_drafts,
             importer::start_url_extraction,
             importer::web_clip_raw_extracted,
             importer::web_clip_accept,
@@ -147,6 +151,9 @@ pub fn run() {
             ..
         } => {
             windows::unregister_window_label(app_handle, &label);
+            if label == "extractor" {
+                let _ = app_handle.emit("web_clip_closed", ());
+            }
         }
         _ => {}
     });

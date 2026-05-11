@@ -5,8 +5,7 @@
  * - 顶部 ⋯ 改 ghost-btn（无 secondary-btn class），保存按钮 primary-btn 视觉权重明确高于 ⋯
  * - 模式切换段控件改纯文字（不再渲染 .mode-btn-icon SVG）
  * - ⋯ 菜单不再用"危险"分组（关闭文档不是破坏性操作）
- * - 导览按钮直显（无嵌套菜单 / 无状态点）：无导览时只有 #docutour-generate；有导览时
- *   #docutour-play 出现，#docutour-generate 文案变为"重新生成"
+ * - 旧导览菜单 / 状态点 / 按钮不再出现。
  * - 进入 source 模式且文档含 frontmatter 时 #source-banner 可见，否则 hidden
  */
 import { test, expect, Page } from "@playwright/test";
@@ -106,7 +105,7 @@ test.describe("⋯ 菜单：不再用危险分组", () => {
   });
 });
 
-test.describe("导览按钮：直显，不嵌套，无状态点", () => {
+test.describe("已移除的导览入口", () => {
   test("旧的 tour-menu / tour-status-dot 元素已经不存在", async ({ page }) => {
     await installTauriMock(page, { withTour: false });
     await page.goto("/");

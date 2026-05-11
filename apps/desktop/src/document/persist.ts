@@ -7,6 +7,13 @@ import { rememberOpenedPath } from "../ui/recents";
 import { fileStem, suggestAimdFilename } from "../util/path";
 import { applyDocument } from "./apply";
 import { flushInline } from "../editor/inline";
+import { deleteDraftFile } from "./drafts";
+
+function messageFromError(err: unknown, fallback: string): string {
+  if (err instanceof Error && err.message) return `${fallback}: ${err.message}`;
+  if (typeof err === "string" && err.trim()) return `${fallback}: ${err}`;
+  return fallback;
+}
 
 export async function saveDocument() {
   if (!state.doc) return;
@@ -18,8 +25,9 @@ export async function saveDocument() {
   if (!state.doc.dirty) return;
 
   if (state.doc.format === "markdown") {
-    if (state.doc.assets.length > 0) {
-      await upgradeMarkdownToAimd();
+    if (state.doc.needsAimdSave || state.doc.assets.length > 0) {
+      setStatus("当前 Markdown 包含本地图片，请另存为 .aimd", "info");
+      await saveDocumentAs();
       return;
     }
     setStatus("正在保存", "loading");
@@ -32,7 +40,7 @@ export async function saveDocument() {
       setStatus("已保存（Markdown）", "success");
     } catch (err) {
       console.error(err);
-      setStatus("保存失败", "warn");
+      setStatus(messageFromError(err, "保存失败"), "warn");
     } finally {
       updateChrome();
     }
@@ -51,7 +59,7 @@ export async function saveDocument() {
     setStatus("已保存", "success");
   } catch (err) {
     console.error(err);
-    setStatus("保存失败", "warn");
+    setStatus(messageFromError(err, "保存失败"), "warn");
   } finally {
     updateChrome();
   }
@@ -62,6 +70,10 @@ export async function saveDocumentAs() {
   if (state.mode === "edit") flushInline();
   const isMarkdownDoc = state.doc.format === "markdown" && Boolean(state.doc.path);
   const wasDraft = Boolean(state.doc.isDraft || !state.doc.path);
+  const draftSourcePath = state.doc.draftSourcePath || "";
+  const sourcePath = state.doc.format === "markdown"
+    ? (draftSourcePath || null)
+    : (state.doc.path || draftSourcePath || null);
   const suggestedName = isMarkdownDoc
     ? `${fileStem(state.doc.path)}.aimd`
     : suggestAimdFilename(state.doc.path || `${displayDocTitle(state.doc)}.aimd`);
@@ -71,26 +83,29 @@ export async function saveDocumentAs() {
   saveAsEl().disabled = true;
   try {
     const doc = await invoke<AimdDocument>("save_aimd_as", {
-      path: state.doc.path || state.doc.draftSourcePath || null,
+      path: sourcePath,
       savePath,
       markdown: state.doc.markdown,
       title: displayDocTitle(state.doc),
     });
     if (isMarkdownDoc) {
-      applyDocument({ ...doc, isDraft: false, format: "aimd", dirty: false }, state.mode);
+      applyDocument({ ...doc, isDraft: false, format: "aimd", dirty: false, needsAimdSave: false }, state.mode);
       rememberOpenedPath(doc.path);
       setStatus("已转换为 .aimd", "success");
     } else {
-      applyDocument({ ...doc, isDraft: false, format: "aimd", dirty: false }, state.mode);
+      applyDocument({ ...doc, isDraft: false, format: "aimd", dirty: false, needsAimdSave: false }, state.mode);
       rememberOpenedPath(doc.path);
       setStatus(wasDraft ? "文件已创建" : "已另存为", "success");
+    }
+    if (draftSourcePath && draftSourcePath !== doc.path) {
+      void deleteDraftFile(draftSourcePath);
     }
     try {
       await invoke("update_window_path", { newPath: doc.path });
     } catch { /* 命令不存在时静默忽略 */ }
   } catch (err) {
     console.error(err);
-    setStatus("另存为失败", "warn");
+    setStatus(messageFromError(err, "另存为失败"), "warn");
   } finally {
     updateChrome();
   }
@@ -98,18 +113,6 @@ export async function saveDocumentAs() {
 
 export async function upgradeMarkdownToAimd(): Promise<boolean> {
   if (!state.doc || state.doc.format !== "markdown") return false;
-  let confirmed = false;
-  try {
-    confirmed = await invoke<boolean>("confirm_upgrade_to_aimd", {
-      message: "文档包含图片资源，需要升级为 .aimd 格式才能保存。是否现在升级？",
-    });
-  } catch {
-    confirmed = window.confirm("文档包含图片资源，需要升级为 .aimd 格式才能保存。是否现在升级？");
-  }
-  if (!confirmed) {
-    setStatus("升级取消", "info");
-    return false;
-  }
   const stem = fileStem(state.doc.path) || displayDocTitle(state.doc);
   const suggestedName = `${stem}.aimd`;
   const savePath = await invoke<string | null>("choose_save_aimd_file", { suggestedName });
@@ -118,18 +121,21 @@ export async function upgradeMarkdownToAimd(): Promise<boolean> {
     return false;
   }
   try {
-    const doc = await invoke<AimdDocument>("create_aimd", {
-      path: savePath,
+    const doc = await invoke<AimdDocument>("save_aimd_as", {
+      path: state.doc.draftSourcePath || null,
+      savePath,
       markdown: state.doc.markdown,
       title: displayDocTitle(state.doc),
     });
-    applyDocument({ ...doc, isDraft: false, format: "aimd", dirty: false }, state.mode);
+    const draftSourcePath = state.doc.draftSourcePath;
+    applyDocument({ ...doc, isDraft: false, format: "aimd", dirty: false, needsAimdSave: false }, state.mode);
     rememberOpenedPath(savePath);
+    if (draftSourcePath && draftSourcePath !== savePath) void deleteDraftFile(draftSourcePath);
     setStatus("已升级为 .aimd", "success");
     return true;
   } catch (err) {
     console.error(err);
-    setStatus("升级失败", "warn");
+    setStatus(messageFromError(err, "升级失败"), "warn");
     return false;
   }
 }

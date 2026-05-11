@@ -53,10 +53,6 @@
     flex: 1 1 0;
     justify-content: center;
   }
-  .toolbar-group--tour {
-    flex: 1 1 100%;
-    justify-content: flex-end;
-  }
   .empty-state {
     padding: 24px 18px 24px;
   }

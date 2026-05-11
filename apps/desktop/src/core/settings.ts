@@ -95,7 +95,8 @@ export async function loadAppSettings(): Promise<AppSettings> {
       ai: coerceSettings(raw?.ai ?? null),
       webClip: coerceWebClipSettings(raw?.webClip ?? null)
     };
-  } catch {
+  } catch (err) {
+    console.warn("load_settings failed; using defaults", err);
     return { 
       ai: cloneSettings(DEFAULT_AI_SETTINGS),
       webClip: { ...DEFAULT_WEB_CLIP_SETTINGS }

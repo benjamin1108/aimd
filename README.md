@@ -1,145 +1,125 @@
-<div align="center">
-
 # AIMD
 
-**把图文文档装进一个文件。**
+AI 时代基于 Markdown 的独立文档格式。保留 Markdown 的可读写与 AI 友好，同时把图片和资源封装进一个文件。
 
-正文、图片、元信息始终在一起 — 发给别人不丢图，换台电脑也能完整打开。
+[下载](#下载) · [解决什么问题](#解决什么问题) · [AIMD Desktop](#aimd-desktop) · [文件格式](#文件格式) · [从源码构建](#从源码构建)
 
-[下载 macOS 版](#下载) · [下载 Windows 版](#下载) · [它解决什么问题](#为什么会有-aimd) · [文件格式](#文件格式)
-
-</div>
-
-![AIMD Desktop — 一个文件打开，左侧大纲与资源，中间正文与配图同屏可见](docs/assets/readme/hero-desktop.png)
+![AIMD Desktop](docs/assets/readme/hero-desktop.png)
 
 ---
 
-## 为什么会有 AIMD
+## 解决什么问题
 
-AI 工具正在让 Markdown 变成内容输出的默认格式。日报、调研、教程、周报、Agent 跑出来的报告，几乎都是 Markdown。
+Markdown 很适合写内容，也很适合给 AI 和程序处理。问题是图片通常不在 Markdown 文件里，而是在在线 URL 或本地资源目录里。
 
-但 Markdown 不是一个完整的"文档"：
+一旦文件被移动、重命名、单独发送、跨设备同步或长期归档，图片引用就可能失效。
 
-- 图片散在文件夹里，一拖动就断了
-- 发给同事，对方不会装编辑器
-- 想存档，过几个月发现配图全丢了
-- 转成 PDF，就不能再编辑了
+AIMD 做的事情很简单：把 Markdown 正文、图片资源和资源清单打包成一个 `.aimd` 文件。这个文件可以直接保存、发送、打开和继续编辑。
 
-`.aimd` 是一个开放格式 — 一个 ZIP 容器，里面装着 Markdown 正文、所有图片，以及元数据。**一个文件，发哪儿都齐整。**
+| 方案 | 适合 | 问题 |
+|---|---|---|
+| Markdown + images | 源码仓库、网站内容 | 不是单文件，分享和归档容易丢图 |
+| PDF | 最终分发、打印 | 不适合继续编辑，也不适合 AI 结构化修改 |
+| AIMD | 图文 Markdown 工作文件 | 保持可编辑，同时图文在一个文件里 |
 
-AIMD Desktop 是配套的桌面应用：双击 `.aimd` 就打开，像看 Markdown 一样阅读，像写 Markdown 一样编辑，图片直接粘贴进文档里就和正文绑在一起了。
-
----
-
-## 给谁用
-
-- **写 AI 日报 / 调研报告的你** — AI 给你的内容连图带表，存成 `.aimd`，发给老板、扔进群里、归档，都是一个文件搞定
-- **整理技术文档的你** — 截图、流程图、架构图直接粘进编辑器，不用单独管 `images/` 目录
-- **跑 Agent 输出的你** — 让 Agent 直接产出 `.aimd`（ZIP + manifest，结构透明），未来还能记录模型、提示词、出处
+纯文字文档继续用 `.md`。当 Markdown 里有图片，并且你希望它能稳定保存、发送和归档时，再使用 `.aimd`。
 
 ---
 
-## 你能在 AIMD Desktop 里做什么
+## AIMD Desktop
 
-### 一个文件，三种看法
+AIMD Desktop 是用于打开、阅读和编辑 `.aimd` 文件的桌面应用。
 
-- **阅读模式** — 干净的排版，专注读
-- **编辑模式** — 所见即所得，直接在渲染好的页面上改字、加粗、贴图
-- **源码模式** — 左边写 Markdown，右边实时预览
-
-顶部一键切换；正常 / 加宽 / 超宽三档版面，长图大表也舒服。
-
-### 图片就该跟正文走
-
-- **粘贴即入文档** — 截图直接 ⌘V，图自动塞进 `.aimd`，不再是外部链接
-- **自动去重 + 压缩** — 同一张图复制多次只存一份；大图按需压缩，文件不臃肿
-- **保存自动清理** — 删掉的图片，不再被引用的资源，会在保存时一起 GC 掉
-
-### 拖、双击、关联，怎么自然怎么来
-
-- 直接把 `.aimd` 拖进窗口，立刻打开
-- 系统里双击 `.aimd` 文件，自动用 AIMD 启动
-- 也能直接打开普通 `.md` 文件，按需另存为 `.aimd` 升级
-- 多窗口同时开多个文档（⌘⇧N），互不干扰
-
-### 还顺手的细节
-
-- 左侧自动生成大纲，跳转章节；下面是资源面板，文档里所有图片一目了然
-- 点图片即放大灯箱，按 Esc 收起
-- 最近打开列表，丢了文件路径也能回到现场
-- 完整快捷键：⌘N 新建 / ⌘O 打开 / ⌘S 保存 / ⇧⌘S 另存为 / ⌘W 关闭
+| 能力 | 说明 |
+|---|---|
+| 阅读 / 编辑 / 源码 | 三种模式切换：干净阅读、所见即所得编辑、Markdown 源文编辑 |
+| 图片内嵌 | 粘贴截图或图片后，资源写入 `.aimd` 文件内部 |
+| Markdown 兼容 | 普通 `.md` 原样打开和保存；插入图片后，保存时另存为 `.aimd` |
+| 资源管理 | 图片去重、大图压缩、保存时清理未使用资源 |
+| 文件体验 | 双击打开、拖拽打开、多窗口、最近打开、文件关联 |
+| 阅读辅助 | 自动大纲、资源面板、图片灯箱预览、常用快捷键 |
 
 ---
 
 ## 下载
 
-桌面应用支持 **macOS** 和 **Windows**。
+当前版本：`v0.1.0`
 
-| 平台 | 文件 | 安装 |
-|---|---|---|
-| macOS (Apple Silicon) | [`AIMD.Desktop_0.1.0_aarch64.dmg`](https://github.com/benjamin1108/aimd/releases/download/v0.1.0/AIMD.Desktop_0.1.0_aarch64.dmg) | 双击挂载，把 AIMD 拖进 Applications |
-| Windows 10/11 (x64) | [`AIMD.Desktop_0.1.0_x64-setup.exe`](https://github.com/benjamin1108/aimd/releases/download/v0.1.0/AIMD.Desktop_0.1.0_x64-setup.exe) | 双击安装 |
+请到 GitHub Releases 下载最新安装包：
 
-> 当前版本为 `v0.1.0`，可在 [Releases](https://github.com/benjamin1108/aimd/releases/tag/v0.1.0) 下载。
-> macOS 版当前未经过 Apple 公证。首次打开如被系统拦截，请到 系统设置 → 隐私与安全，点击“仍要打开”。后续版本会在接入 Developer ID 签名与公证后移除此步骤。
+https://github.com/benjamin1108/aimd/releases
 
-首次打开 `.aimd` 文件时，建议在系统中右键 → "打开方式" → "始终用 AIMD 打开"，之后双击即可。
+| 平台 | 安装包 |
+|---|---|
+| macOS Apple Silicon | `AIMD.Desktop_0.1.0_aarch64.dmg` |
+| Windows x64 | `AIMD.Desktop_0.1.0_x64-setup.exe` |
+| Windows x64 MSI | `AIMD.Desktop_0.1.0_x64_en-US.msi` |
+
+macOS 版本当前尚未完成 Apple 公证。首次打开如被系统拦截，请到：
+
+```text
+系统设置 → 隐私与安全 → 仍要打开
+```
 
 ---
 
 ## 文件格式
 
-`.aimd` 就是一个普通 ZIP，结构透明，可以用任何解压工具打开看：
+`.aimd` 是一个开放的 ZIP 容器：
 
 ```text
 report.aimd
 ├── manifest.json     文档元信息、资源清单、SHA-256
 ├── main.md           Markdown 正文
-└── assets/           打包进来的图片和资源
+└── assets/           图片和其他资源
     ├── cover.png
     └── chart-001.png
 ```
 
-正文里的图片用稳定引用形式 `![](asset://chart-001)`，移动文件、改名字、跨平台，都不会断。
+正文中的图片使用稳定资源引用：
 
-**为什么不直接用 PDF？** PDF 是给人看的终点，AIMD 是给人编辑的中间格式 — 可读、可改、可归档、可被脚本和 Agent 处理。
+```md
+![chart](asset://chart-001)
+```
 
-**为什么不直接用 Markdown + images 文件夹？** 那个组合发出去就散架。AIMD 是同一个东西，但只剩一个文件。
+只要 `.aimd` 文件还在，正文和图片就始终在一起。文件内部仍然是 Markdown、JSON 和普通资源文件，不是黑盒格式。
 
 ---
 
 ## 从源码构建
 
-桌面应用基于 [Tauri 2](https://tauri.app/)（Rust + TypeScript）。
+AIMD Desktop 基于 Tauri 2、Rust 和 TypeScript。
 
-需要：Node.js 18+，Rust（cargo），平台对应工具链（macOS 需 Xcode CLT，Windows 需 MSVC + WebView2）。
+需要：
+
+- Node.js 18+
+- Rust / Cargo
+- macOS：Xcode Command Line Tools
+- Windows：MSVC + WebView2
 
 ```bash
-# 克隆
-git clone https://github.com/<your-org>/aimd.git
-cd aimd
-
-# 开发运行
-cd apps/desktop
+git clone https://github.com/benjamin1108/aimd.git
+cd aimd/apps/desktop
 npm install
-npm run dev          # 启动 Tauri dev 窗口
+npm run dev
+```
 
-# 类型检查 + 端到端
+类型检查和测试：
+
+```bash
 npm run typecheck
 npm run test:e2e
 ```
 
-打包发布：
+打包：
 
 ```bash
-# macOS — 产出 .dmg / .app 到 dist/
+# macOS
 ./build-dmg.sh
 
-# Windows — 产出 .exe / .msi 到 dist/
+# Windows
 build-windows.bat
 ```
-
-仓库里附了一个示例文档可以直接打开看效果：[`examples/ai-daily-2026-04-30.aimd`](examples/ai-daily-2026-04-30.aimd)。
 
 ---
 
@@ -147,36 +127,30 @@ build-windows.bat
 
 ```text
 aimd/
-├── apps/desktop/        Tauri 桌面应用（前端 TS + 后端 Rust）
+├── apps/desktop/        Tauri 桌面应用
 ├── crates/
-│   ├── aimd-core/       .aimd ZIP 容器读写
-│   ├── aimd-mdx/        Markdown 解析与改写
+│   ├── aimd-core/       .aimd 容器读写
+│   ├── aimd-mdx/        Markdown 解析与资源引用改写
 │   └── aimd-render/     渲染管线
-├── skill/               Claude Code skill —— 让 AI Agent 直接读写 .aimd
-└── examples/            示例文档
+├── docs/                文档与图片资源
+├── examples/            示例文档
+├── scripts/             构建与辅助脚本
+└── skill/               AI Agent 读写 .aimd 的 skill
 ```
 
-`skill/` 目录里是一个可以装到 Claude Code 的 skill，让 AI 能直接用 Python 脚本读写 `.aimd`，把 AI 生成的内容打包进来。
+示例文档：
+
+```text
+examples/ai-daily-2026-04-30.aimd
+```
 
 ---
 
 ## 路线图
 
-**已交付（v0.1）**
+已完成：`.aimd` 单文件容器、Markdown 正文和图片资源封装、macOS / Windows 桌面应用、阅读 / 编辑 / 源码模式、图片粘贴与资源管理、普通 `.md` 按需另存为 `.aimd`。
 
-- `.aimd` 单文件容器：manifest + main.md + assets，SHA-256 校验
-- macOS / Windows 桌面应用：阅读 / 编辑 / 源码三模式，多窗口
-- 图片粘贴、去重、按需压缩、保存时 GC
-- 普通 `.md` 兼容打开与按需升级
-- 文件关联、最近打开、会话恢复
-
-**接下来**
-
-- AI 出处与溯源元信息（模型、提示词、来源引用、审阅状态）
-- 文档健康检查（缺图、断链、过大资源、结构异常）
-- 更多导出方式：自渲染 HTML、PDF
-- 浏览器在线查看器
-- 文件格式正式规范与 SDK
+计划中：AI 来源和溯源信息、文档健康检查、HTML / PDF 导出、浏览器查看器、文件格式规范、SDK。
 
 ---
 

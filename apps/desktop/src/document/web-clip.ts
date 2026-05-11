@@ -7,6 +7,7 @@ import { setStatus } from "../ui/chrome";
 import { loadAppSettings } from "../core/settings";
 import type { AimdDocument } from "../core/types";
 import { applyDocument } from "./apply";
+import { deleteDraftFile } from "./drafts";
 
 // Type definitions matching Rust backend
 interface ImagePayload {
@@ -82,7 +83,21 @@ export async function importWebClip() {
   const startedAt = performance.now();
   console.info("[web-clip] extraction dialog requested");
 
-  const unlistenRaw = await listen<ExtractPayload>("web_clip_raw_extracted", async (event) => {
+  let cleanedUp = false;
+  let unlistenRaw: () => void = () => {};
+  let unlistenAccept: () => void = () => {};
+  let unlistenClosed: () => void = () => {};
+  let pendingDraftPath = "";
+  let accepted = false;
+  const cleanupListeners = () => {
+    if (cleanedUp) return;
+    cleanedUp = true;
+    unlistenRaw();
+    unlistenAccept();
+    unlistenClosed();
+  };
+
+  unlistenRaw = await listen<ExtractPayload>("web_clip_raw_extracted", async (event) => {
     const payload = event.payload;
     for (const item of payload.diagnostics || []) {
       const args = item.data === undefined
@@ -182,8 +197,9 @@ export async function importWebClip() {
         }
       }
       
-      // Create an unsaved draft. The backend keeps a temporary resource package
-      // only so asset:// images can render before the user chooses a save path.
+      // Create an unsaved draft. The backend keeps an app-managed resource
+      // package so asset:// images survive restart until the user saves or
+      // discards the draft.
       const saveStartedAt = performance.now();
       const doc = await invoke<AimdDocument>("save_web_clip", {
         title: title,
@@ -195,6 +211,7 @@ export async function importWebClip() {
         markdownChars: markdown.length,
         imageCount: images.length,
       });
+      pendingDraftPath = doc.draftSourcePath || "";
 
       setStatus("就绪", "idle");
       console.info("[web-clip] opened web clip draft", {
@@ -218,19 +235,24 @@ export async function importWebClip() {
     }
   });
 
-  const unlistenAccept = await listen<AimdDocument>("web_clip_accept", (event) => {
-    unlistenRaw();
-    unlistenAccept();
+  unlistenAccept = await listen<AimdDocument>("web_clip_accept", (event) => {
+    accepted = true;
+    cleanupListeners();
     const doc = event.payload;
     applyDocument({ ...doc, path: "", isDraft: true, dirty: true, format: "aimd" }, "read");
     setStatus("已创建未保存草稿，点击保存后选择位置", "info");
   });
 
+  unlistenClosed = await listen("web_clip_closed", () => {
+    if (!accepted && pendingDraftPath) void deleteDraftFile(pendingDraftPath);
+    cleanupListeners();
+    setStatus("网页提取已取消", "info");
+  });
+
   try {
     await invoke("start_url_extraction");
   } catch (e: any) {
-    unlistenRaw();
-    unlistenAccept();
+    cleanupListeners();
     console.error("Failed to start extraction:", e);
     setStatus("启动提取器失败", "idle");
   }

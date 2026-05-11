@@ -26,6 +26,8 @@ export function loadSessionSnapshot(): SessionSnapshot | null {
       assets,
       dirty: Boolean(parsed.dirty),
       isDraft: Boolean(parsed.isDraft),
+      draftSourcePath: typeof parsed.draftSourcePath === "string" ? parsed.draftSourcePath : undefined,
+      needsAimdSave: Boolean(parsed.needsAimdSave),
       format: parsed.format === "markdown" ? "markdown" : "aimd",
       mode: parsed.mode === "edit" || parsed.mode === "source" ? parsed.mode : "read",
     };
@@ -55,6 +57,8 @@ export function persistSessionSnapshot() {
     assets: state.doc.assets,
     dirty: state.doc.dirty,
     isDraft: Boolean(state.doc.isDraft),
+    draftSourcePath: state.doc.draftSourcePath,
+    needsAimdSave: Boolean(state.doc.needsAimdSave),
     format: state.doc.format,
     mode: state.mode,
   };
@@ -105,6 +109,35 @@ async function registerRestoredPath(path: string) {
 }
 
 export async function restoreSnapshot(snapshot: SessionSnapshot): Promise<{ doc: AimdDocument; mode: Mode; message: string } | null> {
+  if (snapshot.draftSourcePath) {
+    try {
+      const draftDoc = await invoke<AimdDocument>("open_aimd", { path: snapshot.draftSourcePath });
+      const html = await renderSnapshotHTML({
+        ...snapshot,
+        assets: draftDoc.assets,
+      });
+      return {
+        doc: {
+          ...draftDoc,
+          path: snapshot.path,
+          title: snapshot.title || draftDoc.title,
+          markdown: snapshot.markdown,
+          html,
+          assets: draftDoc.assets,
+          dirty: snapshot.dirty,
+          isDraft: snapshot.isDraft,
+          draftSourcePath: snapshot.draftSourcePath,
+          needsAimdSave: snapshot.needsAimdSave,
+          format: snapshot.format,
+        },
+        mode: snapshot.mode,
+        message: snapshot.dirty || snapshot.isDraft ? "已恢复未保存草稿" : "已恢复上次会话",
+      };
+    } catch {
+      // Fall back to the persisted snapshot below; this may still recover text.
+    }
+  }
+
   if (snapshot.path && !snapshot.isDraft && snapshot.format !== "markdown") {
     try {
       const diskDoc = await invoke<AimdDocument>("open_aimd", { path: snapshot.path });
@@ -130,6 +163,8 @@ export async function restoreSnapshot(snapshot: SessionSnapshot): Promise<{ doc:
           assets: diskDoc.assets,
           dirty: true,
           isDraft: false,
+          draftSourcePath: snapshot.draftSourcePath,
+          needsAimdSave: snapshot.needsAimdSave,
           format: "aimd",
         },
         mode: snapshot.mode,
@@ -150,6 +185,8 @@ export async function restoreSnapshot(snapshot: SessionSnapshot): Promise<{ doc:
       assets: snapshot.assets,
       dirty: snapshot.dirty,
       isDraft: snapshot.isDraft,
+      draftSourcePath: snapshot.draftSourcePath,
+      needsAimdSave: snapshot.needsAimdSave,
       format: snapshot.format,
     },
     mode: snapshot.mode,
@@ -159,9 +196,11 @@ export async function restoreSnapshot(snapshot: SessionSnapshot): Promise<{ doc:
 
 export async function renderSnapshotHTML(snapshot: SessionSnapshot): Promise<string> {
   try {
-    if (snapshot.path && !snapshot.isDraft && snapshot.format !== "markdown") {
+    const renderPath = snapshot.draftSourcePath
+      || (snapshot.path && !snapshot.isDraft && snapshot.format !== "markdown" ? snapshot.path : "");
+    if (renderPath) {
       const out = await invoke<RenderResult>("render_markdown", {
-        path: snapshot.path,
+        path: renderPath,
         markdown: snapshot.markdown,
       });
       return out.html;

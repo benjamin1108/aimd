@@ -12,6 +12,7 @@ import { fileStem } from "../util/path";
 import { applyDocument } from "./apply";
 import { triggerOptimizeOnOpen } from "./optimize";
 import { saveDocument } from "./persist";
+import { deleteDocumentDraft } from "./drafts";
 import { clearSessionSnapshot, clearLastSessionPath } from "../session/snapshot";
 
 export type OpenRouteResult = "opened" | "focused" | "current" | "cancelled" | "failed" | "unsupported";
@@ -46,7 +47,7 @@ export async function openMarkdownDocument(markdownPath: string, opts?: { skipCo
     return "opened";
   } catch (err) {
     console.error(err);
-    setStatus("打开失败", "warn");
+    setStatus(`打开失败: ${err instanceof Error ? err.message : String(err)}`, "warn");
     return "failed";
   }
 }
@@ -145,13 +146,14 @@ export async function openDocument(path: string, options: { skipConfirm?: boolea
     return "opened";
   } catch (err) {
     console.error(err);
-    setStatus("打开失败", "warn");
+    setStatus(`打开失败: ${err instanceof Error ? err.message : String(err)}`, "warn");
     return "failed";
   }
 }
 
 export async function closeDocument() {
   if (!await ensureCanDiscardChanges("关闭当前文档")) return;
+  await deleteDocumentDraft(state.doc);
   state.doc = null;
   state.outline = [];
   state.inlineDirty = false;
@@ -190,5 +192,9 @@ export async function ensureCanDiscardChanges(action: string): Promise<boolean> 
     // saveDocument 内部走 saveDocumentAs；若用户在 file picker 里取消、文档仍是 draft / 仍 dirty，则视为放弃此次离开。
     return !(state.doc?.dirty ?? false);
   }
-  return choice === "discard";
+  if (choice === "discard") {
+    await deleteDocumentDraft(state.doc);
+    return true;
+  }
+  return false;
 }

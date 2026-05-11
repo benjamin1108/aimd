@@ -2383,6 +2383,7 @@
     const workPanel = shell.querySelector(".aimd-clip-work");
     const previewPanel = shell.querySelector(".aimd-clip-preview");
     const previewInner = shell.querySelector(".aimd-clip-preview-inner");
+    const loadingWorkPanelHTML = workPanel.innerHTML;
     mount();
     await listen("web_clip_preview_ready", (event) => {
       currentDoc = event.payload;
@@ -2395,7 +2396,12 @@
     });
     await listen("web_clip_preview_failed", (event) => {
       workPanel.hidden = false;
-      workPanel.innerHTML = `<div><div class="aimd-clip-work-text">\u63D0\u53D6\u5931\u8D25</div><div class="aimd-clip-work-sub">${escapeHTML(event.payload?.error || "\u672A\u77E5\u9519\u8BEF")}</div></div>`;
+      workPanel.innerHTML = `
+      <div class="aimd-clip-work-card">
+        <div class="aimd-clip-work-text">\u63D0\u53D6\u5931\u8D25</div>
+        <div class="aimd-clip-work-sub">${escapeHTML(event.payload?.error || "\u672A\u77E5\u9519\u8BEF")}</div>
+      </div>
+    `;
       loadBtn.textContent = "\u667A\u80FD\u63D0\u53D6";
       loadBtn.dataset.action = "extract";
       loadBtn.disabled = false;
@@ -2550,6 +2556,7 @@
       loadBtn.textContent = "\u63D0\u53D6\u4E2D";
       startPanel.hidden = true;
       previewPanel.hidden = true;
+      workPanel.innerHTML = loadingWorkPanelHTML;
       workPanel.hidden = false;
       document.body.style.overflow = "hidden";
       const startedAt = performance.now();

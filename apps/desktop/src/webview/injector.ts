@@ -197,6 +197,7 @@ const ASSET_URI_PREFIX = "asset://";
   const workPanel = shell.querySelector<HTMLElement>(".aimd-clip-work")!;
   const previewPanel = shell.querySelector<HTMLElement>(".aimd-clip-preview")!;
   const previewInner = shell.querySelector<HTMLElement>(".aimd-clip-preview-inner")!;
+  const loadingWorkPanelHTML = workPanel.innerHTML;
   mount();
 
   await listen<AimdDocument>("web_clip_preview_ready", (event) => {
@@ -211,7 +212,12 @@ const ASSET_URI_PREFIX = "asset://";
 
   await listen<{ error?: string }>("web_clip_preview_failed", (event) => {
     workPanel.hidden = false;
-    workPanel.innerHTML = `<div><div class="aimd-clip-work-text">提取失败</div><div class="aimd-clip-work-sub">${escapeHTML(event.payload?.error || "未知错误")}</div></div>`;
+    workPanel.innerHTML = `
+      <div class="aimd-clip-work-card">
+        <div class="aimd-clip-work-text">提取失败</div>
+        <div class="aimd-clip-work-sub">${escapeHTML(event.payload?.error || "未知错误")}</div>
+      </div>
+    `;
     loadBtn.textContent = "智能提取";
     loadBtn.dataset.action = "extract";
     loadBtn.disabled = false;
@@ -393,6 +399,7 @@ const ASSET_URI_PREFIX = "asset://";
     loadBtn.textContent = "提取中";
     startPanel.hidden = true;
     previewPanel.hidden = true;
+    workPanel.innerHTML = loadingWorkPanelHTML;
     workPanel.hidden = false;
     document.body.style.overflow = "hidden";
 

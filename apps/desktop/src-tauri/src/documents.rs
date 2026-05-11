@@ -117,6 +117,15 @@ pub fn save_aimd_as(
     }
 
     let src_file = Path::new(&src);
+    if src_file
+        .extension()
+        .and_then(|e| e.to_str())
+        .map(|e| e.to_lowercase())
+        .as_deref()
+        != Some("aimd")
+    {
+        return create_aimd(save_path, markdown, title);
+    }
     let src_abs = fs::canonicalize(src_file).unwrap_or_else(|_| src_file.to_path_buf());
     let dest_abs = fs::canonicalize(dest_file).unwrap_or_else(|_| dest_file.to_path_buf());
     if src_abs == dest_abs {

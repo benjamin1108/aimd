@@ -1,4 +1,4 @@
-use crate::documents;
+use crate::drafts;
 use crate::llm::{generate_text, GenerateTextRequest, ModelConfig};
 use crate::settings::load_settings;
 use aimd_core::manifest::{Manifest, ROLE_CONTENT_IMAGE};
@@ -66,25 +66,18 @@ pub async fn localize_web_clip_images(
 
 #[tauri::command]
 pub async fn save_web_clip(
+    app: AppHandle,
     title: String,
     markdown: String,
     images: Vec<ImagePayload>,
 ) -> Result<Value, String> {
-    let sanitized_title = title.replace(&['/', '\\', '?', '%', '*', ':', '|', '"', '<', '>'][..], "-");
-    let sanitized_title = sanitized_title.trim();
-    let sanitized_title = if sanitized_title.is_empty() { "Untitled_Web_Clip" } else { sanitized_title };
-    
-    let now = std::time::SystemTime::now()
-        .duration_since(std::time::UNIX_EPOCH)
-        .unwrap()
-        .as_millis();
-    let filename = format!("webclip-draft-{now}-{sanitized_title}.aimd");
-    
-    let temp_dir = std::env::temp_dir();
-    let file_path = temp_dir.join(filename);
+    let sanitized_title = title.trim();
+    let sanitized_title = if sanitized_title.is_empty() { "Untitled Web Clip" } else { sanitized_title };
+    let now = chrono::Utc::now().timestamp_millis();
+    let file_path = drafts::drafts_dir(&app)?.join(format!("webclip-{now}.aimd"));
     let file = file_path.as_path();
 
-    let mf = Manifest::new(title);
+    let mf = Manifest::new(sanitized_title.to_string());
     let mut updated_markdown = markdown.clone();
 
     let mut assets_to_add = Vec::new();
@@ -149,15 +142,7 @@ pub async fn save_web_clip(
         Ok(())
     }).map_err(|e| format!("save_web_clip writer::create failed for {:?}: {}", file, e))?;
     
-    let draft_source_path = file_path.to_string_lossy().to_string();
-    let mut doc = documents::open_aimd(draft_source_path.clone())?;
-    if let Some(obj) = doc.as_object_mut() {
-        obj.insert("path".into(), Value::String(String::new()));
-        obj.insert("isDraft".into(), Value::Bool(true));
-        obj.insert("dirty".into(), Value::Bool(true));
-        obj.insert("draftSourcePath".into(), Value::String(draft_source_path));
-    }
-    Ok(doc)
+    drafts::draft_doc_from_path(file_path)
 }
 
 fn image_download_client() -> Result<reqwest::Client, String> {

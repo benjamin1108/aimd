@@ -39,7 +39,7 @@ pub fn render(markdown: &str, resolve: Option<&Resolver>) -> String {
     opts.extension.tasklist = true;
     opts.extension.autolink = true;
     opts.extension.footnotes = true;
-    opts.render.unsafe_ = true;
+    opts.render.unsafe_ = false;
 
     let html_raw = markdown_to_html(&body_str, &opts);
 

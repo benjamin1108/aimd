@@ -2,10 +2,10 @@
  * 40-redesign-2026-05.spec.ts
  *
  * 钉本轮 taste-skill 重设计的不可回归点：
- * - 工具栏：导览改直显（无嵌套菜单 / 无状态点 / 无 eyebrow 标签）
+ * - 工具栏：旧导览菜单 / 状态点 / eyebrow 标签不再出现
  * - ⋯ 菜单：删除"危险"分组 + 关闭文档不再红
  * - 保存按钮：干净文档 disabled；脏文档 enabled；保存成功瞬间显示"已保存"后清空
- * - 设置：双栏 IA（左导航 / 右分节）；导览偏好独立分节；API Key 半遮罩；
+ * - 设置：双栏 IA（左导航 / 右分节）；API Key 半遮罩；
  *   合法尺寸约束（前端 max-width 固定，避免被拉成大白屏）
  * - 调试控制台：常驻收集 + 折叠成底部 pill
  */
@@ -73,7 +73,7 @@ async function installMock(page: Page, opts: SetupOpts = {}) {
   }, { withTour: tour, isDirty: dirty });
 }
 
-test.describe("工具栏：导览直显，无嵌套菜单 / 无状态点", () => {
+test.describe("工具栏：旧导览入口已移除", () => {
   test("旧 tour-menu / tour-status-dot 元素已被删除", async ({ page }) => {
     await installMock(page);
     await page.goto("/");
@@ -84,12 +84,12 @@ test.describe("工具栏：导览直显，无嵌套菜单 / 无状态点", () =>
     await expect(page.locator(".tour-status-dot")).toHaveCount(0);
   });
 
-  test("toolbar-group 不再渲染 eyebrow 文字（'文档模式' / '导览' 标签）", async ({ page }) => {
+  test("toolbar-group 不再渲染 eyebrow 文字", async ({ page }) => {
     await installMock(page);
     await page.goto("/");
     await page.locator("#empty-open").click();
     await expect(page.locator(".toolbar-group-label")).toHaveCount(0);
-    // 但分组 wrapper 仍在，模式开关 / 导览动作各自归属。
+    // 模式开关分组仍在。
     await expect(page.locator(".toolbar-group--mode")).toBeVisible();
   });
 });

@@ -1,8 +1,5 @@
-/* Doc toolbar contents — mode-switch, tour direct buttons, ⋯ action-menu,
-   source-mode metadata banner, starter / quick actions.
-
-   导览不再用嵌套菜单：直接渲染按钮（生成 / 重新生成 / 播放）。状态由按钮存在性
-   和文案表达，不再用顶部小圆点。 */
+/* Doc toolbar contents — mode switch, action menu, source-mode metadata
+   banner, starter / quick actions. */
 
 .toolbar-group {
   display: inline-flex;
@@ -47,18 +44,6 @@
   line-height: 1;
 }
 
-/* 生成导览按钮在调用模型期间脉冲式淡灰，避免用户重复点击。 */
-.ghost-btn.is-generating,
-.secondary-btn.is-generating {
-  opacity: 0.6;
-  animation: tour-generating-pulse 1.6s var(--ease) infinite;
-}
-
-@keyframes tour-generating-pulse {
-  0%, 100% { opacity: 0.5; }
-  50%      { opacity: 0.9; }
-}
-
 /* Source-mode metadata banner — 出现在 textarea 上方，提示
    front-matter 行数。不强制折叠（textarea 不支持），但通过明确告知
    把"刺眼"变成"知情" 。 */
@@ -96,7 +81,7 @@
   font-weight: 600;
 }
 
-/* Action menu (shared by ⋯ menu and 导览 menu) */
+/* Action menu */
 
 .action-menu {
   position: absolute;

@@ -90,6 +90,17 @@ fn render_rewrites_asset_uri_when_resolver_provided() {
     }
 }
 
+#[test]
+fn render_escapes_raw_html() {
+    let html = render("# Title\n\n<script>alert(1)</script>\n\n<img src=x onerror=alert(1)>", None);
+    assert!(!html.contains("<script>"), "raw script tag must not render as HTML");
+    assert!(!html.contains("onerror="), "raw HTML attributes must not survive");
+    assert!(
+        html.contains("&lt;script&gt;") || html.contains("<!-- raw HTML omitted -->"),
+        "raw HTML should be escaped or omitted"
+    );
+}
+
 // ─── Strikethrough + tasklist (GFM extensions) ────────────────────────────────
 
 #[test]

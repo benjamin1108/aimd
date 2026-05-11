@@ -16,8 +16,6 @@ pub const MENU_EVENT_IDS: &[&str] = &[
     "width-normal",
     "width-wide",
     "width-ultra",
-    "generate-tour",
-    "play-tour",
 ];
 
 pub fn build_app_menu<M: Manager<tauri::Wry>>(manager: &M) -> tauri::Result<tauri::menu::Menu<tauri::Wry>> {
@@ -70,11 +68,7 @@ pub fn build_app_menu<M: Manager<tauri::Wry>>(manager: &M) -> tauri::Result<taur
         .text("width-wide", "加宽")
         .text("width-ultra", "超宽")
         .build()?;
-    let tools_menu = SubmenuBuilder::new(manager, "工具")
-        .text("generate-tour", "生成导览")
-        .text("play-tour", "播放导览")
-        .build()?;
     MenuBuilder::new(manager)
-        .items(&[&app_menu, &file_menu, &edit_menu, &view_menu, &tools_menu])
+        .items(&[&app_menu, &file_menu, &edit_menu, &view_menu])
         .build()
 }

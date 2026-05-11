@@ -18,6 +18,7 @@ export type AimdDocument = {
   dirty: boolean;
   isDraft?: boolean;
   draftSourcePath?: string;
+  needsAimdSave?: boolean;
   format: "aimd" | "markdown";
 };
 
@@ -33,6 +34,8 @@ export type SessionSnapshot = {
   assets: AimdAsset[];
   dirty: boolean;
   isDraft: boolean;
+  draftSourcePath?: string;
+  needsAimdSave?: boolean;
   format: "aimd" | "markdown";
   mode: Mode;
 };

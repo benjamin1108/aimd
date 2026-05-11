@@ -117,7 +117,14 @@ fi
 
 mkdir -p "$DIST"
 cd "$DESKTOP"
-if [[ ! -d node_modules ]]; then
+needs_npm_install=0
+if [[ ! -d node_modules || ! -f node_modules/.package-lock.json ]]; then
+  needs_npm_install=1
+elif [[ package.json -nt node_modules/.package-lock.json || package-lock.json -nt node_modules/.package-lock.json ]]; then
+  needs_npm_install=1
+fi
+
+if [[ "$needs_npm_install" == "1" ]]; then
   echo "==> installing npm dependencies"
   npm install
 fi
