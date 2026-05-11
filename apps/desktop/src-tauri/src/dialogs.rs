@@ -20,6 +20,14 @@ pub fn choose_markdown_file() -> Option<String> {
 }
 
 #[tauri::command]
+pub fn choose_markdown_project_path() -> Option<String> {
+    rfd::FileDialog::new()
+        .set_title("选择 Markdown 项目文件夹")
+        .pick_folder()
+        .map(|path| path.to_string_lossy().to_string())
+}
+
+#[tauri::command]
 pub fn choose_doc_file() -> Option<String> {
     rfd::FileDialog::new()
         .add_filter("AIMD or Markdown", &["aimd", "md", "markdown", "mdx"])
@@ -38,6 +46,36 @@ pub fn choose_image_file() -> Option<String> {
 #[tauri::command]
 pub fn choose_save_aimd_file(suggested_name: Option<String>) -> Option<String> {
     let mut dialog = rfd::FileDialog::new().add_filter("AIMD document", &["aimd"]);
+    if let Some(name) = suggested_name {
+        dialog = dialog.set_file_name(&name);
+    }
+    dialog
+        .save_file()
+        .map(|path| path.to_string_lossy().to_string())
+}
+
+#[tauri::command]
+pub fn choose_export_markdown_dir() -> Option<String> {
+    rfd::FileDialog::new()
+        .set_title("选择 Markdown 导出文件夹")
+        .pick_folder()
+        .map(|path| path.to_string_lossy().to_string())
+}
+
+#[tauri::command]
+pub fn choose_export_html_file(suggested_name: Option<String>) -> Option<String> {
+    let mut dialog = rfd::FileDialog::new().add_filter("HTML", &["html", "htm"]);
+    if let Some(name) = suggested_name {
+        dialog = dialog.set_file_name(&name);
+    }
+    dialog
+        .save_file()
+        .map(|path| path.to_string_lossy().to_string())
+}
+
+#[tauri::command]
+pub fn choose_export_pdf_file(suggested_name: Option<String>) -> Option<String> {
+    let mut dialog = rfd::FileDialog::new().add_filter("PDF", &["pdf"]);
     if let Some(name) = suggested_name {
         dialog = dialog.set_file_name(&name);
     }

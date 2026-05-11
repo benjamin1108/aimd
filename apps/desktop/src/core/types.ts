@@ -58,6 +58,42 @@ export type MarkdownDraft = { markdown: string; title: string; html: string };
 
 export type AssetEntry = { name: string; size: number; mime: string };
 
+export type ExportMarkdownResult = {
+  markdownPath: string;
+  assetsDir: string;
+  exportedAssets: Array<{
+    id: string;
+    filename: string;
+    path: string;
+    size: number;
+  }>;
+};
+
+export type HealthStatus = "offline_ready" | "risk" | "missing";
+export type HealthSeverity = "info" | "warning" | "error";
+
+export type HealthIssue = {
+  kind: string;
+  severity: HealthSeverity;
+  message: string;
+  id?: string;
+  url?: string;
+  path?: string;
+  size?: number;
+  mime?: string;
+};
+
+export type DocumentHealthReport = {
+  status: HealthStatus;
+  summary: string;
+  counts: {
+    errors: number;
+    warnings: number;
+    infos: number;
+  };
+  issues: HealthIssue[];
+};
+
 export type ModelProvider = "dashscope" | "gemini";
 
 // 单 provider 的凭证集合：模型 / API Key / 可选的 API Base。每个 provider 独立持有，

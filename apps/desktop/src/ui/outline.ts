@@ -9,6 +9,7 @@ import { rewriteAssetURLs } from "../document/assets";
 import { escapeAttr, escapeHTML } from "../util/escape";
 import { setStatus } from "./chrome";
 import { persistSessionSnapshot } from "../session/snapshot";
+import { enhanceRenderedDocument } from "../editor/interactive";
 
 export function scheduleRender() {
   if (state.renderTimer) window.clearTimeout(state.renderTimer);
@@ -52,6 +53,9 @@ export function applyHTML(html: string) {
   if (state.doc) {
     tagAssetImages(readerEl(), state.doc.assets);
     tagAssetImages(previewEl(), state.doc.assets);
+    enhanceRenderedDocument(readerEl(), { codeCopy: true, taskToggle: true, linkOpen: "plain" });
+    enhanceRenderedDocument(previewEl(), { codeCopy: true, taskToggle: true, linkOpen: "plain" });
+    enhanceRenderedDocument(inlineEditorEl(), { taskToggle: true, linkOpen: "modifier" });
   }
   state.outline = extractOutlineFromHTML(renderedHTML);
   if (state.doc) {
@@ -146,13 +150,16 @@ export function paintPaneIfStale(mode: Mode) {
     tmpEdit.querySelectorAll(".aimd-frontmatter").forEach((el) => el.remove());
     inlineEditorEl().innerHTML = tmpEdit.innerHTML;
     tagAssetImages(inlineEditorEl(), state.doc.assets);
+    enhanceRenderedDocument(inlineEditorEl(), { taskToggle: true, linkOpen: "modifier" });
     state.inlineDirty = false;
   } else if (mode === "read") {
     readerEl().innerHTML = state.doc.html;
     tagAssetImages(readerEl(), state.doc.assets);
+    enhanceRenderedDocument(readerEl(), { codeCopy: true, taskToggle: true, linkOpen: "plain" });
   } else {
     previewEl().innerHTML = state.doc.html;
     tagAssetImages(previewEl(), state.doc.assets);
+    enhanceRenderedDocument(previewEl(), { codeCopy: true, taskToggle: true, linkOpen: "plain" });
   }
   state.paintedVersion[mode] = state.htmlVersion;
 }

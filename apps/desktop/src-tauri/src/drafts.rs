@@ -134,7 +134,9 @@ pub fn cleanup_old_drafts(app: AppHandle, active_paths: Option<Vec<String>>) -> 
             continue;
         }
         let Ok(meta) = entry.metadata() else { continue };
-        let Ok(modified) = meta.modified() else { continue };
+        let Ok(modified) = meta.modified() else {
+            continue;
+        };
         let modified: chrono::DateTime<Utc> = modified.into();
         if modified < cutoff {
             let _ = fs::remove_file(path);

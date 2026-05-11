@@ -5,7 +5,8 @@ import {
   sidebarOutlineAssetResizerEl,
   starterActionsEl, docActionsEl, sidebarFootEl,
   sidebarNewEl, sidebarSaveEl, saveEl, saveLabelEl, saveAsEl, closeEl,
-  newWindowEl,
+  packageLocalImagesEl, healthCheckEl, exportMarkdownEl, exportHtmlEl, exportPdfEl,
+  newWindowEl, findToggleEl,
   modeReadEl, modeEditEl, modeSourceEl, docToolbarEl,
 } from "../core/dom";
 import type { AimdAsset, AimdDocument } from "../core/types";
@@ -97,7 +98,13 @@ export function updateChrome() {
   const canSave = Boolean(doc && (doc.dirty || doc.isDraft));
   saveEl().disabled = !canSave;
   saveAsEl().disabled = !doc;
-  newWindowEl().disabled = !doc?.path;
+  packageLocalImagesEl().disabled = doc?.format !== "markdown";
+  healthCheckEl().disabled = !doc;
+  exportMarkdownEl().disabled = !doc || doc.format === "markdown";
+  exportHtmlEl().disabled = !doc;
+  exportPdfEl().disabled = !doc;
+  findToggleEl().disabled = !doc;
+  newWindowEl().disabled = !doc;
   closeEl().disabled = !doc;
   // 顶部的主按钮统一显示「保存」：草稿状态下点击仍走 saveDocumentAs 创建文件，
   // 但视觉/语义上对用户都是"保存"动作（与 sidebar-foot 一致）。

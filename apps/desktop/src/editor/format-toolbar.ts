@@ -1,4 +1,7 @@
-import { inlineEditorEl, formatToolbarEl } from "../core/dom";
+import {
+  inlineEditorEl, formatToolbarEl,
+  imageAltPopoverEl, imageAltInputEl, imageAltConfirmEl, imageAltCancelEl,
+} from "../core/dom";
 import { showLinkPopover } from "./link-popover";
 import { insertImage } from "./images";
 
@@ -177,6 +180,74 @@ export function wrapSelectionInTag(tag: string) {
   }
 }
 
+let selectedImage: HTMLImageElement | null = null;
+
+function insertHTMLAtSelection(html: string) {
+  inlineEditorEl().focus();
+  const tpl = document.createElement("template");
+  tpl.innerHTML = html.trim();
+  const fragment = tpl.content;
+  const sel = document.getSelection();
+  if (!sel || sel.rangeCount === 0) {
+    inlineEditorEl().appendChild(fragment);
+    inlineEditorEl().dispatchEvent(new Event("input"));
+    return;
+  }
+  const range = sel.getRangeAt(0);
+  range.deleteContents();
+  const last = fragment.lastChild;
+  range.insertNode(fragment);
+  if (last) {
+    range.setStartAfter(last);
+    range.collapse(true);
+    sel.removeAllRanges();
+    sel.addRange(range);
+  }
+  inlineEditorEl().dispatchEvent(new Event("input"));
+}
+
+function insertTable() {
+  insertHTMLAtSelection(`
+    <table>
+      <thead><tr><th>列 1</th><th>列 2</th><th>列 3</th></tr></thead>
+      <tbody>
+        <tr><td>内容</td><td>内容</td><td>内容</td></tr>
+        <tr><td>内容</td><td>内容</td><td>内容</td></tr>
+      </tbody>
+    </table>
+  `);
+}
+
+function insertCodeBlock() {
+  insertHTMLAtSelection(`<pre><code class="language-text">code</code></pre>`);
+}
+
+function insertTaskItem() {
+  insertHTMLAtSelection(`<ul><li><input type="checkbox"> 任务</li></ul>`);
+}
+
+function findImageForAlt(): HTMLImageElement | null {
+  const sel = document.getSelection();
+  const node = sel?.anchorNode;
+  const el = node && node.nodeType === Node.ELEMENT_NODE
+    ? node as Element
+    : node?.parentElement ?? null;
+  const img = el?.closest?.("img") as HTMLImageElement | null;
+  if (img && inlineEditorEl().contains(img)) return img;
+  if (selectedImage && inlineEditorEl().contains(selectedImage)) return selectedImage;
+  return null;
+}
+
+function openImageAltPopover() {
+  const img = findImageForAlt();
+  if (!img) return;
+  selectedImage = img;
+  imageAltInputEl().value = img.getAttribute("alt") || "";
+  imageAltPopoverEl().hidden = false;
+  imageAltInputEl().focus();
+  imageAltInputEl().select();
+}
+
 export function runFormatCommand(cmd: string) {
   inlineEditorEl().focus();
   switch (cmd) {
@@ -191,6 +262,9 @@ export function runFormatCommand(cmd: string) {
     case "ol":        document.execCommand("insertOrderedList"); break;
     case "quote":     toggleBlockquote(); break;
     case "code":      wrapSelectionInTag("code"); break;
+    case "codeblock": insertCodeBlock(); return;
+    case "table":     insertTable(); return;
+    case "task":      insertTaskItem(); return;
     case "link": {
       // BUG-013: window.prompt 在 WKWebView 下被静默屏蔽，改用自定义 HTML 浮层。
       // 先保存 selection，浮层关闭后恢复再执行 createLink（在 showLinkPopover 内部完成）。
@@ -205,11 +279,32 @@ export function runFormatCommand(cmd: string) {
       return; // showLinkPopover 内部自行 dispatchEvent("input")，不需要外层再 dispatch
     }
     case "image":     void insertImage(); return; // insertImage handles its own dirty
+    case "image-alt": openImageAltPopover(); return;
   }
   inlineEditorEl().dispatchEvent(new Event("input"));
 }
 
 export function bindFormatToolbar() {
+  inlineEditorEl().addEventListener("click", (event) => {
+    const img = (event.target as HTMLElement | null)?.closest("img") as HTMLImageElement | null;
+    if (img && inlineEditorEl().contains(img)) selectedImage = img;
+  });
+  imageAltCancelEl().addEventListener("click", () => {
+    imageAltPopoverEl().hidden = true;
+  });
+  imageAltConfirmEl().addEventListener("click", () => {
+    if (!selectedImage || !inlineEditorEl().contains(selectedImage)) return;
+    selectedImage.alt = imageAltInputEl().value;
+    imageAltPopoverEl().hidden = true;
+    inlineEditorEl().dispatchEvent(new Event("input"));
+  });
+  imageAltInputEl().addEventListener("keydown", (event) => {
+    if (event.key === "Escape") imageAltPopoverEl().hidden = true;
+    if (event.key === "Enter") {
+      event.preventDefault();
+      imageAltConfirmEl().click();
+    }
+  });
   formatToolbarEl().querySelectorAll<HTMLButtonElement>("[data-cmd]").forEach((btn) => {
     // Prevent the button from stealing focus from the editor mid-selection.
     btn.addEventListener("mousedown", (e) => e.preventDefault());

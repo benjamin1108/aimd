@@ -15,8 +15,10 @@ import {
   debugIndicatorEl, debugIndicatorCountEl,
 } from "./core/dom";
 import { setMode, refreshSourceBanner } from "./ui/mode";
-import { updateChrome } from "./ui/chrome";
+import { setStatus, updateChrome } from "./ui/chrome";
 import { bindFormatToolbar } from "./editor/format-toolbar";
+import { bindSearch, openFindBar } from "./editor/search";
+import { bindSourceHighlight } from "./editor/source-highlight";
 import { bindWidthSwitch, setWidth } from "./ui/width";
 import { bindSidebarResizers, bindSidebarHrResizer } from "./ui/resizers";
 import { bindImageLightbox } from "./ui/lightbox";
@@ -28,19 +30,35 @@ import { scheduleRender } from "./ui/outline";
 import { clearRecentDocuments, loadRecentPaths } from "./ui/recents";
 import {
   chooseAndOpen, newDocument, closeDocument,
-  routeOpenedPath, openDocument,
+  routeOpenedPath, openDocument, chooseAndImportMarkdownProject,
 } from "./document/lifecycle";
 import { saveDocument, saveDocumentAs } from "./document/persist";
 import { importWebClip } from "./document/web-clip";
 import { cleanupOldDrafts } from "./document/drafts";
 import { optimizeDocumentAssets } from "./document/optimize";
+import { exportMarkdownAssets, exportHTML, exportPDF } from "./document/export";
+import { bindHealthPanel, runHealthCheck, packageLocalImages } from "./document/health";
 import {
   onWindowDragOver, onWindowDragLeave, onWindowDrop,
 } from "./drag/window-drop";
 import { persistSessionSnapshot, restoreSession } from "./session/snapshot";
-import { installDebugConsole, openDebugConsole, onDebugChange } from "./debug/console";
+import { debugLog, installDebugConsole, openDebugConsole, onDebugChange } from "./debug/console";
 
 installDebugConsole();
+void listen<{ level?: string; traceId?: string; elapsedMs?: number; message?: string }>("aimd-pdf-log", (event) => {
+  const payload = event.payload || {};
+  const level = payload.level === "error"
+    ? "error"
+    : payload.level === "warn"
+      ? "warn"
+      : payload.level === "debug"
+        ? "debug"
+        : "info";
+  debugLog(
+    level,
+    `[pdf:${payload.traceId || "-"} +${payload.elapsedMs ?? "?"}ms] ${payload.message || ""}`,
+  );
+});
 
 // footer 状态条上的隐式调试指示器：只有出现 warn / error 时才显示，
 // 文案 "调试 · N"，点击就开 Debug 窗口；不再用最小化 / 最小化条。
@@ -73,6 +91,16 @@ function closeActionMenus() {
   moreMenuToggleEl().setAttribute("aria-expanded", "false");
 }
 
+async function openNewWindow() {
+  try {
+    await invoke("open_in_new_window", { path: null });
+    setStatus("已打开新窗口", "success");
+  } catch (err) {
+    console.error(err);
+    setStatus(`新建窗口失败: ${String(err)}`, "warn");
+  }
+}
+
 $("#head-new").addEventListener("click", () => { void newDocument(); });
 $("#head-open").addEventListener("click", () => { void chooseAndOpen(); });
 $("body").addEventListener("dragover", onWindowDragOver);
@@ -81,6 +109,7 @@ $("body").addEventListener("dragleave", onWindowDragLeave);
 $("#empty-open").addEventListener("click", chooseAndOpen);
 $("#empty-new").addEventListener("click", () => { void newDocument(); });
 $("#empty-import-web").addEventListener("click", () => { void importWebClip(); });
+$("#empty-import-md-project").addEventListener("click", () => { void chooseAndImportMarkdownProject(); });
 $("#sidebar-new").addEventListener("click", () => { void newDocument(); });
 $("#sidebar-save").addEventListener("click", () => { void saveDocument(); });
 $("#sidebar-open").addEventListener("click", chooseAndOpen);
@@ -90,10 +119,15 @@ modeEditEl().addEventListener("click", () => setMode("edit"));
 modeSourceEl().addEventListener("click", () => setMode("source"));
 saveEl().addEventListener("click", saveDocument);
 saveAsEl().addEventListener("click", () => { closeActionMenus(); void saveDocumentAs(); });
+$("#package-local-images").addEventListener("click", () => { closeActionMenus(); void packageLocalImages(); });
+$("#health-check").addEventListener("click", () => { closeActionMenus(); void runHealthCheck(); });
+$("#export-markdown").addEventListener("click", () => { closeActionMenus(); void exportMarkdownAssets(); });
+$("#export-html").addEventListener("click", () => { closeActionMenus(); void exportHTML(); });
+$("#export-pdf").addEventListener("click", () => { closeActionMenus(); void exportPDF(); });
 bindMenuToggle(moreMenuToggleEl(), moreMenuEl());
 $<HTMLButtonElement>("#new-window").addEventListener("click", () => {
   closeActionMenus();
-  void invoke("open_in_new_window", { path: state.doc?.path || null });
+  void openNewWindow();
 });
 closeEl().addEventListener("click", () => { closeActionMenus(); void closeDocument(); });
 document.addEventListener("click", (event) => {
@@ -128,6 +162,9 @@ inlineEditorEl().addEventListener("focus", () => {
 }, { once: true });
 
 bindFormatToolbar();
+bindSearch();
+bindSourceHighlight();
+bindHealthPanel();
 bindWidthSwitch();
 bindImageDeleteGuard(inlineEditorEl());
 bindSidebarResizers();
@@ -145,7 +182,7 @@ document.addEventListener("keydown", (event) => {
 
   if (mod && key === "n" && event.shiftKey) {
     event.preventDefault();
-    void invoke("open_in_new_window", { path: null });
+    void openNewWindow();
   } else if (mod && key === "n") {
     event.preventDefault();
     void newDocument();
@@ -164,6 +201,14 @@ document.addEventListener("keydown", (event) => {
   if (mod && key === "o") {
     event.preventDefault();
     void chooseAndOpen();
+  }
+  if (mod && key === "f") {
+    event.preventDefault();
+    openFindBar(false);
+  }
+  if (mod && key === "h") {
+    event.preventDefault();
+    openFindBar(true);
   }
   if (event.key === "Escape") closeActionMenus();
 });
@@ -210,7 +255,7 @@ window.addEventListener("DOMContentLoaded", async () => {
       "open-document":     () => { void chooseAndOpen(); },
       "save-document":     () => { void saveDocument(); },
       "save-document-as":  () => { void saveDocumentAs(); },
-      "new-window":        () => { void invoke("open_in_new_window", { path: null }); },
+      "new-window":        () => { void openNewWindow(); },
       "close-document":    () => { void closeDocument(); },
       "mode-read":         () => { setMode("read"); },
       "mode-edit":         () => { setMode("edit"); },

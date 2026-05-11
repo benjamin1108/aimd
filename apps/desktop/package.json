@@ -9,6 +9,7 @@
     "build": "npm run build:injector && tauri build",
     "build:web": "vite build",
     "build:injector": "esbuild src/webview/injector.ts --bundle --outfile=../dist/injector.js --format=iife --platform=browser",
+    "prepare:pdf-sidecar": "node scripts/prepare-pdf-sidecar.mjs",
     "icon:prepare": "./scripts/prepare-icon.sh",
     "icon:update": "./scripts/update-tauri-icons.sh",
     "typecheck": "tsc --noEmit",

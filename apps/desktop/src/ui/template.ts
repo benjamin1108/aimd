@@ -84,9 +84,27 @@ export const APP_HTML = `
                   <span class="action-menu-icon">${ICONS.folder}</span>
                   <span>另存为...</span>
                 </button>
+                <button id="package-local-images" class="action-menu-item" type="button" disabled>
+                  <span class="action-menu-icon">${ICONS.image}</span>
+                  <span>保存为 AIMD</span>
+                </button>
+                <hr class="action-menu-divider" role="separator">
+                <button id="export-markdown" class="action-menu-item" type="button" disabled>
+                  <span class="action-menu-icon">${ICONS.source}</span>
+                  <span>导出 Markdown</span>
+                </button>
+                <button id="export-html" class="action-menu-item" type="button" disabled>
+                  <span class="action-menu-icon">${ICONS.document}</span>
+                  <span>导出 HTML</span>
+                </button>
+                <button id="export-pdf" class="action-menu-item" type="button" disabled>
+                  <span class="action-menu-icon">${ICONS.document}</span>
+                  <span>导出 PDF</span>
+                </button>
+                <hr class="action-menu-divider" role="separator">
                 <button id="new-window" class="action-menu-item" type="button">
                   <span class="action-menu-icon">${ICONS.plus}</span>
-                  <span>在新窗口打开</span>
+                  <span>新建窗口</span>
                 </button>
                 <hr class="action-menu-sep" role="separator">
                 <button id="close" class="action-menu-item" type="button" disabled>
@@ -114,6 +132,26 @@ export const APP_HTML = `
           </div>
 
           <div class="doc-toolbar-spacer"></div>
+
+          <button id="health-check" class="secondary-btn sm" type="button" disabled>
+            <span class="secondary-btn-icon">${ICONS.info}</span>
+            <span>交付状态</span>
+          </button>
+
+          <button id="find-toggle" class="secondary-btn sm" type="button" disabled>
+            <span>查找</span>
+          </button>
+
+          <div id="find-bar" class="find-bar" hidden>
+            <input id="find-input" class="find-input" type="search" placeholder="查找" autocomplete="off" />
+            <input id="replace-input" class="find-input replace-input" type="text" placeholder="替换" autocomplete="off" />
+            <span id="find-count" class="find-count">0/0</span>
+            <button id="find-prev" class="find-icon-btn" type="button" title="上一个">${ICONS.source}</button>
+            <button id="find-next" class="find-icon-btn" type="button" title="下一个">${ICONS.source}</button>
+            <button id="replace-one" class="secondary-btn sm" type="button">替换</button>
+            <button id="replace-all" class="secondary-btn sm" type="button">全部</button>
+            <button id="find-close" class="find-icon-btn" type="button" title="关闭">${ICONS.close}</button>
+          </div>
         </div>
 
         <div class="format-toolbar" id="format-toolbar" hidden>
@@ -138,8 +176,12 @@ export const APP_HTML = `
           <span class="ft-sep"></span>
           <div class="ft-group">
             <button class="ft-btn" data-cmd="code" type="button" title="行内代码">${ICONS.code}</button>
+            <button class="ft-btn" data-cmd="codeblock" type="button" title="代码块">${ICONS.source}</button>
+            <button class="ft-btn" data-cmd="table" type="button" title="插入表格">${ICONS.table}</button>
+            <button class="ft-btn" data-cmd="task" type="button" title="任务列表">${ICONS.check}</button>
             <button class="ft-btn" data-cmd="link" type="button" title="链接">${ICONS.link}</button>
             <button class="ft-btn" data-cmd="image" type="button" title="插入图片">${ICONS.image}</button>
+            <button class="ft-btn ft-btn--text" data-cmd="image-alt" type="button" title="图片 alt">Alt</button>
           </div>
         </div>
 
@@ -151,6 +193,30 @@ export const APP_HTML = `
             <button id="link-popover-unlink" class="secondary-btn sm danger-btn" type="button" hidden>删除链接</button>
             <button id="link-popover-cancel" class="secondary-btn sm" type="button">取消</button>
             <button id="link-popover-confirm" class="primary-btn sm" type="button">确定</button>
+          </div>
+        </div>
+
+        <div id="image-alt-popover" class="link-popover" hidden>
+          <label class="link-popover-label" for="image-alt-input">图片 alt 文本</label>
+          <input id="image-alt-input" class="link-popover-input" type="text" />
+          <div class="link-popover-actions">
+            <button id="image-alt-cancel" class="secondary-btn sm" type="button">取消</button>
+            <button id="image-alt-confirm" class="primary-btn sm" type="button">确定</button>
+          </div>
+        </div>
+
+        <div id="health-panel" class="health-panel" hidden>
+          <div class="health-panel-head">
+            <div>
+              <div class="health-title">交付状态</div>
+              <div id="health-summary" class="health-summary">未检查</div>
+            </div>
+            <button id="health-close" class="ft-btn" type="button" title="关闭">${ICONS.close}</button>
+          </div>
+          <div id="health-list" class="health-list"></div>
+          <div class="health-actions">
+            <button id="health-clean-unused" class="secondary-btn sm" type="button">清理未引用资源</button>
+            <button id="health-package-local" class="secondary-btn sm" type="button">嵌入本地图片</button>
           </div>
         </div>
 
@@ -176,6 +242,10 @@ export const APP_HTML = `
               <button id="empty-import-web" class="secondary-btn" type="button">
                 <span class="secondary-btn-icon">${ICONS.link}</span>
                 <span>一键网页提取</span>
+              </button>
+              <button id="empty-import-md-project" class="secondary-btn" type="button">
+                <span class="secondary-btn-icon">${ICONS.source}</span>
+                <span>导入 Markdown 文件夹</span>
               </button>
             </div>
 
@@ -205,7 +275,10 @@ export const APP_HTML = `
                 <span class="source-banner-text" id="source-banner-text"></span>
               </div>
               <div class="pane-tag">Markdown</div>
-              <textarea id="markdown" spellcheck="false"></textarea>
+              <div class="source-editor-shell">
+                <pre id="markdown-highlight" class="markdown-highlight" aria-hidden="true"></pre>
+                <textarea id="markdown" spellcheck="false" wrap="soft"></textarea>
+              </div>
             </div>
             <div class="preview-pane">
               <div class="pane-tag">预览</div>

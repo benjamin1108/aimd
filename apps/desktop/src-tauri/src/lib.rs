@@ -6,8 +6,9 @@ mod assets;
 mod dev_log;
 mod dialogs;
 mod documents;
-mod dto;
 mod drafts;
+mod dto;
+mod external;
 mod importer;
 mod llm;
 mod macos_assoc;
@@ -26,7 +27,7 @@ use documents::{is_supported_doc_extension, PendingOpenPaths};
 pub fn run() {
     dev_log::init();
 
-    let builder = tauri::Builder::default();
+    let builder = tauri::Builder::default().plugin(external::link_navigation_guard());
 
     #[cfg(any(target_os = "windows", target_os = "linux"))]
     let builder = builder.plugin(tauri_plugin_single_instance::init(|app, args, _cwd| {
@@ -70,9 +71,13 @@ pub fn run() {
         .invoke_handler(tauri::generate_handler![
             dialogs::choose_aimd_file,
             dialogs::choose_markdown_file,
+            dialogs::choose_markdown_project_path,
             dialogs::choose_doc_file,
             dialogs::choose_image_file,
             dialogs::choose_save_aimd_file,
+            dialogs::choose_export_markdown_dir,
+            dialogs::choose_export_html_file,
+            dialogs::choose_export_pdf_file,
             dialogs::confirm_discard_changes,
             dialogs::confirm_upgrade_to_aimd,
             dialogs::reveal_in_finder,
@@ -84,6 +89,13 @@ pub fn run() {
             documents::render_markdown,
             documents::render_markdown_standalone,
             documents::import_markdown,
+            documents::package_markdown_as_aimd,
+            documents::package_local_images,
+            documents::check_document_health,
+            documents::export_markdown_assets,
+            documents::export_html,
+            documents::export_pdf,
+            external::open_external_url,
             documents::convert_md_to_draft,
             documents::save_markdown,
             drafts::create_aimd_draft,

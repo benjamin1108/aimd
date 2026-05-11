@@ -72,7 +72,11 @@ pub async fn save_web_clip(
     images: Vec<ImagePayload>,
 ) -> Result<Value, String> {
     let sanitized_title = title.trim();
-    let sanitized_title = if sanitized_title.is_empty() { "Untitled Web Clip" } else { sanitized_title };
+    let sanitized_title = if sanitized_title.is_empty() {
+        "Untitled Web Clip"
+    } else {
+        sanitized_title
+    };
     let now = chrono::Utc::now().timestamp_millis();
     let file_path = drafts::drafts_dir(&app)?.join(format!("webclip-{now}.aimd"));
     let file = file_path.as_path();
@@ -104,7 +108,10 @@ pub async fn save_web_clip(
                     bytes
                 }
                 Err(err) => {
-                    println!("[web-clip] backend image fetch failed url={} error={}", img.url, err);
+                    println!(
+                        "[web-clip] backend image fetch failed url={} error={}",
+                        img.url, err
+                    );
                     continue;
                 }
             }
@@ -115,7 +122,7 @@ pub async fn save_web_clip(
         if data.is_empty() {
             continue;
         };
-        
+
         let ext = image_ext_from_bytes(&data);
         let filename = format!("image-{}.{}", i, ext);
         let id = aimd_core::rewrite::sha256_hex(&data)[0..8].to_string();
@@ -131,17 +138,18 @@ pub async fn save_web_clip(
         replacement_hits,
         updated_markdown.chars().count()
     );
-    
+
     let md_bytes = updated_markdown.as_bytes().to_vec();
-    
+
     writer::create(file, mf, |w| {
         w.set_main_markdown(&md_bytes)?;
         for (id, filename, data) in &assets_to_add {
             w.add_asset(id, filename, data, ROLE_CONTENT_IMAGE)?;
         }
         Ok(())
-    }).map_err(|e| format!("save_web_clip writer::create failed for {:?}: {}", file, e))?;
-    
+    })
+    .map_err(|e| format!("save_web_clip writer::create failed for {:?}: {}", file, e))?;
+
     drafts::draft_doc_from_path(file_path)
 }
 
@@ -179,7 +187,10 @@ async fn localize_images_in_markdown(
                     bytes
                 }
                 Err(err) => {
-                    println!("[web-clip] pre-llm image fetch failed url={} error={}", img.url, err);
+                    println!(
+                        "[web-clip] pre-llm image fetch failed url={} error={}",
+                        img.url, err
+                    );
                     localized.push(img);
                     continue;
                 }
@@ -281,16 +292,13 @@ pub async fn start_url_extraction(app: AppHandle) -> Result<(), String> {
     // We will use include_str! since we build it via `npm run build:injector` before cargo runs.
     let script = include_str!("../../../dist/injector.js");
 
-    let builder = WebviewWindowBuilder::new(
-        &app,
-        "extractor",
-        WebviewUrl::App("extractor.html".into()),
-    )
-    .title("AIMD Web Clipper")
-    .inner_size(1100.0, 800.0)
-    .center()
-    .visible(true)
-    .initialization_script(script);
+    let builder =
+        WebviewWindowBuilder::new(&app, "extractor", WebviewUrl::App("extractor.html".into()))
+            .title("AIMD Web Clipper")
+            .inner_size(1100.0, 800.0)
+            .center()
+            .visible(true)
+            .initialization_script(script);
 
     builder
         .build()
@@ -347,13 +355,17 @@ pub async fn show_extractor_window(app: AppHandle) -> Result<(), String> {
 }
 
 #[tauri::command]
-pub async fn refine_markdown(app: AppHandle, markdown: String, provider: String) -> Result<String, String> {
+pub async fn refine_markdown(
+    app: AppHandle,
+    markdown: String,
+    provider: String,
+) -> Result<String, String> {
     let settings = load_settings(app)?;
     let cred = match provider.as_str() {
         "gemini" => settings.ai.providers.gemini,
         _ => settings.ai.providers.dashscope,
     };
-    
+
     let config = ModelConfig {
         provider: provider.clone(),
         model: cred.model,
@@ -369,12 +381,12 @@ pub async fn refine_markdown(app: AppHandle, markdown: String, provider: String)
 
     let response = generate_text(&config, request).await?;
     let cleaned = response.text.trim();
-    
+
     let final_text = if let Some(rest) = cleaned.strip_prefix("```markdown") {
         rest.strip_suffix("```").unwrap_or(rest).trim()
     } else {
         cleaned
     };
-    
+
     Ok(final_text.to_string())
 }

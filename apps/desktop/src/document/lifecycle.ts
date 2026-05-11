@@ -36,6 +36,7 @@ export async function openMarkdownDocument(markdownPath: string, opts?: { skipCo
       assets: [],
       dirty: false,
       isDraft: false,
+      needsAimdSave: /!\[[^\]]*\]\((?!https?:\/\/|data:|asset:\/\/)[^)]+\)/i.test(draft.markdown),
       format: "markdown",
     };
     applyDocument(doc, "read");
@@ -90,6 +91,28 @@ export async function chooseAndImportMarkdown() {
   const markdownPath = await invoke<string | null>("choose_markdown_file");
   if (!markdownPath) return;
   await openMarkdownDocument(markdownPath);
+}
+
+export async function chooseAndImportMarkdownProject() {
+  if (!await ensureCanDiscardChanges("导入 Markdown 项目")) return;
+  const markdownPath = await invoke<string | null>("choose_markdown_project_path");
+  if (!markdownPath) return;
+  const suggestedName = `${fileStem(markdownPath) || "markdown-project"}.aimd`;
+  const savePath = await invoke<string | null>("choose_save_aimd_file", { suggestedName });
+  if (!savePath) return;
+  setStatus("正在导入 Markdown 项目", "loading");
+  try {
+    const doc = await invoke<AimdDocument>("import_markdown", { markdownPath, savePath });
+    applyDocument({ ...doc, isDraft: false, format: "aimd", dirty: false }, "read");
+    rememberOpenedPath(doc.path);
+    setStatus("Markdown 项目已导入", "success");
+    try {
+      await invoke("register_window_path", { path: doc.path });
+    } catch {}
+  } catch (err) {
+    console.error(err);
+    setStatus(`导入失败: ${err instanceof Error ? err.message : String(err)}`, "warn");
+  }
 }
 
 export async function newDocument() {

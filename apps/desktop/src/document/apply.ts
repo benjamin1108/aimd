@@ -7,6 +7,7 @@ import {
 import { applyHTML } from "../ui/outline";
 import { setMode } from "../ui/mode";
 import { updateChrome } from "../ui/chrome";
+import { refreshSourceHighlight } from "../editor/source-highlight";
 
 export function normalizeAssets(assets: AimdAsset[]): AimdAsset[] {
   return assets.map((asset) => {
@@ -40,6 +41,7 @@ export function applyDocument(doc: AimdDocument, mode: Mode) {
   const normalized = normalizeDocument(withFormat);
   state.doc = normalized;
   markdownEl().value = normalized.markdown;
+  refreshSourceHighlight();
   applyHTML(normalized.html);
   setMode(mode);
   updateChrome();

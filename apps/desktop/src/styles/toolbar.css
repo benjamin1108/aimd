@@ -120,7 +120,8 @@
   opacity: 0.48;
 }
 
-.action-menu-sep {
+.action-menu-sep,
+.action-menu-divider {
   margin: 4px 0;
   border: none;
   border-top: 1px solid var(--hairline);
@@ -198,4 +199,65 @@
   gap: 6px;
   flex-wrap: wrap;
   justify-content: flex-end;
+}
+
+.find-bar {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  min-width: 0;
+  padding: 3px;
+  border: 1px solid var(--hairline);
+  border-radius: 9px;
+  background: rgba(255, 255, 255, 0.72);
+}
+
+.find-bar[hidden] { display: none !important; }
+
+.find-input {
+  width: 132px;
+  height: 26px;
+  border: 1px solid var(--hairline-strong);
+  border-radius: 7px;
+  padding: 0 8px;
+  background: var(--bg-panel);
+  color: var(--ink);
+  font: 12px/1 var(--font-sans);
+  outline: none;
+}
+
+.replace-input {
+  width: 120px;
+}
+
+.find-input:focus {
+  border-color: rgba(31, 22, 11, 0.28);
+  box-shadow: 0 0 0 2px rgba(31, 22, 11, 0.06);
+}
+
+.find-count {
+  min-width: 38px;
+  color: var(--ink-muted);
+  font-family: var(--font-mono);
+  font-size: 11px;
+  text-align: center;
+}
+
+.find-icon-btn {
+  display: inline-grid;
+  place-items: center;
+  width: 26px;
+  height: 24px;
+  border-radius: 6px;
+  color: var(--ink-muted);
+}
+
+.find-icon-btn svg {
+  width: 13px;
+  height: 13px;
+}
+
+.find-icon-btn:hover:not(:disabled) {
+  background: var(--bg-panel);
+  color: var(--ink-strong);
 }

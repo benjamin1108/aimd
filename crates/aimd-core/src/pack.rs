@@ -1,28 +1,44 @@
 use sha2::{Digest, Sha256};
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::io;
 use std::path::{Path, PathBuf};
 
 use aimd_mdx::{extract_title, is_asset_uri, is_remote, rewrite, scan, ASSET_URI_PREFIX};
 
 use crate::manifest::{Manifest, ROLE_CONTENT_IMAGE};
+use crate::rewrite::NewAsset;
 use crate::writer::Writer;
 
-struct LocalAsset {
-    id: String,
-    filename: String,
-    full_path: PathBuf,
+#[derive(Debug)]
+pub struct BundleLocalImagesResult {
+    pub markdown: Vec<u8>,
+    pub assets: Vec<NewAsset>,
+    pub missing: Vec<String>,
 }
 
-/// Converts a Markdown file plus its local images into a .aimd file.
-pub fn run(input_md: &Path, output_aimd: &Path, title_override: Option<&str>) -> io::Result<()> {
-    let src_bytes = std::fs::read(input_md)?;
-    let base_dir = input_md.parent().unwrap_or(Path::new("."));
+/// Converts a Markdown file or directory plus its local images into a .aimd file.
+///
+/// When `input` is a directory, README.md / readme.md / index.md wins; otherwise
+/// the first Markdown file in lexical order is used.
+pub fn run(input: &Path, output_aimd: &Path, title_override: Option<&str>) -> io::Result<()> {
+    let input_md = resolve_markdown_input(input)?;
+    let src_bytes = std::fs::read(&input_md)?;
+    run_with_markdown(&input_md, &src_bytes, output_aimd, title_override)
+}
 
+/// Converts provided Markdown content into a .aimd file, resolving local image
+/// paths relative to `input_md`.
+pub fn run_with_markdown(
+    input_md: &Path,
+    markdown: &[u8],
+    output_aimd: &Path,
+    title_override: Option<&str>,
+) -> io::Result<()> {
+    let base_dir = input_md.parent().unwrap_or(Path::new("."));
     let title = if let Some(t) = title_override.filter(|t| !t.trim().is_empty()) {
         t.to_string()
     } else {
-        let extracted = extract_title(&src_bytes);
+        let extracted = extract_title(markdown);
         if !extracted.is_empty() {
             extracted
         } else {
@@ -35,57 +51,12 @@ pub fn run(input_md: &Path, output_aimd: &Path, title_override: Option<&str>) ->
     };
 
     let mf = Manifest::new(title);
-
-    let mut url_to_id: HashMap<String, String> = HashMap::new();
-    let mut taken_filenames: HashMap<String, bool> = HashMap::new();
-    let mut locals: Vec<LocalAsset> = Vec::new();
-    let mut id_counter = 0u32;
-
-    for image_ref in scan(&src_bytes) {
-        if is_remote(&image_ref.url) || is_asset_uri(&image_ref.url) {
-            continue;
-        }
-        if url_to_id.contains_key(&image_ref.url) {
-            continue;
-        }
-        let full: PathBuf = if Path::new(&image_ref.url).is_absolute() {
-            PathBuf::from(&image_ref.url)
-        } else {
-            base_dir.join(&image_ref.url)
-        };
-        if !full.exists() {
-            eprintln!(
-                "warning: image {:?} not found, leaving reference unchanged",
-                image_ref.url
-            );
-            continue;
-        }
-        id_counter += 1;
-        let id = make_asset_id(&image_ref.url, id_counter);
-        let base_name = full.file_name().and_then(|n| n.to_str()).unwrap_or("image");
-        let filename = unique_filename(&mut taken_filenames, base_name);
-        taken_filenames.insert(filename.clone(), true);
-        url_to_id.insert(image_ref.url.clone(), id.clone());
-        locals.push(LocalAsset {
-            id,
-            filename,
-            full_path: full,
-        });
-    }
-
-    let rewritten = rewrite(&src_bytes, |img_ref| {
-        url_to_id
-            .get(&img_ref.url)
-            .cloned()
-            .map(|id| format!("{}{}", ASSET_URI_PREFIX, id))
-            .unwrap_or_default()
-    });
+    let bundled = bundle_local_images(markdown, base_dir, None)?;
 
     let mut w = Writer::new(mf);
-    w.set_main_markdown(&rewritten)?;
-    for la in &locals {
-        let data = std::fs::read(&la.full_path)?;
-        w.add_asset(&la.id, &la.filename, &data, ROLE_CONTENT_IMAGE)?;
+    w.set_main_markdown(&bundled.markdown)?;
+    for asset in bundled.assets {
+        w.add_asset(&asset.id, &asset.filename, &asset.data, &asset.role)?;
     }
 
     // Write to temp then rename for atomicity.
@@ -106,6 +77,136 @@ pub fn run(input_md: &Path, output_aimd: &Path, title_override: Option<&str>) ->
     })
 }
 
+/// Rewrites local Markdown image paths to asset:// ids and returns the new
+/// assets that should be inserted into the package. Missing files are reported
+/// but left untouched in Markdown.
+pub fn bundle_local_images(
+    markdown: &[u8],
+    base_dir: &Path,
+    manifest: Option<&Manifest>,
+) -> io::Result<BundleLocalImagesResult> {
+    let mut url_to_id: HashMap<String, String> = HashMap::new();
+    let mut hash_to_id: HashMap<String, String> = HashMap::new();
+    let mut taken_ids: HashSet<String> = manifest
+        .map(|m| m.assets.iter().map(|a| a.id.clone()).collect())
+        .unwrap_or_default();
+    let mut taken_filenames: HashSet<String> = manifest
+        .map(|m| {
+            m.assets
+                .iter()
+                .filter_map(|a| a.path.split('/').next_back().map(|s| s.to_string()))
+                .collect()
+        })
+        .unwrap_or_default();
+    let mut assets: Vec<NewAsset> = Vec::new();
+    let mut missing: Vec<String> = Vec::new();
+    let mut id_counter = 0u32;
+
+    for image_ref in scan(markdown) {
+        if is_remote(&image_ref.url) || is_asset_uri(&image_ref.url) {
+            continue;
+        }
+        if url_to_id.contains_key(&image_ref.url) {
+            continue;
+        }
+        let full: PathBuf = if Path::new(&image_ref.url).is_absolute() {
+            PathBuf::from(&image_ref.url)
+        } else {
+            base_dir.join(&image_ref.url)
+        };
+        if !full.exists() {
+            missing.push(image_ref.url.clone());
+            continue;
+        }
+
+        let data = std::fs::read(&full)?;
+        let hash = sha256_hex(&data);
+        if let Some(existing_id) = hash_to_id.get(&hash) {
+            url_to_id.insert(image_ref.url.clone(), existing_id.clone());
+            continue;
+        }
+
+        id_counter += 1;
+        let id = unique_asset_id(&mut taken_ids, &make_asset_id(&image_ref.url, id_counter));
+        let base_name = full.file_name().and_then(|n| n.to_str()).unwrap_or("image");
+        let filename = unique_filename(&mut taken_filenames, base_name);
+        url_to_id.insert(image_ref.url.clone(), id.clone());
+        hash_to_id.insert(hash, id.clone());
+        assets.push(NewAsset {
+            id: id.clone(),
+            filename,
+            data,
+            role: ROLE_CONTENT_IMAGE.to_string(),
+        });
+    }
+
+    let rewritten = rewrite(markdown, |img_ref| {
+        url_to_id
+            .get(&img_ref.url)
+            .cloned()
+            .map(|id| format!("{}{}", ASSET_URI_PREFIX, id))
+            .unwrap_or_default()
+    });
+
+    Ok(BundleLocalImagesResult {
+        markdown: rewritten,
+        assets,
+        missing,
+    })
+}
+
+fn resolve_markdown_input(input: &Path) -> io::Result<PathBuf> {
+    if input.is_file() {
+        return Ok(input.to_path_buf());
+    }
+    if !input.is_dir() {
+        return Err(io::Error::new(
+            io::ErrorKind::NotFound,
+            format!("markdown input not found: {}", input.display()),
+        ));
+    }
+
+    for name in ["README.md", "readme.md", "index.md"] {
+        let candidate = input.join(name);
+        if candidate.is_file() {
+            return Ok(candidate);
+        }
+    }
+
+    let mut files = Vec::new();
+    collect_markdown_files(input, &mut files)?;
+    files.sort();
+    files.into_iter().next().ok_or_else(|| {
+        io::Error::new(
+            io::ErrorKind::NotFound,
+            format!("no Markdown file found in {}", input.display()),
+        )
+    })
+}
+
+fn collect_markdown_files(dir: &Path, out: &mut Vec<PathBuf>) -> io::Result<()> {
+    for entry in std::fs::read_dir(dir)? {
+        let entry = entry?;
+        let path = entry.path();
+        if path.is_dir() {
+            collect_markdown_files(&path, out)?;
+        } else if is_markdown_path(&path) {
+            out.push(path);
+        }
+    }
+    Ok(())
+}
+
+fn is_markdown_path(path: &Path) -> bool {
+    matches!(
+        path.extension()
+            .and_then(|e| e.to_str())
+            .map(|e| e.to_ascii_lowercase())
+            .as_deref(),
+        Some("md") | Some("markdown") | Some("mdx")
+    )
+}
+
 fn make_asset_id(url: &str, seq: u32) -> String {
     let base = Path::new(url)
         .file_stem()
@@ -120,6 +221,19 @@ fn make_asset_id(url: &str, seq: u32) -> String {
     format!("{}-{:03}", sanitized, seq)
 }
 
+fn unique_asset_id(taken: &mut HashSet<String>, preferred: &str) -> String {
+    if taken.insert(preferred.to_string()) {
+        return preferred.to_string();
+    }
+    for i in 1u32.. {
+        let candidate = format!("{}-{}", preferred, i);
+        if taken.insert(candidate.clone()) {
+            return candidate;
+        }
+    }
+    unreachable!()
+}
+
 fn sanitize_id(s: &str) -> String {
     s.chars()
         .map(|c| match c {
@@ -132,23 +246,43 @@ fn sanitize_id(s: &str) -> String {
         .collect()
 }
 
-fn unique_filename(taken: &mut HashMap<String, bool>, name: &str) -> String {
-    if !taken.contains_key(name) {
-        return name.to_string();
+fn unique_filename(taken: &mut HashSet<String>, name: &str) -> String {
+    let name = sanitize_filename(name);
+    if taken.insert(name.clone()) {
+        return name;
     }
-    let ext = Path::new(name)
+    let ext = Path::new(&name)
         .extension()
         .and_then(|e| e.to_str())
         .map(|e| format!(".{e}"))
         .unwrap_or_default();
-    let stem = name.strip_suffix(&ext).unwrap_or(name);
+    let stem = name.strip_suffix(&ext).unwrap_or(&name);
     for i in 1u32.. {
         let candidate = format!("{}-{}{}", stem, i, ext);
-        if !taken.contains_key(&candidate) {
+        if taken.insert(candidate.clone()) {
             return candidate;
         }
     }
     unreachable!()
+}
+
+fn sanitize_filename(s: &str) -> String {
+    let out: String = s
+        .replace(' ', "-")
+        .chars()
+        .filter(|&c| c.is_ascii_alphanumeric() || c == '-' || c == '_' || c == '.')
+        .collect();
+    if out.is_empty() {
+        "image.bin".to_string()
+    } else {
+        out
+    }
+}
+
+fn sha256_hex(data: &[u8]) -> String {
+    let mut h = Sha256::new();
+    h.update(data);
+    format!("{:x}", h.finalize())
 }
 
 #[cfg(test)]
@@ -264,6 +398,67 @@ mod tests {
         let r = Reader::open(&out_path).unwrap();
         assert_eq!(r.manifest.assets.len(), 0);
         assert_eq!(r.manifest.title, "Title");
+    }
+
+    #[test]
+    fn pack_duplicate_local_image_bytes_reuse_one_asset() {
+        let tmp = tempfile::tempdir().unwrap();
+        let md_path = tmp.path().join("input.md");
+        let a_path = tmp.path().join("a.png");
+        let b_path = tmp.path().join("b.png");
+        let out_path = tmp.path().join("output.aimd");
+
+        std::fs::write(&md_path, "![a](a.png)\n![b](b.png)\n").unwrap();
+        std::fs::write(&a_path, MIN_PNG).unwrap();
+        std::fs::write(&b_path, MIN_PNG).unwrap();
+
+        run(&md_path, &out_path, None).unwrap();
+
+        let r = Reader::open(&out_path).unwrap();
+        assert_eq!(
+            r.manifest.assets.len(),
+            1,
+            "duplicate bytes should be exported once"
+        );
+        let md_got = String::from_utf8(r.main_markdown().unwrap()).unwrap();
+        let id = &r.manifest.assets[0].id;
+        assert_eq!(md_got.matches(&format!("asset://{id}")).count(), 2);
+    }
+
+    #[test]
+    fn pack_directory_uses_readme() {
+        let tmp = tempfile::tempdir().unwrap();
+        let readme = tmp.path().join("README.md");
+        let other = tmp.path().join("z.md");
+        let out_path = tmp.path().join("output.aimd");
+
+        std::fs::write(&readme, "# Readme Title\n").unwrap();
+        std::fs::write(&other, "# Other Title\n").unwrap();
+
+        run(tmp.path(), &out_path, None).unwrap();
+
+        let r = Reader::open(&out_path).unwrap();
+        assert_eq!(r.manifest.title, "Readme Title");
+    }
+
+    #[test]
+    fn pack_run_with_markdown_uses_current_buffer_not_original_file() {
+        let tmp = tempfile::tempdir().unwrap();
+        let md_path = tmp.path().join("input.md");
+        let png_path = tmp.path().join("pic.png");
+        let out_path = tmp.path().join("output.aimd");
+
+        std::fs::write(&md_path, "# Old\n").unwrap();
+        std::fs::write(&png_path, MIN_PNG).unwrap();
+
+        run_with_markdown(&md_path, b"# New\n\n![x](pic.png)\n", &out_path, None).unwrap();
+
+        let r = Reader::open(&out_path).unwrap();
+        assert_eq!(r.manifest.title, "New");
+        assert_eq!(r.manifest.assets.len(), 1);
+        let md_got = String::from_utf8(r.main_markdown().unwrap()).unwrap();
+        assert!(md_got.contains("# New"));
+        assert!(!md_got.contains("pic.png"));
     }
 
     #[test]

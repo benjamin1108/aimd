@@ -22,6 +22,7 @@ name = "aimd-core"
 version = "0.1.0"
 dependencies = [
  "aimd-mdx",
+ "aimd-render",
  "chrono",
  "regex",
  "serde",

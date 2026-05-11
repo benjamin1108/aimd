@@ -48,7 +48,9 @@ pub struct ModelConnectionTestResult {
 }
 
 #[tauri::command]
-pub async fn test_model_connection(config: ModelConfig) -> Result<ModelConnectionTestResult, String> {
+pub async fn test_model_connection(
+    config: ModelConfig,
+) -> Result<ModelConnectionTestResult, String> {
     let started = Instant::now();
     let result = generate_text(
         &config,

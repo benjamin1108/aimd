@@ -12,6 +12,7 @@ use crate::reader::Reader;
 use crate::writer::Writer;
 
 /// An asset to be appended while rewriting an existing AIMD file.
+#[derive(Debug)]
 pub struct NewAsset {
     pub id: String,
     pub filename: String,

@@ -1,5 +1,5 @@
-use tauri::Manager;
 use tauri::menu::{MenuBuilder, PredefinedMenuItem, SubmenuBuilder};
+use tauri::Manager;
 
 pub const MENU_EVENT_IDS: &[&str] = &[
     "settings",
@@ -18,7 +18,9 @@ pub const MENU_EVENT_IDS: &[&str] = &[
     "width-ultra",
 ];
 
-pub fn build_app_menu<M: Manager<tauri::Wry>>(manager: &M) -> tauri::Result<tauri::menu::Menu<tauri::Wry>> {
+pub fn build_app_menu<M: Manager<tauri::Wry>>(
+    manager: &M,
+) -> tauri::Result<tauri::menu::Menu<tauri::Wry>> {
     // Tauri 默认 .quit() 在 macOS 下渲染成 "Quit AIMD Desktop"（英文）。
     // 用 PredefinedMenuItem::quit + Some("退出 AIMD Desktop") 强制中文。
     let quit_item = PredefinedMenuItem::quit(manager, Some("退出 AIMD Desktop"))?;

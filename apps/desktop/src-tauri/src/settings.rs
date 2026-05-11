@@ -126,7 +126,7 @@ fn migrate_legacy_inplace(value: &mut Value) {
     let Some(root) = value.as_object_mut() else {
         return;
     };
-    
+
     // 如果存在 docutour，把内容迁移到 ai 并删除 docutour
     if root.contains_key("docutour") {
         if let Some(docutour) = root.remove("docutour") {
@@ -216,12 +216,12 @@ fn migrate_legacy_inplace(value: &mut Value) {
     ai.remove("provider");
     ai.remove("maxSteps"); // 清理残留
     ai.remove("language"); // 清理残留
-    
+
     // 只有在没设置 activeProvider 时才覆盖
     if !ai.contains_key("activeProvider") {
         ai.insert("activeProvider".into(), Value::String(provider.to_string()));
     }
-    
+
     // 如果没有 providers 节点则写入
     if !ai.contains_key("providers") {
         ai.insert("providers".into(), Value::Object(providers));
@@ -249,9 +249,7 @@ pub fn load_settings(app: AppHandle) -> Result<AppSettings, String> {
 pub fn save_settings(app: AppHandle, settings: AppSettings) -> Result<(), String> {
     let path = settings_path(&app)?;
     let mut normalized = settings;
-    if normalized.ai.active_provider != "dashscope"
-        && normalized.ai.active_provider != "gemini"
-    {
+    if normalized.ai.active_provider != "dashscope" && normalized.ai.active_provider != "gemini" {
         normalized.ai.active_provider = "dashscope".to_string();
     }
     let body =

@@ -14,11 +14,17 @@ use aimd_core::writer;
 use aimd_render::render;
 use chrono::Utc;
 use serde_json::Value;
+use std::env;
 use std::fs;
-use std::path::Path;
+use std::fs::OpenOptions;
+use std::io::{Read, Write};
+use std::path::{Path, PathBuf};
+use std::process::{Command, Stdio};
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Mutex;
-use tauri::State;
+use std::thread;
+use std::time::{Duration, Instant};
+use tauri::{AppHandle, Emitter, Manager, State};
 
 pub static MAIN_INITIALIZED: AtomicBool = AtomicBool::new(false);
 
@@ -33,6 +39,555 @@ pub fn is_supported_doc_extension(path: &Path) -> bool {
             .as_deref(),
         Some("aimd") | Some("md") | Some("markdown") | Some("mdx")
     )
+}
+
+fn is_markdown_extension(path: &Path) -> bool {
+    matches!(
+        path.extension()
+            .and_then(|e| e.to_str())
+            .map(|e| e.to_lowercase())
+            .as_deref(),
+        Some("md") | Some("markdown") | Some("mdx")
+    )
+}
+
+fn is_aimd_extension(path: &Path) -> bool {
+    path.extension()
+        .and_then(|e| e.to_str())
+        .map(|e| e.to_lowercase())
+        .as_deref()
+        == Some("aimd")
+}
+
+fn export_html_for_document(file: &Path, markdown: &str) -> Result<Vec<u8>, String> {
+    if is_aimd_extension(file) {
+        let reader = Reader::open(file).map_err(|e| e.to_string())?;
+        return aimd_core::export_html_bytes(&reader, markdown).map_err(|e| e.to_string());
+    }
+
+    let title = resolve_title(None, markdown, file);
+    let base_href = markdown_base_href(file);
+    Ok(aimd_core::export_html_document_bytes(
+        &title,
+        markdown,
+        None,
+        base_href.as_deref(),
+    ))
+}
+
+fn markdown_base_href(file: &Path) -> Option<String> {
+    if !is_markdown_extension(file) {
+        return None;
+    }
+    let dir = file.parent()?;
+    if dir.as_os_str().is_empty() {
+        return None;
+    }
+    Some(file_url_for_path(dir, true))
+}
+
+fn file_url_for_path(path: &Path, trailing_slash: bool) -> String {
+    let path = fs::canonicalize(path).unwrap_or_else(|_| path.to_path_buf());
+    let mut value = path.to_string_lossy().replace('\\', "/");
+    if trailing_slash && !value.ends_with('/') {
+        value.push('/');
+    }
+    let prefix = if cfg!(target_os = "windows") && !value.starts_with('/') {
+        "file:///"
+    } else {
+        "file://"
+    };
+    format!("{}{}", prefix, percent_encode_url_path(&value))
+}
+
+fn percent_encode_url_path(value: &str) -> String {
+    let mut out = String::with_capacity(value.len());
+    for &byte in value.as_bytes() {
+        match byte {
+            b'A'..=b'Z' | b'a'..=b'z' | b'0'..=b'9' | b'-' | b'_' | b'.' | b'~' | b'/' | b':' => {
+                out.push(byte as char)
+            }
+            _ => out.push_str(&format!("%{byte:02X}")),
+        }
+    }
+    out
+}
+
+fn pdf_trace_id() -> String {
+    std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map(|d| format!("{:x}", d.as_millis()))
+        .unwrap_or_else(|_| "unknown".to_string())
+}
+
+fn pdf_log(trace_id: &str, start: Instant, message: impl AsRef<str>) {
+    let message = message.as_ref();
+    let elapsed_ms = start.elapsed().as_millis();
+    eprintln!("[aimd:pdf:{trace_id} +{}ms] {}", elapsed_ms, message);
+    write_pdf_log_line(trace_id, elapsed_ms, message);
+}
+
+fn pdf_emit(
+    app: &AppHandle,
+    trace_id: &str,
+    start: Instant,
+    level: &str,
+    message: impl AsRef<str>,
+) {
+    let message = message.as_ref().to_string();
+    pdf_log(trace_id, start, &message);
+    let _ = app.emit(
+        "aimd-pdf-log",
+        serde_json::json!({
+            "traceId": trace_id,
+            "elapsedMs": start.elapsed().as_millis(),
+            "level": level,
+            "message": message,
+        }),
+    );
+}
+
+fn write_pdf_log_line(trace_id: &str, elapsed_ms: u128, message: &str) {
+    let dir = PathBuf::from("/tmp/aimd-dev-logs");
+    if fs::create_dir_all(&dir).is_err() {
+        return;
+    }
+    let path = dir.join(format!("pdf-{}.jsonl", Utc::now().format("%Y%m%d")));
+    let line = serde_json::json!({
+        "ts": Utc::now().to_rfc3339_opts(chrono::SecondsFormat::Millis, true),
+        "pid": std::process::id(),
+        "traceId": trace_id,
+        "elapsedMs": elapsed_ms,
+        "message": message,
+    });
+    if let Ok(mut file) = OpenOptions::new().create(true).append(true).open(path) {
+        let _ = writeln!(file, "{}", line);
+    }
+}
+
+fn human_bytes(bytes: u64) -> String {
+    const KB: f64 = 1024.0;
+    const MB: f64 = 1024.0 * 1024.0;
+    const GB: f64 = 1024.0 * 1024.0 * 1024.0;
+    let bytes_f = bytes as f64;
+    if bytes_f >= GB {
+        format!("{:.1}GB", bytes_f / GB)
+    } else if bytes_f >= MB {
+        format!("{:.1}MB", bytes_f / MB)
+    } else if bytes_f >= KB {
+        format!("{:.1}KB", bytes_f / KB)
+    } else {
+        format!("{bytes}B")
+    }
+}
+
+fn html_debug_summary(html: &[u8]) -> String {
+    let text = String::from_utf8_lossy(html);
+    format!(
+        "html_bytes={} html_lines={} max_line_chars={} h1={} h2={} img={} table={} pre={} max_pre_chars={} code={} link={} page_css={} fixed_css={}",
+        html.len(),
+        text.lines().count(),
+        text.lines().map(|line| line.chars().count()).max().unwrap_or(0),
+        text.matches("<h1").count(),
+        text.matches("<h2").count(),
+        text.matches("<img").count(),
+        text.matches("<table").count(),
+        text.matches("<pre").count(),
+        max_tag_inner_chars(&text, "<pre", "</pre>"),
+        text.matches("<code").count(),
+        text.matches("<a ").count(),
+        text.matches("@page").count(),
+        text.matches("position:fixed").count()
+    )
+}
+
+fn max_tag_inner_chars(text: &str, open: &str, close: &str) -> usize {
+    let mut max_len = 0;
+    let mut remaining = text;
+    while let Some(open_idx) = remaining.find(open) {
+        let after_open = &remaining[open_idx..];
+        let Some(open_end) = after_open.find('>') else {
+            break;
+        };
+        let body = &after_open[open_end + 1..];
+        let Some(close_idx) = body.find(close) else {
+            break;
+        };
+        max_len = max_len.max(body[..close_idx].chars().count());
+        remaining = &body[close_idx + close.len()..];
+    }
+    max_len
+}
+
+fn write_pdf_html_snapshot(trace_id: &str, html: &[u8]) -> Option<PathBuf> {
+    let dir = PathBuf::from("/tmp/aimd-dev-logs");
+    fs::create_dir_all(&dir).ok()?;
+    let path = dir.join(format!("pdf-{trace_id}.html"));
+    fs::write(&path, html).ok()?;
+    Some(path)
+}
+
+const PDF_SIDECAR_ENV: &str = "AIMD_CHROME_HEADLESS_SHELL";
+const PDF_SIDECAR_TIMEOUT_SECS: u64 = 120;
+
+#[derive(Debug)]
+struct PdfSidecar {
+    path: PathBuf,
+    source: String,
+}
+
+fn chrome_headless_shell_filename() -> &'static str {
+    if cfg!(target_os = "windows") {
+        "chrome-headless-shell.exe"
+    } else {
+        "chrome-headless-shell"
+    }
+}
+
+fn sidecar_relative_path() -> PathBuf {
+    Path::new("sidecars")
+        .join("chrome-headless-shell")
+        .join(chrome_headless_shell_filename())
+}
+
+fn validate_pdf_sidecar(path: PathBuf, source: impl Into<String>) -> Result<PdfSidecar, String> {
+    let expected_name = chrome_headless_shell_filename();
+    let file_name = path
+        .file_name()
+        .and_then(|name| name.to_str())
+        .unwrap_or("");
+    if file_name != expected_name {
+        return Err(format!(
+            "PDF sidecar 路径必须指向 {expected_name}，不会调用系统浏览器: {}",
+            path.display()
+        ));
+    }
+    if path
+        .components()
+        .any(|part| part.as_os_str() == "Google Chrome.app")
+    {
+        return Err(format!(
+            "PDF sidecar 不能指向系统 Chrome 应用包: {}",
+            path.display()
+        ));
+    }
+    if path.is_file() {
+        return Ok(PdfSidecar {
+            path,
+            source: source.into(),
+        });
+    }
+    Err(format!("PDF sidecar 不存在或不是文件: {}", path.display()))
+}
+
+fn dev_sidecar_candidates() -> Vec<PathBuf> {
+    let manifest_dir = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+    manifest_dir
+        .ancestors()
+        .map(|dir| dir.join("vendor").join(sidecar_relative_path()))
+        .collect()
+}
+
+fn find_pdf_sidecar(app: &AppHandle) -> Result<PdfSidecar, String> {
+    if let Ok(value) = env::var(PDF_SIDECAR_ENV) {
+        return validate_pdf_sidecar(PathBuf::from(value), PDF_SIDECAR_ENV);
+    }
+
+    let bundle_candidate = app
+        .path()
+        .resource_dir()
+        .ok()
+        .map(|dir| dir.join(sidecar_relative_path()));
+    if let Some(path) = bundle_candidate.as_ref().filter(|path| path.is_file()) {
+        return Ok(PdfSidecar {
+            path: path.clone(),
+            source: "bundle-resource".to_string(),
+        });
+    }
+
+    for path in dev_sidecar_candidates() {
+        if path.is_file() {
+            return Ok(PdfSidecar {
+                path,
+                source: "development-vendor".to_string(),
+            });
+        }
+    }
+
+    let expected = bundle_candidate
+        .map(|path| path.display().to_string())
+        .unwrap_or_else(|| format!("$RESOURCE/{}", sidecar_relative_path().display()));
+    Err(format!(
+        "未找到 PDF sidecar Chrome Headless Shell。期望应用包内路径: {expected}。开发环境可设置 {PDF_SIDECAR_ENV} 指向仓库内或本机明确安装的 chrome-headless-shell 可执行文件；不会回退到系统 Chrome 或系统浏览器。"
+    ))
+}
+
+fn pdf_temp_output_file(final_output: &Path) -> Result<tempfile::NamedTempFile, String> {
+    let parent = final_output
+        .parent()
+        .filter(|path| !path.as_os_str().is_empty())
+        .unwrap_or_else(|| Path::new("."));
+    tempfile::Builder::new()
+        .prefix(".aimd-pdf-")
+        .suffix(".pdf")
+        .tempfile_in(parent)
+        .map_err(|e| format!("创建 PDF 临时输出失败: {e}"))
+}
+
+fn render_pdf_with_sidecar(
+    app: &AppHandle,
+    trace_id: &str,
+    start: Instant,
+    html: &[u8],
+    output_path: &Path,
+) -> Result<u64, String> {
+    let sidecar = find_pdf_sidecar(app)?;
+    pdf_emit(
+        app,
+        trace_id,
+        start,
+        "info",
+        format!(
+            "sidecar-resolved source={} path={}",
+            sidecar.source,
+            sidecar.path.display()
+        ),
+    );
+
+    let temp_dir = tempfile::tempdir().map_err(|e| format!("创建 PDF 临时目录失败: {e}"))?;
+    let html_path = temp_dir.path().join("aimd-export.html");
+    fs::write(&html_path, html).map_err(|e| format!("写入 PDF 临时 HTML 失败: {e}"))?;
+    pdf_emit(
+        app,
+        trace_id,
+        start,
+        "info",
+        format!(
+            "temp-html path={} bytes={}",
+            html_path.display(),
+            html.len()
+        ),
+    );
+
+    let temp_output = pdf_temp_output_file(output_path)?;
+    let temp_output_path = temp_output.path().to_path_buf();
+    let args = vec![
+        "--headless".to_string(),
+        "--disable-gpu".to_string(),
+        "--disable-extensions".to_string(),
+        "--disable-background-networking".to_string(),
+        "--no-first-run".to_string(),
+        "--no-default-browser-check".to_string(),
+        "--allow-file-access-from-files".to_string(),
+        "--no-pdf-header-footer".to_string(),
+        format!("--print-to-pdf={}", temp_output_path.to_string_lossy()),
+        file_url_for_path(&html_path, false),
+    ];
+    pdf_emit(
+        app,
+        trace_id,
+        start,
+        "info",
+        format!(
+            "sidecar-command path={} args={}",
+            sidecar.path.display(),
+            format_command_args(&args)
+        ),
+    );
+
+    let mut child = Command::new(&sidecar.path)
+        .args(&args)
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped())
+        .spawn()
+        .map_err(|e| format!("启动 PDF sidecar 失败: {e}"))?;
+
+    let deadline = Instant::now() + Duration::from_secs(PDF_SIDECAR_TIMEOUT_SECS);
+    let mut timed_out = false;
+    loop {
+        if child
+            .try_wait()
+            .map_err(|e| format!("等待 PDF sidecar 失败: {e}"))?
+            .is_some()
+        {
+            break;
+        }
+        if Instant::now() >= deadline {
+            timed_out = true;
+            let _ = child.kill();
+            break;
+        }
+        thread::sleep(Duration::from_millis(100));
+    }
+
+    let output = child
+        .wait_with_output()
+        .map_err(|e| format!("读取 PDF sidecar 输出失败: {e}"))?;
+    let exit_code = output
+        .status
+        .code()
+        .map(|code| code.to_string())
+        .unwrap_or_else(|| "signal".to_string());
+    pdf_emit(
+        app,
+        trace_id,
+        start,
+        if output.status.success() {
+            "info"
+        } else {
+            "error"
+        },
+        format!("sidecar-exit status={} code={exit_code}", output.status),
+    );
+    let detail = compact_command_output(&output.stdout, &output.stderr);
+    pdf_emit(
+        app,
+        trace_id,
+        start,
+        if output.status.success() {
+            "debug"
+        } else {
+            "error"
+        },
+        format!(
+            "sidecar-output stdout_bytes={} stderr_bytes={} summary={}",
+            output.stdout.len(),
+            output.stderr.len(),
+            if detail.is_empty() {
+                "(empty)"
+            } else {
+                &detail
+            }
+        ),
+    );
+
+    if timed_out {
+        let _ = fs::remove_file(&temp_output_path);
+        return Err(format!(
+            "PDF sidecar 渲染超时（{} 秒）",
+            PDF_SIDECAR_TIMEOUT_SECS
+        ));
+    }
+    if !output.status.success() {
+        let _ = fs::remove_file(&temp_output_path);
+        return Err(format!(
+            "PDF sidecar 渲染失败（{}）{}",
+            output.status,
+            if detail.is_empty() {
+                String::new()
+            } else {
+                format!(": {detail}")
+            }
+        ));
+    }
+
+    let temp_bytes = verify_pdf_file(&temp_output_path)?;
+    pdf_emit(
+        app,
+        trace_id,
+        start,
+        "info",
+        format!(
+            "verify-temp ok path={} bytes={} human={}",
+            temp_output_path.display(),
+            temp_bytes,
+            human_bytes(temp_bytes)
+        ),
+    );
+
+    temp_output
+        .persist(output_path)
+        .map_err(|e| format!("替换 PDF 输出失败: {e}"))?;
+    let final_bytes = verify_pdf_file(output_path)?;
+    pdf_emit(
+        app,
+        trace_id,
+        start,
+        "info",
+        format!(
+            "install-output final={} bytes={} human={} verify=ok",
+            output_path.display(),
+            final_bytes,
+            human_bytes(final_bytes)
+        ),
+    );
+    Ok(final_bytes)
+}
+
+fn format_command_args(args: &[String]) -> String {
+    args.iter()
+        .map(|arg| format!("{:?}", arg))
+        .collect::<Vec<_>>()
+        .join(" ")
+}
+
+fn verify_pdf_file(path: &Path) -> Result<u64, String> {
+    let meta = fs::metadata(path).map_err(|e| format!("PDF 未生成: {e}"))?;
+    if meta.len() < 16 {
+        return Err("PDF 输出为空或不完整".to_string());
+    }
+    let mut file = fs::File::open(path).map_err(|e| format!("读取 PDF 输出失败: {e}"))?;
+    let mut header = [0u8; 5];
+    file.read_exact(&mut header)
+        .map_err(|e| format!("读取 PDF 头失败: {e}"))?;
+    if &header != b"%PDF-" {
+        return Err("PDF 输出不是有效的 PDF 文件".to_string());
+    }
+    Ok(meta.len())
+}
+
+fn compact_command_output(stdout: &[u8], stderr: &[u8]) -> String {
+    let mut text = String::new();
+    let out = String::from_utf8_lossy(stdout);
+    let err = String::from_utf8_lossy(stderr);
+    if !out.trim().is_empty() {
+        text.push_str(out.trim());
+    }
+    if !err.trim().is_empty() {
+        if !text.is_empty() {
+            text.push_str(" | ");
+        }
+        text.push_str(err.trim());
+    }
+    if text.chars().count() <= 800 {
+        return text;
+    }
+    text.chars().take(800).collect::<String>() + "..."
+}
+
+#[cfg(test)]
+mod pdf_tests {
+    use super::*;
+
+    #[test]
+    fn sidecar_validation_rejects_non_headless_shell_names() {
+        let path = PathBuf::from("/Applications/Google Chrome.app/Contents/MacOS/Google Chrome");
+        let err = validate_pdf_sidecar(path, "test").unwrap_err();
+        assert!(err.contains("chrome-headless-shell"));
+    }
+
+    #[test]
+    fn sidecar_validation_rejects_google_chrome_app_bundle() {
+        let path =
+            PathBuf::from("/Applications/Google Chrome.app/Contents/MacOS/chrome-headless-shell");
+        let err = validate_pdf_sidecar(path, "test").unwrap_err();
+        assert!(err.contains("系统 Chrome"));
+    }
+
+    #[test]
+    fn pdf_verification_requires_pdf_header() {
+        let file = tempfile::NamedTempFile::new().unwrap();
+        fs::write(file.path(), b"not a pdf document").unwrap();
+        let err = verify_pdf_file(file.path()).unwrap_err();
+        assert!(err.contains("有效的 PDF"));
+    }
+
+    #[test]
+    fn pdf_verification_accepts_nonempty_pdf_header() {
+        let file = tempfile::NamedTempFile::new().unwrap();
+        fs::write(file.path(), b"%PDF-1.7\n0123456789").unwrap();
+        assert_eq!(verify_pdf_file(file.path()).unwrap(), 19);
+    }
 }
 
 #[tauri::command]
@@ -67,8 +622,11 @@ pub fn initial_open_path(
 #[tauri::command]
 pub fn open_aimd(path: String) -> Result<Value, String> {
     let file = Path::new(&path);
-    let reader = Reader::open(file).map_err(|e| format!("open_aimd Reader::open failed for {:?}: {}", file, e))?;
-    let md_bytes = reader.main_markdown().map_err(|e| format!("open_aimd main_markdown failed: {}", e))?;
+    let reader = Reader::open(file)
+        .map_err(|e| format!("open_aimd Reader::open failed for {:?}: {}", file, e))?;
+    let md_bytes = reader
+        .main_markdown()
+        .map_err(|e| format!("open_aimd main_markdown failed: {}", e))?;
     let markdown = String::from_utf8_lossy(&md_bytes).to_string();
     let dto = document_dto_from_reader(file, &reader, &markdown)?;
     serde_json::to_value(dto).map_err(|e| format!("open_aimd json error: {}", e))
@@ -117,13 +675,18 @@ pub fn save_aimd_as(
     }
 
     let src_file = Path::new(&src);
-    if src_file
-        .extension()
-        .and_then(|e| e.to_str())
-        .map(|e| e.to_lowercase())
-        .as_deref()
-        != Some("aimd")
-    {
+    if is_markdown_extension(src_file) {
+        aimd_core::pack_run_with_markdown(
+            src_file,
+            markdown.as_bytes(),
+            dest_file,
+            title.as_deref(),
+        )
+        .map_err(|e| e.to_string())?;
+        return open_aimd(save_path);
+    }
+
+    if !is_aimd_extension(src_file) {
         return create_aimd(save_path, markdown, title);
     }
     let src_abs = fs::canonicalize(src_file).unwrap_or_else(|_| src_file.to_path_buf());
@@ -188,6 +751,170 @@ pub fn import_markdown(markdown_path: String, save_path: String) -> Result<Value
     let output = Path::new(&save_path);
     aimd_core::pack_run(input, output, None).map_err(|e| e.to_string())?;
     open_aimd(save_path)
+}
+
+#[tauri::command]
+pub fn package_markdown_as_aimd(
+    markdown_path: String,
+    save_path: String,
+    markdown: String,
+    title: Option<String>,
+) -> Result<Value, String> {
+    aimd_core::pack_run_with_markdown(
+        Path::new(&markdown_path),
+        markdown.as_bytes(),
+        Path::new(&save_path),
+        title.as_deref(),
+    )
+    .map_err(|e| e.to_string())?;
+    open_aimd(save_path)
+}
+
+#[tauri::command]
+pub fn package_local_images(path: String, markdown: String) -> Result<Value, String> {
+    let file = Path::new(&path);
+    if is_markdown_extension(file) {
+        return Err("Markdown 文件需要先保存为 .aimd，才能嵌入本地图片".to_string());
+    }
+    if !is_aimd_extension(file) {
+        return Err("仅 .aimd 文档支持就地嵌入本地图片".to_string());
+    }
+    let reader = Reader::open(file).map_err(|e| e.to_string())?;
+    let base_dir = file.parent().unwrap_or(Path::new("."));
+    let bundled =
+        aimd_core::bundle_local_images(markdown.as_bytes(), base_dir, Some(&reader.manifest))
+            .map_err(|e| e.to_string())?;
+
+    rewrite_file(
+        file,
+        RewriteOptions {
+            markdown: bundled.markdown,
+            delete_assets: None,
+            add_assets: bundled.assets,
+            add_files: Vec::new(),
+            delete_files: std::collections::HashSet::new(),
+            gc_unreferenced: false,
+        },
+    )
+    .map_err(|e| e.to_string())?;
+    open_aimd(path)
+}
+
+#[tauri::command]
+pub fn check_document_health(path: Option<String>, markdown: String) -> Result<Value, String> {
+    let path_ref = path.as_deref().map(Path::new);
+    let base_dir = path_ref.and_then(|p| p.parent());
+    let manifest = if let Some(file) = path_ref.filter(|p| is_aimd_extension(p) && p.exists()) {
+        Reader::open(file).map_err(|e| e.to_string())?.manifest
+    } else {
+        Manifest::new(
+            path_ref
+                .map(|p| resolve_title(None, &markdown, p))
+                .unwrap_or_else(|| resolve_title(None, &markdown, Path::new("document.md"))),
+        )
+    };
+    let report = aimd_core::check_document_health(&manifest, markdown.as_bytes(), base_dir);
+    serde_json::to_value(report).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub fn export_markdown_assets(
+    path: String,
+    markdown: String,
+    output_dir: String,
+) -> Result<Value, String> {
+    let file = Path::new(&path);
+    let output = Path::new(&output_dir);
+    if is_aimd_extension(file) {
+        let reader = Reader::open(file).map_err(|e| e.to_string())?;
+        let result = aimd_core::export_markdown_with_assets(&reader, markdown.as_bytes(), output)
+            .map_err(|e| e.to_string())?;
+        return serde_json::to_value(result).map_err(|e| e.to_string());
+    }
+
+    fs::create_dir_all(output).map_err(|e| e.to_string())?;
+    let markdown_path = output.join("main.md");
+    fs::write(&markdown_path, markdown.as_bytes()).map_err(|e| e.to_string())?;
+    serde_json::to_value(aimd_core::ExportMarkdownResult {
+        markdown_path: markdown_path.to_string_lossy().to_string(),
+        assets_dir: output.join("assets").to_string_lossy().to_string(),
+        exported_assets: Vec::new(),
+    })
+    .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub fn export_html(path: String, markdown: String, output_path: String) -> Result<Value, String> {
+    let file = Path::new(&path);
+    let html = export_html_for_document(file, &markdown)?;
+    fs::write(&output_path, html).map_err(|e| e.to_string())?;
+    serde_json::to_value(serde_json::json!({ "path": output_path })).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub async fn export_pdf(
+    app: AppHandle,
+    path: String,
+    markdown: String,
+    output_path: String,
+) -> Result<Value, String> {
+    let trace_id = pdf_trace_id();
+    let start = Instant::now();
+    let file = Path::new(&path);
+    let output = Path::new(&output_path);
+    pdf_emit(
+        &app,
+        &trace_id,
+        start,
+        "info",
+        format!(
+            "command-start engine=sidecar-chrome-headless-shell source={} output={} markdown_bytes={}",
+            file.display(),
+            output.display(),
+            markdown.len(),
+        ),
+    );
+    let html = export_html_for_document(file, &markdown)?;
+    pdf_emit(&app, &trace_id, start, "debug", html_debug_summary(&html));
+    if let Some(snapshot_path) = write_pdf_html_snapshot(&trace_id, &html) {
+        pdf_emit(
+            &app,
+            &trace_id,
+            start,
+            "info",
+            format!("html-snapshot path={}", snapshot_path.display()),
+        );
+    }
+    let final_bytes = match render_pdf_with_sidecar(&app, &trace_id, start, &html, output) {
+        Ok(bytes) => bytes,
+        Err(err) => {
+            pdf_emit(
+                &app,
+                &trace_id,
+                start,
+                "error",
+                format!("command-error {err}"),
+            );
+            return Err(format!("PDF 导出失败: {err}"));
+        }
+    };
+    pdf_emit(
+        &app,
+        &trace_id,
+        start,
+        "info",
+        format!(
+            "command-finish engine={} output_bytes={} output_human={}",
+            "sidecar-chrome-headless-shell",
+            final_bytes,
+            human_bytes(final_bytes)
+        ),
+    );
+    serde_json::to_value(serde_json::json!({
+        "path": output_path,
+        "engine": "sidecar-chrome-headless-shell"
+    }))
+    .map_err(|e| e.to_string())
 }
 
 #[tauri::command]

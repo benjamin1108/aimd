@@ -69,20 +69,48 @@
   background: var(--bg-soft);
 }
 
-#markdown {
+.source-editor-shell {
+  position: relative;
   flex: 1 1 auto;
   min-height: 0;
-  width: 100%;
-  resize: none;
-  border: 0;
-  outline: 0;
-  padding: 22px 28px 36px 32px;
+  overflow: hidden;
   background: #fcfaf5;
-  color: var(--ink);
+}
+
+#markdown,
+.markdown-highlight {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  margin: 0;
+  padding: 22px 28px 36px 32px;
+  border: 0;
   font-family: var(--font-mono);
   font-size: 13px;
   line-height: 1.7;
   letter-spacing: 0;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  tab-size: 2;
+}
+
+.markdown-highlight {
+  z-index: 0;
+  overflow: auto;
+  pointer-events: none;
+  color: var(--ink);
+}
+
+#markdown {
+  flex: 1 1 auto;
+  min-height: 0;
+  resize: none;
+  outline: 0;
+  z-index: 1;
+  background: transparent;
+  color: transparent;
+  -webkit-text-fill-color: transparent;
   caret-color: var(--accent);
   scrollbar-width: thin;
   scrollbar-color: var(--hairline-strong) transparent;
@@ -96,6 +124,14 @@
 #markdown::selection {
   background: rgba(31, 22, 11, 0.14);
 }
+
+.md-heading { color: #7f342a; font-weight: 700; }
+.md-code-fence { color: #7a5a12; font-weight: 600; }
+.md-code { color: #4a5f35; }
+.md-quote { color: #6d5b8c; }
+.md-list { color: #315f79; }
+.md-table { color: #775326; }
+.md-image { color: #8b3f64; }
 
 /* Markdown content (.aimd) typography */
 
@@ -164,9 +200,17 @@
   color: var(--ink-strong);
   text-decoration: none;
   border-bottom: 1px solid var(--hairline-strong);
+  cursor: pointer;
   transition: border-color var(--t-fast) var(--ease);
 }
 .aimd a:hover { border-bottom-color: var(--ink); }
+.aimd:not(.inline-editor) a[data-external-link]::after {
+  content: "↗";
+  margin-left: 0.18em;
+  font-size: 0.72em;
+  vertical-align: 0.16em;
+  color: var(--ink-muted);
+}
 
 .aimd strong { font-weight: 600; color: var(--ink-strong); }
 
@@ -205,6 +249,7 @@
 }
 
 .aimd pre {
+  position: relative;
   margin: 16px 0;
   padding: 14px 16px;
   border-radius: 9px;
@@ -221,6 +266,30 @@
   padding: 0;
   background: transparent;
   font-size: inherit;
+}
+
+.code-copy {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  height: 24px;
+  padding: 0 8px;
+  border-radius: 6px;
+  background: rgba(255, 255, 255, 0.74);
+  color: var(--ink-muted);
+  font-size: 11px;
+  opacity: 0;
+  transition: opacity var(--t-fast) var(--ease), background var(--t-fast) var(--ease);
+}
+
+.aimd pre:hover .code-copy,
+.code-copy:focus {
+  opacity: 1;
+}
+
+.code-copy:hover {
+  background: rgba(255, 255, 255, 0.92);
+  color: var(--ink-strong);
 }
 
 .aimd table {

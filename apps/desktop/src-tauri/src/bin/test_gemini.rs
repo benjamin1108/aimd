@@ -89,7 +89,9 @@ fn read_prompt() -> Result<String, String> {
     }
     Ok(arg_value("--prompt")
         .or_else(|| env::var("GEMINI_PROMPT").ok())
-        .unwrap_or_else(|| "请只回复一个 JSON 对象：{\"ok\":true,\"message\":\"pong\"}".to_string()))
+        .unwrap_or_else(|| {
+            "请只回复一个 JSON 对象：{\"ok\":true,\"message\":\"pong\"}".to_string()
+        }))
 }
 
 #[tokio::main]
@@ -123,7 +125,10 @@ async fn main() {
         .and_then(|value| value.parse::<usize>().ok())
         .unwrap_or(1)
         .max(1);
-    let url = format!("{base}/models/{model}:generateContent?key={}", api_key.trim());
+    let url = format!(
+        "{base}/models/{model}:generateContent?key={}",
+        api_key.trim()
+    );
     let body = json!({
         "contents": [{
             "role": "user",
@@ -142,7 +147,10 @@ async fn main() {
     };
 
     println!("Gemini Rust reqwest smoke test");
-    println!("Loaded .env.local: {}", if loaded_env { "yes" } else { "no" });
+    println!(
+        "Loaded .env.local: {}",
+        if loaded_env { "yes" } else { "no" }
+    );
     println!(
         "URL: {base}/models/{model}:generateContent?key={}",
         redact(api_key.trim())

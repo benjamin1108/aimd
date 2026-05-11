@@ -72,7 +72,7 @@ export async function saveDocumentAs() {
   const wasDraft = Boolean(state.doc.isDraft || !state.doc.path);
   const draftSourcePath = state.doc.draftSourcePath || "";
   const sourcePath = state.doc.format === "markdown"
-    ? (draftSourcePath || null)
+    ? (draftSourcePath || state.doc.path || null)
     : (state.doc.path || draftSourcePath || null);
   const suggestedName = isMarkdownDoc
     ? `${fileStem(state.doc.path)}.aimd`

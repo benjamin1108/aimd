@@ -11,10 +11,8 @@ fn heading_open_re() -> &'static Regex {
 
 /// Renders a Markdown document to an HTML body fragment.
 ///
-/// `resolve`: maps an asset id → URL. When None, asset:// references are left unchanged.
-type Resolver = dyn Fn(&str) -> Option<String>;
-
-pub fn render(markdown: &str, resolve: Option<&Resolver>) -> String {
+/// `resolve`: maps an asset id to a URL. When None, asset:// references are left unchanged.
+pub fn render(markdown: &str, resolve: Option<&dyn Fn(&str) -> Option<String>>) -> String {
     let src = markdown.as_bytes();
     let (yaml, body, has_fm) = extract_frontmatter(src);
 

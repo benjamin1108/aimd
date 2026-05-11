@@ -6,6 +6,7 @@ authors.workspace = true
 
 [dependencies]
 aimd-mdx = { path = "../aimd-mdx" }
+aimd-render = { path = "../aimd-render" }
 serde = { workspace = true }
 serde_json = { workspace = true }
 zip = { workspace = true }
