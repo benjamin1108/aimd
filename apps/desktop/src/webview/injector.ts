@@ -5,6 +5,7 @@ import { absoluteHTTPURL, extractImagePayloadsFromHTML, prefetchProxyImages, rew
 import { waitForDocumentShell } from "./injector-dom";
 import { fallbackExtractArticle } from "./injector-fallback";
 import { WEB_CLIP_STYLE } from "./injector-style";
+import { createSafeHTMLSetter } from "./injector-trusted-html";
 import type { AimdDocument, DiagnosticLevel, ExtractDiagnostic } from "./injector-types";
 
 (async () => {
@@ -25,7 +26,6 @@ import type { AimdDocument, DiagnosticLevel, ExtractDiagnostic } from "./injecto
   let currentDoc: AimdDocument | null = null;
   let extracting = false;
   const startupParams = readStartupParams();
-  let trustedHTMLPolicy: { createHTML: (input: string) => unknown } | null | undefined;
 
   const record = (level: DiagnosticLevel, message: string, data?: unknown) => {
     diagnostics.push({ level, message, data });
@@ -35,6 +35,7 @@ import type { AimdDocument, DiagnosticLevel, ExtractDiagnostic } from "./injecto
     else if (level === "warn") console.warn(...args);
     else console.error(...args);
   };
+  const safeSetHTML = createSafeHTMLSetter(record);
 
   void setupImageProxyForPage({
     startupRequestId: startupParams.requestId,
@@ -462,46 +463,6 @@ import type { AimdDocument, DiagnosticLevel, ExtractDiagnostic } from "./injecto
       await invoke("web_clip_raw_extracted", { payload: { ...getPayloadBase(), success: false, error: err.message || "Unknown error", diagnostics } });
     } finally {
       extracting = false;
-    }
-  }
-
-  function safeSetHTML(target: Element | HTMLTemplateElement, html: string) {
-    const trustedHTML = trustedHTMLFor(html);
-    try {
-      (target as any).innerHTML = trustedHTML || html;
-    } catch (err) {
-      record("warn", "HTML assignment blocked by page policy", {
-        error: err instanceof Error ? `${err.name}: ${err.message}` : String(err),
-        trustedPolicy: Boolean(trustedHTML),
-      });
-      if (target instanceof HTMLTemplateElement) return;
-      target.textContent = html;
-    }
-  }
-
-  function trustedHTMLFor(html: string): unknown | null {
-    if (trustedHTMLPolicy === undefined) {
-      trustedHTMLPolicy = null;
-      try {
-        const trustedTypes = (window as any).trustedTypes;
-        if (trustedTypes?.createPolicy) {
-          trustedHTMLPolicy = trustedTypes.createPolicy("aimd-web-clip", {
-            createHTML: (input: string) => input,
-          });
-        }
-      } catch (err) {
-        record("debug", "Trusted Types policy creation unavailable", {
-          error: err instanceof Error ? `${err.name}: ${err.message}` : String(err),
-        });
-      }
-    }
-    try {
-      return trustedHTMLPolicy?.createHTML(html) || null;
-    } catch (err) {
-      record("debug", "Trusted Types HTML creation failed", {
-        error: err instanceof Error ? `${err.name}: ${err.message}` : String(err),
-      });
-      return null;
     }
   }
 

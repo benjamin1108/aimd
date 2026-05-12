@@ -2645,6 +2645,51 @@
     @keyframes aimdAura { 0%, 100% { background-position: 0% 50%; } 50% { background-position: 100% 50%; } }
   `;
 
+  // src/webview/injector-trusted-html.ts
+  function createSafeHTMLSetter(record) {
+    let trustedHTMLPolicy;
+    const trustedHTMLFor = (html) => {
+      if (trustedHTMLPolicy === void 0) {
+        trustedHTMLPolicy = null;
+        try {
+          const trustedTypes = window.trustedTypes;
+          if (trustedTypes?.createPolicy) {
+            trustedHTMLPolicy = trustedTypes.createPolicy("aimd-web-clip", {
+              createHTML: (input) => input
+            });
+          }
+        } catch (err) {
+          recordTrustedHTMLDiagnostic(record, "Trusted Types policy creation unavailable", err);
+        }
+      }
+      try {
+        return trustedHTMLPolicy?.createHTML(html) || null;
+      } catch (err) {
+        recordTrustedHTMLDiagnostic(record, "Trusted Types HTML creation failed", err);
+        return null;
+      }
+    };
+    return (target, html) => {
+      const trustedHTML = trustedHTMLFor(html);
+      try {
+        target.innerHTML = trustedHTML || html;
+      } catch (err) {
+        record("warn", "HTML assignment blocked by page policy", {
+          error: errorMessage(err),
+          trustedPolicy: Boolean(trustedHTML)
+        });
+        if (target instanceof HTMLTemplateElement) return;
+        target.textContent = html;
+      }
+    };
+  }
+  function recordTrustedHTMLDiagnostic(record, message, err) {
+    record("debug", message, { error: errorMessage(err) });
+  }
+  function errorMessage(err) {
+    return err instanceof Error ? `${err.name}: ${err.message}` : String(err);
+  }
+
   // src/webview/injector.ts
   (async () => {
     const installState = window;
@@ -2662,7 +2707,6 @@
     let currentDoc = null;
     let extracting = false;
     const startupParams = readStartupParams();
-    let trustedHTMLPolicy;
     const record = (level, message, data) => {
       diagnostics.push({ level, message, data });
       const args = data === void 0 ? [`[web-clip:extractor] ${message}`] : [`[web-clip:extractor] ${message}`, data];
@@ -2671,6 +2715,7 @@
       else if (level === "warn") console.warn(...args);
       else console.error(...args);
     };
+    const safeSetHTML = createSafeHTMLSetter(record);
     void setupImageProxyForPage({
       startupRequestId: startupParams.requestId,
       getRequestId,
@@ -3049,44 +3094,6 @@
         await invoke("web_clip_raw_extracted", { payload: { ...getPayloadBase(), success: false, error: err.message || "Unknown error", diagnostics } });
       } finally {
         extracting = false;
-      }
-    }
-    function safeSetHTML(target, html) {
-      const trustedHTML = trustedHTMLFor(html);
-      try {
-        target.innerHTML = trustedHTML || html;
-      } catch (err) {
-        record("warn", "HTML assignment blocked by page policy", {
-          error: err instanceof Error ? `${err.name}: ${err.message}` : String(err),
-          trustedPolicy: Boolean(trustedHTML)
-        });
-        if (target instanceof HTMLTemplateElement) return;
-        target.textContent = html;
-      }
-    }
-    function trustedHTMLFor(html) {
-      if (trustedHTMLPolicy === void 0) {
-        trustedHTMLPolicy = null;
-        try {
-          const trustedTypes = window.trustedTypes;
-          if (trustedTypes?.createPolicy) {
-            trustedHTMLPolicy = trustedTypes.createPolicy("aimd-web-clip", {
-              createHTML: (input) => input
-            });
-          }
-        } catch (err) {
-          record("debug", "Trusted Types policy creation unavailable", {
-            error: err instanceof Error ? `${err.name}: ${err.message}` : String(err)
-          });
-        }
-      }
-      try {
-        return trustedHTMLPolicy?.createHTML(html) || null;
-      } catch (err) {
-        record("debug", "Trusted Types HTML creation failed", {
-          error: err instanceof Error ? `${err.name}: ${err.message}` : String(err)
-        });
-        return null;
       }
     }
   })().catch((err) => {
