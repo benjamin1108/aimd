@@ -138,6 +138,10 @@ export function extractImagePayloadsFromHTML(
     byOriginal.set(original, existing);
   };
 
+  for (const item of extractImageCandidatesFromHTMLText(html)) {
+    addURL(item.value, item.fallbackOriginal);
+  }
+
   tpl.content.querySelectorAll("img,source").forEach((el) => {
     addURL(el.getAttribute("src"), el.getAttribute("data-aimd-original-src"));
     for (const attr of LAZY_IMAGE_ATTRS) addURL(el.getAttribute(attr), el.getAttribute("data-aimd-original-src"));
@@ -146,6 +150,44 @@ export function extractImagePayloadsFromHTML(
   });
 
   return Array.from(byOriginal.values());
+}
+
+function extractImageCandidatesFromHTMLText(html: string): Array<{ value: string; fallbackOriginal?: string }> {
+  const candidates: Array<{ value: string; fallbackOriginal?: string }> = [];
+  const tagPattern = /<(img|source)\b[^>]*>/gi;
+  for (const tagMatch of html.matchAll(tagPattern)) {
+    const tag = tagMatch[0] || "";
+    const attrs = parseHTMLAttributes(tag);
+    const fallbackOriginal = attrs.get("data-aimd-original-src") || "";
+    const add = (value: string | undefined, original = fallbackOriginal) => {
+      if (value) candidates.push({ value, fallbackOriginal: original || undefined });
+    };
+    add(attrs.get("src"));
+    for (const attr of LAZY_IMAGE_ATTRS) add(attrs.get(attr));
+    for (const part of parseSrcset(attrs.get("srcset") || "")) add(part.url);
+    for (const part of parseSrcset(attrs.get("data-aimd-original-srcset") || "")) add(part.url, "");
+  }
+  return candidates;
+}
+
+function parseHTMLAttributes(tag: string): Map<string, string> {
+  const attrs = new Map<string, string>();
+  const attrPattern = /([^\s"'<>/=]+)(?:\s*=\s*(?:"([^"]*)"|'([^']*)'|([^\s"'=<>`]+)))?/g;
+  for (const match of tag.matchAll(attrPattern)) {
+    const name = (match[1] || "").toLowerCase();
+    if (!name || name === "img" || name === "source") continue;
+    attrs.set(name, decodeHTMLAttribute(match[2] ?? match[3] ?? match[4] ?? ""));
+  }
+  return attrs;
+}
+
+function decodeHTMLAttribute(value: string): string {
+  return value
+    .replace(/&amp;/g, "&")
+    .replace(/&quot;/g, "\"")
+    .replace(/&#39;/g, "'")
+    .replace(/&lt;/g, "<")
+    .replace(/&gt;/g, ">");
 }
 
 export function absoluteHTTPURL(value: string | null): string {

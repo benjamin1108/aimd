@@ -15,6 +15,7 @@ import type {
   AiSettings,
   ModelProvider,
   ProviderCredential,
+  WebClipOutputLanguage,
 } from "../core/types";
 
 const CUSTOM_MODEL_VALUE = "__custom__";
@@ -129,6 +130,15 @@ root.innerHTML = `
                 <option value="gemini">Gemini（Google）</option>
               </select>
             </label>
+
+            <label class="field">
+              <span class="field-label">输出语言</span>
+              <select id="webclip-output-language">
+                <option value="zh-CN">中文</option>
+                <option value="en">英文</option>
+              </select>
+            </label>
+            <p style="font-size: 13px; color: var(--text-muted); margin-bottom: 16px;">如果网页原文不是所选语言，智能排版会在保留链接、图片和术语的前提下翻译正文。</p>
           </section>
         </div>
       </div>
@@ -157,6 +167,7 @@ const apiKeyErrorEl = $<HTMLElement>("#api-key-error");
 const apiBaseEl = $<HTMLInputElement>("#api-base");
 const webClipLlmEnabledEl = $<HTMLInputElement>("#webclip-llm-enabled");
 const webClipProviderEl = $<HTMLSelectElement>("#webclip-provider");
+const webClipOutputLanguageEl = $<HTMLSelectElement>("#webclip-output-language");
 const saveStateEl = $<HTMLElement>("#save-state");
 const saveButtonEl = $<HTMLButtonElement>("#save-settings");
 const cancelButtonEl = $<HTMLButtonElement>("#cancel");
@@ -227,6 +238,7 @@ function captureFormToDraft() {
   draft[activeProvider] = readCredFromForm();
   webClipConfig.llmEnabled = webClipLlmEnabledEl.checked;
   webClipConfig.provider = webClipProviderEl.value as ModelProvider;
+  webClipConfig.outputLanguage = webClipOutputLanguageEl.value as WebClipOutputLanguage;
 }
 
 function clearConnectionTestState() {
@@ -256,9 +268,11 @@ function fill(settings: AppSettings) {
   webClipConfig = {
     llmEnabled: settings.webClip?.llmEnabled ?? false,
     provider: settings.webClip?.provider ?? "dashscope",
+    outputLanguage: settings.webClip?.outputLanguage ?? "zh-CN",
   };
   webClipLlmEnabledEl.checked = webClipConfig.llmEnabled;
   webClipProviderEl.value = webClipConfig.provider;
+  webClipOutputLanguageEl.value = webClipConfig.outputLanguage;
 
   loadProviderToForm(activeProvider);
   saveStateEl.textContent = "";
@@ -280,6 +294,7 @@ function readSettings(): AppSettings {
     webClip: {
       llmEnabled: webClipConfig.llmEnabled,
       provider: webClipConfig.provider,
+      outputLanguage: webClipConfig.outputLanguage,
     }
   };
 }
@@ -339,7 +354,7 @@ apiKeyRevealEl.addEventListener("click", () => {
   refreshApiKeyMask();
 });
 
-[apiBaseEl, modelEl, webClipLlmEnabledEl, webClipProviderEl].forEach((el) => {
+[apiBaseEl, modelEl, webClipLlmEnabledEl, webClipProviderEl, webClipOutputLanguageEl].forEach((el) => {
   el.addEventListener("input", () => {
     clearConnectionTestState();
     syncSaveButton();

@@ -25,6 +25,7 @@ import type { AimdDocument, DiagnosticLevel, ExtractDiagnostic } from "./injecto
   let currentDoc: AimdDocument | null = null;
   let extracting = false;
   const startupParams = readStartupParams();
+  let trustedHTMLPolicy: { createHTML: (input: string) => unknown } | null | undefined;
 
   const record = (level: DiagnosticLevel, message: string, data?: unknown) => {
     diagnostics.push({ level, message, data });
@@ -465,14 +466,42 @@ import type { AimdDocument, DiagnosticLevel, ExtractDiagnostic } from "./injecto
   }
 
   function safeSetHTML(target: Element | HTMLTemplateElement, html: string) {
+    const trustedHTML = trustedHTMLFor(html);
     try {
-      target.innerHTML = html;
+      (target as any).innerHTML = trustedHTML || html;
     } catch (err) {
       record("warn", "HTML assignment blocked by page policy", {
         error: err instanceof Error ? `${err.name}: ${err.message}` : String(err),
+        trustedPolicy: Boolean(trustedHTML),
       });
       if (target instanceof HTMLTemplateElement) return;
       target.textContent = html;
+    }
+  }
+
+  function trustedHTMLFor(html: string): unknown | null {
+    if (trustedHTMLPolicy === undefined) {
+      trustedHTMLPolicy = null;
+      try {
+        const trustedTypes = (window as any).trustedTypes;
+        if (trustedTypes?.createPolicy) {
+          trustedHTMLPolicy = trustedTypes.createPolicy("aimd-web-clip", {
+            createHTML: (input: string) => input,
+          });
+        }
+      } catch (err) {
+        record("debug", "Trusted Types policy creation unavailable", {
+          error: err instanceof Error ? `${err.name}: ${err.message}` : String(err),
+        });
+      }
+    }
+    try {
+      return trustedHTMLPolicy?.createHTML(html) || null;
+    } catch (err) {
+      record("debug", "Trusted Types HTML creation failed", {
+        error: err instanceof Error ? `${err.name}: ${err.message}` : String(err),
+      });
+      return null;
     }
   }
 

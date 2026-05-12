@@ -2308,6 +2308,9 @@
       if (proxyOriginal && value) existing.proxyUrl = value.trim();
       byOriginal.set(original, existing);
     };
+    for (const item of extractImageCandidatesFromHTMLText(html)) {
+      addURL(item.value, item.fallbackOriginal);
+    }
     tpl.content.querySelectorAll("img,source").forEach((el) => {
       addURL(el.getAttribute("src"), el.getAttribute("data-aimd-original-src"));
       for (const attr of LAZY_IMAGE_ATTRS) addURL(el.getAttribute(attr), el.getAttribute("data-aimd-original-src"));
@@ -2315,6 +2318,36 @@
       for (const part of parseSrcset(el.getAttribute("data-aimd-original-srcset") || "")) addURL(part.url);
     });
     return Array.from(byOriginal.values());
+  }
+  function extractImageCandidatesFromHTMLText(html) {
+    const candidates = [];
+    const tagPattern = /<(img|source)\b[^>]*>/gi;
+    for (const tagMatch of html.matchAll(tagPattern)) {
+      const tag = tagMatch[0] || "";
+      const attrs = parseHTMLAttributes(tag);
+      const fallbackOriginal = attrs.get("data-aimd-original-src") || "";
+      const add = (value, original = fallbackOriginal) => {
+        if (value) candidates.push({ value, fallbackOriginal: original || void 0 });
+      };
+      add(attrs.get("src"));
+      for (const attr of LAZY_IMAGE_ATTRS) add(attrs.get(attr));
+      for (const part of parseSrcset(attrs.get("srcset") || "")) add(part.url);
+      for (const part of parseSrcset(attrs.get("data-aimd-original-srcset") || "")) add(part.url, "");
+    }
+    return candidates;
+  }
+  function parseHTMLAttributes(tag) {
+    const attrs = /* @__PURE__ */ new Map();
+    const attrPattern = /([^\s"'<>/=]+)(?:\s*=\s*(?:"([^"]*)"|'([^']*)'|([^\s"'=<>`]+)))?/g;
+    for (const match of tag.matchAll(attrPattern)) {
+      const name = (match[1] || "").toLowerCase();
+      if (!name || name === "img" || name === "source") continue;
+      attrs.set(name, decodeHTMLAttribute(match[2] ?? match[3] ?? match[4] ?? ""));
+    }
+    return attrs;
+  }
+  function decodeHTMLAttribute(value) {
+    return value.replace(/&amp;/g, "&").replace(/&quot;/g, '"').replace(/&#39;/g, "'").replace(/&lt;/g, "<").replace(/&gt;/g, ">");
   }
   function absoluteHTTPURL(value) {
     const raw = (value || "").trim();
@@ -2629,6 +2662,7 @@
     let currentDoc = null;
     let extracting = false;
     const startupParams = readStartupParams();
+    let trustedHTMLPolicy;
     const record = (level, message, data) => {
       diagnostics.push({ level, message, data });
       const args = data === void 0 ? [`[web-clip:extractor] ${message}`] : [`[web-clip:extractor] ${message}`, data];
@@ -3018,14 +3052,41 @@
       }
     }
     function safeSetHTML(target, html) {
+      const trustedHTML = trustedHTMLFor(html);
       try {
-        target.innerHTML = html;
+        target.innerHTML = trustedHTML || html;
       } catch (err) {
         record("warn", "HTML assignment blocked by page policy", {
-          error: err instanceof Error ? `${err.name}: ${err.message}` : String(err)
+          error: err instanceof Error ? `${err.name}: ${err.message}` : String(err),
+          trustedPolicy: Boolean(trustedHTML)
         });
         if (target instanceof HTMLTemplateElement) return;
         target.textContent = html;
+      }
+    }
+    function trustedHTMLFor(html) {
+      if (trustedHTMLPolicy === void 0) {
+        trustedHTMLPolicy = null;
+        try {
+          const trustedTypes = window.trustedTypes;
+          if (trustedTypes?.createPolicy) {
+            trustedHTMLPolicy = trustedTypes.createPolicy("aimd-web-clip", {
+              createHTML: (input) => input
+            });
+          }
+        } catch (err) {
+          record("debug", "Trusted Types policy creation unavailable", {
+            error: err instanceof Error ? `${err.name}: ${err.message}` : String(err)
+          });
+        }
+      }
+      try {
+        return trustedHTMLPolicy?.createHTML(html) || null;
+      } catch (err) {
+        record("debug", "Trusted Types HTML creation failed", {
+          error: err instanceof Error ? `${err.name}: ${err.message}` : String(err)
+        });
+        return null;
       }
     }
   })().catch((err) => {

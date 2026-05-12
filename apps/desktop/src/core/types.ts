@@ -95,6 +95,7 @@ export type DocumentHealthReport = {
 };
 
 export type ModelProvider = "dashscope" | "gemini";
+export type WebClipOutputLanguage = "zh-CN" | "en";
 
 // 单 provider 的凭证集合：模型 / API Key / 可选的 API Base。每个 provider 独立持有，
 // 切 provider 时不串台。
@@ -113,4 +114,5 @@ export type AiSettings = {
 export type WebClipSettings = {
   llmEnabled: boolean;
   provider: ModelProvider;
+  outputLanguage: WebClipOutputLanguage;
 };

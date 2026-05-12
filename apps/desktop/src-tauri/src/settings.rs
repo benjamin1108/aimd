@@ -12,6 +12,10 @@ fn default_provider() -> String {
     "dashscope".to_string()
 }
 
+fn default_web_clip_output_language() -> String {
+    "zh-CN".to_string()
+}
+
 fn default_dashscope_model() -> String {
     "qwen3.6-plus".to_string()
 }
@@ -90,6 +94,8 @@ pub struct WebClipSettings {
     pub llm_enabled: bool,
     #[serde(default = "default_provider")]
     pub provider: String,
+    #[serde(default = "default_web_clip_output_language")]
+    pub output_language: String,
 }
 
 impl Default for WebClipSettings {
@@ -97,6 +103,7 @@ impl Default for WebClipSettings {
         Self {
             llm_enabled: false,
             provider: default_provider(),
+            output_language: default_web_clip_output_language(),
         }
     }
 }
@@ -251,6 +258,12 @@ pub fn save_settings(app: AppHandle, settings: AppSettings) -> Result<(), String
     let mut normalized = settings;
     if normalized.ai.active_provider != "dashscope" && normalized.ai.active_provider != "gemini" {
         normalized.ai.active_provider = "dashscope".to_string();
+    }
+    if normalized.web_clip.provider != "dashscope" && normalized.web_clip.provider != "gemini" {
+        normalized.web_clip.provider = default_provider();
+    }
+    if normalized.web_clip.output_language != "en" {
+        normalized.web_clip.output_language = default_web_clip_output_language();
     }
     let body =
         serde_json::to_vec_pretty(&normalized).map_err(|err| format!("序列化设置失败: {err}"))?;

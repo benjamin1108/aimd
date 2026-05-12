@@ -37,7 +37,7 @@ async function installWebClipMock(page: Page) {
             gemini: { model: "gemini", apiKey: "", apiBase: "" },
           },
         },
-        webClip: { llmEnabled: false, provider: "dashscope" },
+        webClip: { llmEnabled: false, provider: "dashscope", outputLanguage: "zh-CN" },
       },
       refineResponses: [] as string[],
       refineHangs: false,
@@ -198,6 +198,9 @@ async function installWebClipMock(page: Page) {
       hangRefine: () => {
         runtime.settings.webClip.llmEnabled = true;
         runtime.refineHangs = true;
+      },
+      setOutputLanguage: (value: "zh-CN" | "en") => {
+        runtime.settings.webClip.outputLanguage = value;
       },
       stats: () => runtime,
     };
@@ -405,6 +408,7 @@ test.describe("Web Clip background import", () => {
     await expect.poll(() => page.evaluate(() => (window as any).__aimdWebClipMock.stats().openDraftCalls.length)).toBe(1);
     const stats = await page.evaluate(() => (window as any).__aimdWebClipMock.stats());
     expect(stats.refineCalls).toHaveLength(1);
+    expect(stats.refineCalls[0].outputLanguage).toBe("zh-CN");
     expect(stats.saveCalls[0].markdown).toContain("> **摘要**");
     expect(stats.saveCalls[0].markdown).toContain("短新闻正文第二段");
   });
@@ -427,7 +431,7 @@ test.describe("Web Clip background import", () => {
     expect(await page.locator("#status").textContent()).not.toContain("正在智能排版");
   });
 
-  test("invalid LLM heading structure retries once before accepting output", async ({ page }) => {
+  test("LLM refinement result is accepted without validation retries", async ({ page }) => {
     await installWebClipMock(page);
     await page.goto("/");
     await page.evaluate(() => (window as any).__aimdWebClipMock.enableLlm([
@@ -435,178 +439,55 @@ test.describe("Web Clip background import", () => {
         "# Web Clip",
         "",
         "> **摘要**",
-        "> 摘要。",
+        "> 这是一段模型返回的内容。",
         "",
         "> **核心观点**",
-        "> - 观点。",
+        "> - 模型返回的观点。",
         "",
         "### 跳级标题",
         "",
-        "这段正文足够长，能够避开正文过短检查，但标题从 H1 直接跳到了 H3，应该触发重试。这里继续补充原文内容、上下文、细节和说明，使正文长度超过最低要求。原文还包含更多说明、更多段落、更多细节、更多证据、更多上下文、更多可读信息、更多收藏价值和更多结构化内容。",
-      ].join("\n"),
-      [
-        "# Web Clip",
-        "",
-        "> **摘要**",
-        "> 摘要。",
-        "",
-        "> **核心观点**",
-        "> - 观点。",
-        "",
-        "## 合理章节",
-        "",
-        "重试后保留完整正文，并使用 H2 作为主要章节标题。这里继续补充原文中的上下文、细节、段落信息和收藏价值，避免只剩摘要。",
-        "",
-        "### 章节细节",
-        "",
-        "这里是正文细节，继续保持层级结构，并把相关说明放在对应章节下。",
+        "这段正文会被直接接受，不再因为结构、语言、链接或图片启发式校验触发二次请求。",
       ].join("\n"),
     ]));
 
-    await submitWebImport(page, "https://example.com/retry");
+    await submitWebImport(page, "https://example.com/no-validation-retry");
     await expect.poll(() => page.evaluate(() => (window as any).__aimdWebClipMock.stats().saveCalls.length)).toBe(1);
 
     const stats = await page.evaluate(() => (window as any).__aimdWebClipMock.stats());
-    expect(stats.refineCalls).toHaveLength(2);
-    expect(String(stats.refineCalls[1].guardReason)).toContain("标题层级跳跃");
-    expect(stats.saveCalls[0].markdown).toContain("## 合理章节");
-    expect(stats.saveCalls[0].markdown).toContain("### 章节细节");
+    expect(stats.refineCalls).toHaveLength(1);
+    expect(stats.refineCalls[0].guardReason).toBeNull();
+    expect(stats.refineCalls[0].outputLanguage).toBe("zh-CN");
+    expect(stats.saveCalls[0].markdown).toContain("### 跳级标题");
+    expect(stats.saveCalls[0].markdown).toContain("不再因为结构、语言、链接或图片启发式校验触发二次请求");
+    expect(stats.saveCalls[0].markdown).not.toContain("> **未完成智能分章**");
   });
 
-  test("LLM retry preserves source lead-in before the first source H2", async ({ page }) => {
+  test("LLM refinement receives the configured output language", async ({ page }) => {
     await installWebClipMock(page);
     await page.goto("/");
-    const lead = [
-      "Amazon Nova Forge introduces a way for customers to build frontier models using Nova training techniques, proprietary data, and checkpoints while preserving important product context.",
-      "The article explains how teams can combine their own domain data with managed training workflows, evaluate checkpoints, and keep the resulting model aligned with their use case.",
-      "This lead-in defines the product, the customer problem, and the workflow before the article moves into concrete use cases and applications.",
-    ].map((text) => `<p>${text}</p>`).join("");
-    const useCases = Array.from({ length: 12 }, (_, index) =>
-      `<p>Use case paragraph ${index + 1} describes applications, evaluation details, deployment considerations, and model customization context.</p>`,
-    ).join("");
-    await page.evaluate(({ lead, useCases }) => (window as any).__aimdWebClipMock.setNextExtraction({
-      success: true,
-      title: "Nova Forge",
-      content: `<h1>Nova Forge</h1>${lead}<h2>Use cases and applications</h2>${useCases}`,
-      images: [],
-      diagnostics: [],
-    }), { lead, useCases });
     await page.evaluate(() => {
-      const useCaseBody = Array.from({ length: 12 }, (_, index) =>
-        `Use case paragraph ${index + 1} describes applications, evaluation details, deployment considerations, and model customization context.`,
-      ).join("\n\n");
+      (window as any).__aimdWebClipMock.setOutputLanguage("en");
       (window as any).__aimdWebClipMock.enableLlm([
         [
-          "# Nova Forge",
+          "# English Clip",
           "",
           "> **摘要**",
-          "> Nova Forge helps customers build frontier models with Nova.",
+          "> English summary.",
           "",
           "> **核心观点**",
-          "> - Customers can customize models.",
+          "> - English point.",
           "",
-          "## Use cases and applications",
-          "",
-          useCaseBody,
-        ].join("\n"),
-        [
-          "# Nova Forge",
-          "",
-          "> **摘要**",
-          "> Nova Forge helps customers build frontier models with Nova while using their own data and checkpoints.",
-          "",
-          "> **核心观点**",
-          "> - Customers can customize models.",
-          "",
-          "## What Nova Forge provides",
-          "",
-          "Amazon Nova Forge introduces a way for customers to build frontier models using Nova training techniques, proprietary data, and checkpoints while preserving important product context.",
-          "",
-          "The article explains how teams can combine their own domain data with managed training workflows, evaluate checkpoints, and keep the resulting model aligned with their use case.",
-          "",
-          "This lead-in defines the product, the customer problem, and the workflow before the article moves into concrete use cases and applications.",
-          "",
-          "## Use cases and applications",
-          "",
-          useCaseBody,
+          "English body.",
         ].join("\n"),
       ]);
     });
 
-    await submitWebImport(page, "https://example.com/lead-before-h2");
+    await submitWebImport(page, "https://example.com/output-language");
     await expect.poll(() => page.evaluate(() => (window as any).__aimdWebClipMock.stats().saveCalls.length)).toBe(1);
 
     const stats = await page.evaluate(() => (window as any).__aimdWebClipMock.stats());
-    expect(stats.refineCalls).toHaveLength(2);
-    expect(String(stats.refineCalls[1].guardReason)).toContain("导语正文被删除");
-    expect(stats.saveCalls[0].markdown).toContain("## What Nova Forge provides");
-    expect(stats.saveCalls[0].markdown).toContain("This lead-in defines the product");
-    expect(stats.saveCalls[0].markdown).toContain("## Use cases and applications");
-  });
-
-  test("long LLM output must retry until it contains multiple H2 sections", async ({ page }) => {
-    await installWebClipMock(page);
-    await page.goto("/");
-    const longBody = Array.from({ length: 80 }, (_, index) => `<p>Long paragraph ${index + 1} with article body, context, evidence, and details.</p>`).join("");
-    await page.evaluate((content) => (window as any).__aimdWebClipMock.setNextExtraction({
-      success: true,
-      title: "Long Web Clip",
-      content: `<h1>Long Web Clip</h1>${content}`,
-      images: [],
-      diagnostics: [],
-    }), longBody);
-    await page.evaluate(() => {
-      const oneH2Body = Array.from({ length: 72 }, (_, index) =>
-        `长文正文第 ${index + 1} 段，保留原文内容、上下文、证据、细节、段落信息、关键说明和可读内容。`,
-      ).join("\n\n");
-      const firstH2Body = Array.from({ length: 72 }, (_, index) =>
-        `第一章节正文第 ${index + 1} 段，保留原文内容、上下文、证据和细节。`,
-      ).join("\n\n");
-      const secondH2Body = Array.from({ length: 72 }, (_, index) =>
-        `第二章节正文第 ${index + 1} 段，继续保留完整内容，并形成可扫描的章节。`,
-      ).join("\n\n");
-      (window as any).__aimdWebClipMock.enableLlm([
-      [
-        "# Long Web Clip",
-        "",
-        "> **摘要**",
-        "> 摘要。",
-        "",
-        "> **核心观点**",
-        "> - 观点。",
-        "",
-        "## 唯一章节",
-        "",
-        oneH2Body,
-      ].join("\n"),
-      [
-        "# Long Web Clip",
-        "",
-        "> **摘要**",
-        "> 摘要。",
-        "",
-        "> **核心观点**",
-        "> - 观点。",
-        "",
-        "## 第一章节",
-        "",
-        firstH2Body,
-        "",
-        "## 第二章节",
-        "",
-        secondH2Body,
-      ].join("\n"),
-      ]);
-    });
-
-    await submitWebImport(page, "https://example.com/long");
-    await expect.poll(() => page.evaluate(() => (window as any).__aimdWebClipMock.stats().saveCalls.length)).toBe(1);
-
-    const stats = await page.evaluate(() => (window as any).__aimdWebClipMock.stats());
-    expect(stats.refineCalls).toHaveLength(2);
-    expect(String(stats.refineCalls[1].guardReason)).toContain("长文需要多个 H2");
-    expect(stats.saveCalls[0].markdown).toContain("## 第一章节");
-    expect(stats.saveCalls[0].markdown).toContain("## 第二章节");
+    expect(stats.refineCalls).toHaveLength(1);
+    expect(stats.refineCalls[0].outputLanguage).toBe("en");
   });
 
   test("failure stays in the panel and fallback opens the extractor window", async ({ page }) => {

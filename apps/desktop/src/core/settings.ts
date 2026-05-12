@@ -6,6 +6,7 @@ import type {
   WebClipSettings,
   ModelProvider,
   ProviderCredential,
+  WebClipOutputLanguage,
 } from "./types";
 
 export type AppSettings = {
@@ -32,10 +33,15 @@ export const DEFAULT_AI_SETTINGS: AiSettings = {
 export const DEFAULT_WEB_CLIP_SETTINGS: WebClipSettings = {
   llmEnabled: false,
   provider: "dashscope",
+  outputLanguage: "zh-CN",
 };
 
 function normalizeProvider(value: unknown): ModelProvider {
   return value === "gemini" ? "gemini" : "dashscope";
+}
+
+function normalizeWebClipOutputLanguage(value: unknown): WebClipOutputLanguage {
+  return value === "en" ? "en" : "zh-CN";
 }
 
 function coerceProviderCred(raw: unknown, provider: ModelProvider): ProviderCredential {
@@ -75,6 +81,7 @@ export function coerceWebClipSettings(raw: unknown): WebClipSettings {
   return {
     llmEnabled: Boolean(obj.llmEnabled),
     provider: normalizeProvider(obj.provider),
+    outputLanguage: normalizeWebClipOutputLanguage(obj.outputLanguage),
   };
 }
 

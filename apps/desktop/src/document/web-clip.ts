@@ -23,7 +23,6 @@ import {
   countMarkdownImages,
   markUnfinishedSmartSections,
   normalizeMarkdownTitle,
-  shouldAcceptRefinedMarkdown,
 } from "./web-clip-markdown";
 
 interface ImagePayload {
@@ -375,36 +374,27 @@ async function handleExtracted(payload: ExtractPayload) {
     if (webClipConfig?.llmEnabled) {
       setStatus("正在智能排版...", "loading");
       const rawMarkdown = markdown;
-      let guardReason = "";
-      for (let attempt = 0; attempt < 2; attempt += 1) {
-        try {
-          const refined = await invokeWithTimeout<string>(
-            "refine_markdown",
-            {
-              markdown: rawMarkdown,
-              provider: webClipConfig.provider,
-              guardReason: attempt === 0 ? null : guardReason,
-            },
-            refineTimeoutMs(),
-            "智能排版超时",
-          );
-          const normalized = normalizeMarkdownTitle(refined, title);
-          const guard = shouldAcceptRefinedMarkdown(rawMarkdown, normalized);
-          if (guard.ok) {
-            markdown = normalized;
-            guardReason = "";
-            break;
-          }
-          guardReason = guard.reason;
-          console.warn("[web-clip] LLM refinement rejected:", guard.reason);
-          if (attempt === 0) setStatus("智能排版结构不合格，正在重试...", "loading");
-        } catch (llmError) {
-          guardReason = llmError instanceof Error ? llmError.message : String(llmError);
-          console.error("[web-clip] LLM refinement failed:", llmError);
-          break;
+      try {
+        const refined = await invokeWithTimeout<string>(
+          "refine_markdown",
+          {
+            markdown: rawMarkdown,
+            provider: webClipConfig.provider,
+            guardReason: null,
+            outputLanguage: webClipConfig.outputLanguage,
+          },
+          refineTimeoutMs(),
+          "智能排版超时",
+        );
+        const normalized = normalizeMarkdownTitle(refined, title);
+        if (normalized.trim()) {
+          markdown = normalized;
+        } else {
+          markdown = markUnfinishedSmartSections(cleanBasicMarkdown(rawMarkdown, title));
+          setStatus("未完成智能分章，使用基础提取", "warn");
         }
-      }
-      if (guardReason) {
+      } catch (llmError) {
+        console.error("[web-clip] LLM refinement failed:", llmError);
         markdown = markUnfinishedSmartSections(cleanBasicMarkdown(rawMarkdown, title));
         setStatus("未完成智能分章，使用基础提取", "warn");
       }

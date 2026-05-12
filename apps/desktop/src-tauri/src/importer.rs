@@ -13,6 +13,8 @@ use tauri::{AppHandle, Emitter, Manager, State, WebviewUrl, WebviewWindowBuilder
 mod images;
 
 const WEB_CLIP_REFINE_SYSTEM_PROMPT: &str = include_str!("prompts/web_clip_refine_system.md");
+const WEB_CLIP_REFINE_LANGUAGE_POLICY_PROMPT: &str =
+    include_str!("prompts/web_clip_refine_language_policy.md");
 
 #[derive(Default)]
 pub struct WebClipSessionState {
@@ -298,8 +300,14 @@ pub async fn refine_markdown(
     markdown: String,
     provider: String,
     guard_reason: Option<String>,
+    output_language: Option<String>,
 ) -> Result<String, String> {
     let settings = load_settings(app)?;
+    let output_language = normalize_web_clip_output_language(
+        output_language
+            .as_deref()
+            .unwrap_or(settings.web_clip.output_language.as_str()),
+    );
     let cred = match provider.as_str() {
         "gemini" => settings.ai.providers.gemini,
         _ => settings.ai.providers.dashscope,
@@ -315,7 +323,7 @@ pub async fn refine_markdown(
     let user = web_clip_refine_user_prompt(&markdown, guard_reason.as_deref());
 
     let request = GenerateTextRequest {
-        system: WEB_CLIP_REFINE_SYSTEM_PROMPT.to_string(),
+        system: web_clip_refine_system_prompt(output_language),
         user,
         temperature: 0.1,
     };
@@ -334,37 +342,26 @@ pub async fn refine_markdown(
     Ok(final_text.to_string())
 }
 
-fn web_clip_refine_user_prompt(markdown: &str, guard_reason: Option<&str>) -> String {
-    let Some(reason) = guard_reason
-        .map(str::trim)
-        .filter(|value| !value.is_empty())
-    else {
-        return markdown.to_string();
-    };
-
-    let heading_fix = if is_heading_structure_guard(reason) {
-        "\n\n本次必须按原文结构修复：\n- 单一 `# 文章标题`。\n- H1 后输出 `> **摘要**` 和 `> **核心观点**`。\n- 原文第一个 H2 前的导语、定义、背景说明、产品说明或问题陈述属于正文，必须保留。\n- 不得为了满足分章形式而从原文第一个 H2 开始输出，丢掉前面的导语正文。\n- 如果原文没有清晰 H2 且正文很长，必须创建具体 H2 承载正文。\n- 原始 Markdown 较长时至少输出 2 个 `##`，并把完整正文分配到这些 H2 下面。\n- H2 必须具体来自原文语义，不得使用「背景」「正文」「主要内容」「总结」等空泛标题。"
-    } else {
-        ""
-    };
-
-    format!(
-        "上一轮输出未通过格式检查：{reason}\n\n请基于下面原始 Markdown 重新输出。必须保留完整正文，必须包含单一 H1、引用块摘要、引用块核心观点，以及合理 H2/H3 分章。不要只输出摘要。{heading_fix}\n\n原始 Markdown:\n\n{markdown}"
-    )
+fn web_clip_refine_user_prompt(markdown: &str, _guard_reason: Option<&str>) -> String {
+    markdown.to_string()
 }
 
-fn is_heading_structure_guard(reason: &str) -> bool {
-    [
-        "H1 后存在过长正文",
-        "缺少 H2",
-        "长文需要多个 H2",
-        "标题层级跳跃",
-        "标题过长",
-        "标题过于空泛",
-        "导语正文被删除",
-    ]
-    .iter()
-    .any(|needle| reason.contains(needle))
+fn normalize_web_clip_output_language(value: &str) -> &'static str {
+    if value == "en" {
+        "English"
+    } else {
+        "Simplified Chinese"
+    }
+}
+
+fn web_clip_refine_system_prompt(target_language: &str) -> String {
+    let language_policy = WEB_CLIP_REFINE_LANGUAGE_POLICY_PROMPT
+        .replace("{target_language}", target_language);
+    format!(
+        "{}\n\n{}",
+        WEB_CLIP_REFINE_SYSTEM_PROMPT.trim(),
+        language_policy.trim()
+    )
 }
 
 #[cfg(test)]
@@ -372,15 +369,33 @@ mod tests {
     use super::*;
 
     #[test]
-    fn retry_prompt_strengthens_long_article_h2_requirements() {
+    fn refine_user_prompt_keeps_raw_markdown() {
         let prompt = web_clip_refine_user_prompt(
             "# Raw\n\nLong body",
-            Some("H1 后存在过长正文且没有 H2 分章"),
+            Some("ignored guard reason"),
         );
 
-        assert!(prompt.contains("核心观点"));
-        assert!(prompt.contains("原文第一个 H2 前的导语"));
-        assert!(prompt.contains("不得为了满足分章形式"));
-        assert!(prompt.contains("至少输出 2 个 `##`"));
+        assert_eq!(prompt, "# Raw\n\nLong body");
+    }
+
+    #[test]
+    fn system_prompt_adds_target_language_policy() {
+        let prompt = web_clip_refine_system_prompt(normalize_web_clip_output_language("en"));
+
+        assert!(prompt.contains("Target output language: English."));
+        assert!(prompt.contains("translate it faithfully instead of summarizing it"));
+        assert!(prompt.contains("Preserve every Markdown link URL exactly"));
+        assert!(!prompt.contains("正文保持原样"));
+        assert!(!prompt.contains("保持其原始语言"));
+        assert!(!prompt.contains("不要翻译"));
+    }
+
+    #[test]
+    fn system_prompt_adds_simplified_chinese_policy() {
+        let prompt = web_clip_refine_system_prompt(normalize_web_clip_output_language("zh-CN"));
+
+        assert!(prompt.contains("Target output language: Simplified Chinese."));
+        assert!(prompt.contains("必须按 Output Language Policy 指定的目标语言输出整篇文档"));
+        assert!(prompt.contains("需要翻译时必须逐段忠实翻译"));
     }
 }

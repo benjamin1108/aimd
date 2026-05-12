@@ -74,11 +74,16 @@ pub(super) async fn save_web_clip(
             assets_to_add.push((id, filename, data));
         }
     }
+    let existing_asset_hits = assets_to_add
+        .iter()
+        .map(|(id, _, _)| updated_markdown.matches(&format!("asset://{}", id)).count())
+        .sum::<usize>();
     println!(
-        "[web-clip] save_web_clip image mapping images={} assets={} replacementHits={} markdownChars={}",
+        "[web-clip] save_web_clip image mapping images={} assets={} replacementHits={} existingAssetHits={} markdownChars={}",
         images.len(),
         assets_to_add.len(),
         replacement_hits,
+        existing_asset_hits,
         updated_markdown.chars().count()
     );
 

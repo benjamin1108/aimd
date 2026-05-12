@@ -1,7 +1,7 @@
 use crate::dev_log;
 use reqwest::StatusCode;
 use serde_json::{json, Value};
-use std::time::Instant;
+use std::time::{Duration, Instant};
 
 use super::{
     parse_json_from_model_text, strip_provider_prefix, GenerateJsonRequest, GenerateJsonResponse,
@@ -58,28 +58,8 @@ pub async fn generate_text(
         })
     });
 
-    let response = match reqwest::Client::new()
-        .post(url.clone())
-        .header(reqwest::header::CONTENT_TYPE, "application/json")
-        .body(body_bytes)
-        .send()
-        .await
-    {
-        Ok(response) => response,
-        Err(err) => {
-            let message = format!("连接 Gemini 失败: {}", format_reqwest_error(&err));
-            dev_log::llm("gemini.generate_text.transport_error", || {
-                json!({
-                    "provider": "gemini",
-                    "model": model,
-                    "url": redact_url_key(&url),
-                    "elapsedMs": started.elapsed().as_millis(),
-                    "error": message,
-                })
-            });
-            return Err(message);
-        }
-    };
+    let response =
+        send_generate_content("generate_text", &url, &body_bytes, model, started).await?;
 
     let status = response.status();
     println!(
@@ -171,28 +151,8 @@ pub async fn generate_json(
         })
     });
 
-    let response = match reqwest::Client::new()
-        .post(url.clone())
-        .header(reqwest::header::CONTENT_TYPE, "application/json")
-        .body(body_bytes)
-        .send()
-        .await
-    {
-        Ok(response) => response,
-        Err(err) => {
-            let message = format!("连接 Gemini 失败: {}", format_reqwest_error(&err));
-            dev_log::llm("gemini.generate_json.transport_error", || {
-                json!({
-                    "provider": "gemini",
-                    "model": model,
-                    "url": redact_url_key(&url),
-                    "elapsedMs": started.elapsed().as_millis(),
-                    "error": message,
-                })
-            });
-            return Err(message);
-        }
-    };
+    let response =
+        send_generate_content("generate_json", &url, &body_bytes, model, started).await?;
 
     let status = response.status();
     println!(
@@ -243,6 +203,57 @@ fn format_gemini_error(status: StatusCode, value: &Value) -> String {
         .and_then(Value::as_str)
         .unwrap_or("Gemini 请求失败");
     format!("Gemini 请求失败（HTTP {status}）：{message}")
+}
+
+async fn send_generate_content(
+    operation: &str,
+    url: &str,
+    body_bytes: &[u8],
+    model: &str,
+    started: Instant,
+) -> Result<reqwest::Response, String> {
+    const MAX_ATTEMPTS: usize = 2;
+
+    for attempt in 1..=MAX_ATTEMPTS {
+        let client = reqwest::Client::builder()
+            .http1_only()
+            .pool_max_idle_per_host(0)
+            .build()
+            .map_err(|err| format!("初始化 Gemini HTTP 客户端失败: {err}"))?;
+        let response = client
+            .post(url)
+            .header(reqwest::header::CONTENT_TYPE, "application/json")
+            .body(body_bytes.to_vec())
+            .send()
+            .await;
+
+        match response {
+            Ok(response) => return Ok(response),
+            Err(err) => {
+                let message = format!("连接 Gemini 失败: {}", format_reqwest_error(&err));
+                dev_log::llm(&format!("gemini.{operation}.transport_error"), || {
+                    json!({
+                        "provider": "gemini",
+                        "model": model,
+                        "url": redact_url_key(url),
+                        "attempt": attempt,
+                        "maxAttempts": MAX_ATTEMPTS,
+                        "elapsedMs": started.elapsed().as_millis(),
+                        "error": message,
+                    })
+                });
+                if attempt == MAX_ATTEMPTS {
+                    return Err(message);
+                }
+                println!(
+                    "[llm:gemini] {operation} transport error attempt={attempt}/{MAX_ATTEMPTS}; retrying"
+                );
+                tokio::time::sleep(Duration::from_millis(500)).await;
+            }
+        }
+    }
+
+    Err("连接 Gemini 失败: exhausted transport retries".to_string())
 }
 
 fn format_reqwest_error(err: &reqwest::Error) -> String {
