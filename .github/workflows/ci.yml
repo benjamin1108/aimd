@@ -1,0 +1,41 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+      - master
+
+jobs:
+  checks:
+    name: Checks
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: apps/desktop/package-lock.json
+
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Rust cache
+        uses: Swatinem/rust-cache@v2
+
+      - name: Install frontend dependencies
+        working-directory: apps/desktop
+        run: npm ci
+
+      - name: Frontend checks
+        working-directory: apps/desktop
+        run: npm run check
+
+      - name: Rust crate tests
+        run: cargo test -p aimd-core -p aimd-mdx -p aimd-render

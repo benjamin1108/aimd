@@ -3,6 +3,7 @@
 /dist/
 node_modules/
 target/
+apps/dist/
 apps/desktop/dist/
 apps/desktop/src-tauri/target/
 apps/desktop/src-tauri/gen/

@@ -2208,39 +2208,351 @@
     });
   }
 
-  // src/webview/injector.ts
+  // src/webview/injector-images.ts
   var ASSET_URI_PREFIX = "asset://";
   var IMAGE_PROXY_SCHEME = "aimd-image-proxy";
   var IMAGE_PROXY_HOST = "localhost";
   var IMAGE_PROXY_PREFETCH_CONCURRENCY = 4;
   var LAZY_IMAGE_ATTRS = ["data-src", "data-original", "data-lazy-src", "data-lazy", "data-url"];
-  (async () => {
-    const installState = window;
-    if (installState.__aimdWebClipInstalled || installState.__aimdWebClipInstalling) return;
-    installState.__aimdWebClipInstalling = true;
-    try {
-      await waitForDocumentShell();
-    } catch (err) {
-      installState.__aimdWebClipInstalling = false;
-      throw err;
+  function setupImageProxyForPage(options) {
+    if (!options.isRemotePage()) return;
+    const requestId = options.startupRequestId || options.getRequestId();
+    if (!requestId) return;
+    options.setRequestId(requestId);
+    void configureImageProxyContext(requestId, options.record, options.invokeFn);
+    const rewrite = () => rewriteDocumentImages(requestId, options.record);
+    rewrite();
+    window.addEventListener("DOMContentLoaded", rewrite, { once: true });
+    window.addEventListener("load", rewrite);
+    const root = document.documentElement || document;
+    const observer = new MutationObserver((mutations) => {
+      for (const mutation of mutations) {
+        if (mutation.type === "childList") {
+          mutation.addedNodes.forEach((node) => {
+            if (node instanceof Element) rewriteImageTree(node, requestId, options.record);
+          });
+        } else if (mutation.type === "attributes" && mutation.target instanceof Element) {
+          rewriteImageTree(mutation.target, requestId, options.record);
+        }
+      }
+    });
+    observer.observe(root, {
+      childList: true,
+      subtree: true,
+      attributes: true,
+      attributeFilter: ["src", "srcset", ...LAZY_IMAGE_ATTRS]
+    });
+  }
+  async function prefetchProxyImages(images, options) {
+    const requestId = options.startupRequestId || options.getRequestId();
+    if (!requestId || !images.length) return;
+    await configureImageProxyContext(requestId, options.record, options.invokeFn);
+    const urls = Array.from(new Set(images.map((img) => {
+      const original = img.originalUrl || originalURLFromProxyURL(img.proxyUrl || "") || originalURLFromProxyURL(img.url) || img.url;
+      return absoluteHTTPURL(original);
+    }).filter(Boolean)));
+    if (!urls.length) return;
+    let fetchedCount = 0;
+    let failedCount = 0;
+    for (let index = 0; index < urls.length; index += IMAGE_PROXY_PREFETCH_CONCURRENCY) {
+      const chunk = urls.slice(index, index + IMAGE_PROXY_PREFETCH_CONCURRENCY);
+      const results = await Promise.allSettled(
+        chunk.map((url) => options.invokeFn("prefetch_web_clip_image_proxy", { requestId, url }))
+      );
+      results.forEach((result, resultIndex) => {
+        const fallbackURL = chunk[resultIndex] || "";
+        if (result.status === "fulfilled") {
+          recordPrefetchItem(result.value, fallbackURL, options.record, (count) => {
+            if (count === "ok") fetchedCount += 1;
+            else failedCount += 1;
+          });
+        } else {
+          failedCount += 1;
+          options.record("warn", "proxy image fetch failed", {
+            url: fallbackURL,
+            error: result.reason instanceof Error ? `${result.reason.name}: ${result.reason.message}` : String(result.reason)
+          });
+        }
+      });
     }
-    installState.__aimdWebClipInstalled = true;
-    installState.__aimdWebClipInstalling = false;
-    const diagnostics = [];
-    let currentDoc = null;
-    let extracting = false;
-    const startupParams = readStartupParams();
-    const record = (level, message, data) => {
-      diagnostics.push({ level, message, data });
-      const args = data === void 0 ? [`[web-clip:extractor] ${message}`] : [`[web-clip:extractor] ${message}`, data];
-      if (level === "debug") console.debug(...args);
-      else if (level === "info") console.info(...args);
-      else if (level === "warn") console.warn(...args);
-      else console.error(...args);
+    options.record("info", "proxy image prefetch finished", {
+      total: urls.length,
+      fetchedCount,
+      failedCount
+    });
+  }
+  function rewriteAssetURLs(html, assets, safeSetHTML, convertFileSrc2) {
+    if (!assets.length || !html.includes(ASSET_URI_PREFIX)) return html;
+    const tpl = document.createElement("template");
+    safeSetHTML(tpl, html);
+    const byID = new Map(assets.map((asset) => [asset.id, asset]));
+    tpl.content.querySelectorAll("img").forEach((img) => {
+      const source = img.getAttribute("src") || "";
+      const id = img.getAttribute("data-asset-id") || assetIDFromURL(source);
+      const asset = id ? byID.get(id) : null;
+      const localPath = asset?.localPath || asset?.url || "";
+      if (!localPath) return;
+      img.src = convertFileSrc2(localPath);
+    });
+    return tpl.innerHTML;
+  }
+  function extractImagePayloadsFromHTML(html, safeSetHTML) {
+    const tpl = document.createElement("template");
+    safeSetHTML(tpl, html);
+    const byOriginal = /* @__PURE__ */ new Map();
+    const addURL = (value, fallbackOriginal) => {
+      const proxyOriginal = originalURLFromProxyURL(value);
+      const original = proxyOriginal || originalImageURL(value) || originalImageURL(fallbackOriginal || "");
+      if (!original) return;
+      const existing = byOriginal.get(original) || { url: original, originalUrl: original, data: [] };
+      if (proxyOriginal && value) existing.proxyUrl = value.trim();
+      byOriginal.set(original, existing);
     };
-    void setupImageProxyForPage();
-    const style = document.createElement("style");
-    style.textContent = `
+    tpl.content.querySelectorAll("img,source").forEach((el) => {
+      addURL(el.getAttribute("src"), el.getAttribute("data-aimd-original-src"));
+      for (const attr of LAZY_IMAGE_ATTRS) addURL(el.getAttribute(attr), el.getAttribute("data-aimd-original-src"));
+      for (const part of parseSrcset(el.getAttribute("srcset") || "")) addURL(part.url, el.getAttribute("data-aimd-original-src"));
+      for (const part of parseSrcset(el.getAttribute("data-aimd-original-srcset") || "")) addURL(part.url);
+    });
+    return Array.from(byOriginal.values());
+  }
+  function absoluteHTTPURL(value) {
+    const raw = (value || "").trim();
+    if (!raw || raw.startsWith("data:") || raw.startsWith("blob:") || /["'{}<>\s]/.test(raw) || raw.includes(':"')) return "";
+    try {
+      const url = new URL(raw, location.href);
+      return url.protocol === "http:" || url.protocol === "https:" ? url.toString() : "";
+    } catch {
+      return "";
+    }
+  }
+  function originalImageURL(value) {
+    return originalURLFromProxyURL(value) || absoluteHTTPURL(value);
+  }
+  function parseSrcset(srcset) {
+    return srcset.split(",").map((raw) => {
+      const trimmed = raw.trim();
+      const [url = "", ...rest] = trimmed.split(/\s+/);
+      return { raw: trimmed, url, descriptor: rest.join(" ") };
+    }).filter((part) => part.url);
+  }
+  function configureImageProxyContext(requestId, record, invokeFn) {
+    const context = {
+      requestId,
+      pageUrl: location.href,
+      userAgent: navigator.userAgent || "",
+      referer: document.referrer || location.href,
+      cookie: safeDocumentCookie(),
+      acceptLanguage: navigator.languages?.join(",") || navigator.language || ""
+    };
+    return invokeFn("configure_web_clip_image_proxy", { context }).catch((err) => {
+      record("warn", "image proxy context setup failed", {
+        error: err instanceof Error ? `${err.name}: ${err.message}` : String(err)
+      });
+    });
+  }
+  function rewriteDocumentImages(requestId, record) {
+    rewriteImageTree(document.documentElement, requestId, record);
+  }
+  function rewriteImageTree(root, requestId, record) {
+    if (!root) return;
+    const elements = [];
+    if (root instanceof Element && (root.matches("img") || root.matches("source"))) {
+      elements.push(root);
+    }
+    root.querySelectorAll?.("img,source").forEach((el) => elements.push(el));
+    for (const el of elements) {
+      if (el.closest(".aimd-clip-shell")) continue;
+      if (el instanceof HTMLImageElement) rewriteImageElement(el, requestId, record);
+      else rewriteSourceElement(el, requestId);
+    }
+  }
+  function rewriteImageElement(img, requestId, record) {
+    bindProxyImageDiagnostics(img, record);
+    const srcProxy = rewriteImageURLAttribute(img, "src", requestId);
+    const lazyProxy = LAZY_IMAGE_ATTRS.map((attr) => rewriteImageURLAttribute(img, attr, requestId)).find(Boolean) || "";
+    rewriteSrcsetAttribute(img, "srcset", requestId);
+    const selectedProxy = srcProxy || lazyProxy;
+    const currentSrc = img.getAttribute("src") || "";
+    if (selectedProxy && (!currentSrc || currentSrc.startsWith("data:") || currentSrc.startsWith("blob:"))) {
+      img.setAttribute("src", selectedProxy);
+      img.dataset.aimdProxySrc = selectedProxy;
+    }
+  }
+  function rewriteSourceElement(source, requestId) {
+    rewriteSrcsetAttribute(source, "srcset", requestId);
+    for (const attr of LAZY_IMAGE_ATTRS) rewriteImageURLAttribute(source, attr, requestId);
+  }
+  function rewriteImageURLAttribute(el, attr, requestId) {
+    const raw = el.getAttribute(attr);
+    const original = originalImageURL(raw);
+    if (!original) return "";
+    const proxy = imageProxyURL(requestId, original);
+    if (raw === proxy) return proxy;
+    if (!el.getAttribute("data-aimd-original-src")) el.setAttribute("data-aimd-original-src", original);
+    el.setAttribute("data-aimd-proxy-src", proxy);
+    el.setAttribute(attr, proxy);
+    return proxy;
+  }
+  function rewriteSrcsetAttribute(el, attr, requestId) {
+    const raw = el.getAttribute(attr) || "";
+    if (!raw.trim()) return "";
+    const parts = parseSrcset(raw);
+    let changed = false;
+    let firstProxy = "";
+    const next = parts.map((part) => {
+      const original = originalImageURL(part.url);
+      if (!original) return part.raw;
+      const proxy = imageProxyURL(requestId, original);
+      if (!firstProxy) firstProxy = proxy;
+      changed = changed || proxy !== part.url;
+      return [proxy, part.descriptor].filter(Boolean).join(" ");
+    }).join(", ");
+    if (!changed) return firstProxy;
+    if (!el.getAttribute("data-aimd-original-srcset")) el.setAttribute("data-aimd-original-srcset", raw);
+    if (firstProxy && !el.getAttribute("data-aimd-original-src")) {
+      const firstOriginal = originalImageURL(parts[0]?.url || "");
+      if (firstOriginal) el.setAttribute("data-aimd-original-src", firstOriginal);
+    }
+    el.setAttribute(attr, next);
+    return firstProxy;
+  }
+  function bindProxyImageDiagnostics(img, record) {
+    if (img.dataset.aimdProxyObserved === "1") return;
+    img.dataset.aimdProxyObserved = "1";
+    img.addEventListener("load", () => {
+      const proxyUrl = img.getAttribute("data-aimd-proxy-src") || "";
+      if (!proxyUrl || img.currentSrc !== proxyUrl && img.getAttribute("src") !== proxyUrl) return;
+      record("debug", "proxy image fetch ok", {
+        url: img.getAttribute("data-aimd-original-src") || originalURLFromProxyURL(proxyUrl) || proxyUrl
+      });
+    });
+    img.addEventListener("error", () => {
+      const proxyUrl = img.getAttribute("data-aimd-proxy-src") || "";
+      if (!proxyUrl) return;
+    });
+  }
+  function imageProxyURL(requestId, originalURL) {
+    return `${IMAGE_PROXY_SCHEME}://${IMAGE_PROXY_HOST}/${encodeURIComponent(requestId)}/image?u=${encodeURIComponent(originalURL)}`;
+  }
+  function originalURLFromProxyURL(value) {
+    const raw = (value || "").trim();
+    if (!raw) return "";
+    try {
+      const url = new URL(raw);
+      const isProxyScheme = url.protocol === `${IMAGE_PROXY_SCHEME}:`;
+      const isWindowsAlias = url.protocol === "http:" && url.hostname === `${IMAGE_PROXY_SCHEME}.localhost`;
+      if (!isProxyScheme && !isWindowsAlias) return "";
+      return absoluteHTTPURL(url.searchParams.get("u"));
+    } catch {
+      return "";
+    }
+  }
+  function assetIDFromURL(value) {
+    if (!value.startsWith(ASSET_URI_PREFIX)) return "";
+    const rest = value.slice(ASSET_URI_PREFIX.length);
+    const end = rest.search(/[?#]/);
+    return end >= 0 ? rest.slice(0, end) : rest;
+  }
+  function recordPrefetchItem(item, fallbackURL, record, count) {
+    if (item.ok) {
+      count("ok");
+      record("debug", "proxy image fetch ok", {
+        url: item.url || fallbackURL,
+        bytes: item.bytes || 0,
+        mime: item.mime || ""
+      });
+    } else {
+      count("failed");
+      record("warn", "proxy image fetch failed", {
+        url: item.url || fallbackURL,
+        error: item.error || "unknown error"
+      });
+    }
+  }
+  function safeDocumentCookie() {
+    try {
+      return document.cookie || "";
+    } catch {
+      return "";
+    }
+  }
+
+  // src/webview/injector-dom.ts
+  function waitForDocumentShell() {
+    if (document.head && document.body) return Promise.resolve();
+    return new Promise((resolve) => {
+      const tryResolve = () => {
+        if (!document.head || !document.body) return false;
+        document.removeEventListener("DOMContentLoaded", tryResolve);
+        resolve();
+        return true;
+      };
+      if (tryResolve()) return;
+      document.addEventListener("DOMContentLoaded", tryResolve);
+      const timer = window.setInterval(() => {
+        if (tryResolve()) window.clearInterval(timer);
+      }, 20);
+    });
+  }
+
+  // src/webview/injector-fallback.ts
+  function fallbackExtractArticle(pageTitle, extractPageTitle) {
+    const root = document.querySelector("article") || document.querySelector("main") || document.querySelector('[role="main"]') || document.body;
+    if (!root) return null;
+    const blocks = [];
+    const seen = /* @__PURE__ */ new Set();
+    const selector = "h1,h2,h3,h4,p,li,blockquote,pre,img";
+    root.querySelectorAll(selector).forEach((el) => {
+      if (isNoiseElement(el)) return;
+      if (el.tagName === "IMG") {
+        const src = originalImageURL(el.getAttribute("src")) || originalImageURL(el.getAttribute("data-src")) || originalImageURL(el.getAttribute("data-aimd-original-src"));
+        if (!src || seen.has(`img:${src}`)) return;
+        seen.add(`img:${src}`);
+        const alt = normalizeText(el.getAttribute("alt") || "");
+        blocks.push(`<p><img src="${escapeHTML(src)}" alt="${escapeHTML(alt)}"></p>`);
+        return;
+      }
+      const text = normalizeText(el.textContent || "");
+      if (text.length < 2) return;
+      if (seen.has(text)) return;
+      seen.add(text);
+      if (looksLikeNoiseText(text)) return;
+      const tag = el.tagName.toLowerCase();
+      if (/^h[1-4]$/.test(tag)) {
+        const level = tag === "h1" ? "h1" : tag === "h2" ? "h2" : "h3";
+        blocks.push(`<${level}>${escapeHTML(text)}</${level}>`);
+      } else if (tag === "li") {
+        blocks.push(`<ul><li>${escapeHTML(text)}</li></ul>`);
+      } else if (tag === "blockquote") {
+        blocks.push(`<blockquote><p>${escapeHTML(text)}</p></blockquote>`);
+      } else if (tag === "pre") {
+        blocks.push(`<pre><code>${escapeHTML(el.textContent || "")}</code></pre>`);
+      } else {
+        blocks.push(`<p>${escapeHTML(text)}</p>`);
+      }
+    });
+    const title = pageTitle || extractPageTitle() || document.title || "\u7F51\u9875\u8349\u7A3F";
+    const content = [`<h1>${escapeHTML(title)}</h1>`, ...blocks].join("\n");
+    return normalizeText(blocks.join("")).length > 80 ? { title, content } : null;
+  }
+  function normalizeText(value) {
+    return value.replace(/\s+/g, " ").trim();
+  }
+  function isNoiseElement(el) {
+    return Boolean(el.closest(
+      ".aimd-clip-shell,nav,header,footer,aside,form,dialog,script,style,noscript,template,iframe,button,input,textarea,select,[role='navigation'],[role='banner'],[role='contentinfo'],[role='search'],[hidden],[aria-hidden='true']"
+    ));
+  }
+  function looksLikeNoiseText(text) {
+    return /^(share|subscribe|sign in|sign up|read more|learn more|cookie|privacy|terms|all rights reserved)$/i.test(text) || /^\d+\s*(min|minutes?)\s+read$/i.test(text) || /^\d{1,2}:\d{2}$/.test(text);
+  }
+  function escapeHTML(value) {
+    return value.replaceAll("&", "&amp;").replaceAll("<", "&lt;").replaceAll(">", "&gt;").replaceAll('"', "&quot;");
+  }
+
+  // src/webview/injector-style.ts
+  var WEB_CLIP_STYLE = `
     .aimd-clip-shell, .aimd-clip-shell * { box-sizing: border-box; }
     .aimd-clip-shell [hidden] { display: none !important; }
     .aimd-clip-shell { position: fixed; inset: 0; z-index: 2147483647; pointer-events: none; font-family: ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI", "Helvetica Neue", Arial, sans-serif; color: #15171c; letter-spacing: 0; }
@@ -2299,6 +2611,42 @@
     @keyframes aimdShimmer { 0% { background-position: 120% 0; } 100% { background-position: -120% 0; } }
     @keyframes aimdAura { 0%, 100% { background-position: 0% 50%; } 50% { background-position: 100% 50%; } }
   `;
+
+  // src/webview/injector.ts
+  (async () => {
+    const installState = window;
+    if (installState.__aimdWebClipInstalled || installState.__aimdWebClipInstalling) return;
+    installState.__aimdWebClipInstalling = true;
+    try {
+      await waitForDocumentShell();
+    } catch (err) {
+      installState.__aimdWebClipInstalling = false;
+      throw err;
+    }
+    installState.__aimdWebClipInstalled = true;
+    installState.__aimdWebClipInstalling = false;
+    const diagnostics = [];
+    let currentDoc = null;
+    let extracting = false;
+    const startupParams = readStartupParams();
+    const record = (level, message, data) => {
+      diagnostics.push({ level, message, data });
+      const args = data === void 0 ? [`[web-clip:extractor] ${message}`] : [`[web-clip:extractor] ${message}`, data];
+      if (level === "debug") console.debug(...args);
+      else if (level === "info") console.info(...args);
+      else if (level === "warn") console.warn(...args);
+      else console.error(...args);
+    };
+    void setupImageProxyForPage({
+      startupRequestId: startupParams.requestId,
+      getRequestId,
+      setRequestId,
+      isRemotePage,
+      record,
+      invokeFn: invoke
+    });
+    const style = document.createElement("style");
+    style.textContent = WEB_CLIP_STYLE;
     document.head.appendChild(style);
     const shell = document.createElement("div");
     shell.className = "aimd-clip-shell";
@@ -2422,29 +2770,13 @@
         setTimeout(mount, 50);
       }
     }
-    function waitForDocumentShell() {
-      if (document.head && document.body) return Promise.resolve();
-      return new Promise((resolve) => {
-        const tryResolve = () => {
-          if (!document.head || !document.body) return false;
-          document.removeEventListener("DOMContentLoaded", tryResolve);
-          resolve();
-          return true;
-        };
-        if (tryResolve()) return;
-        document.addEventListener("DOMContentLoaded", tryResolve);
-        const timer = window.setInterval(() => {
-          if (tryResolve()) window.clearInterval(timer);
-        }, 20);
-      });
-    }
     mount();
     await listen("web_clip_preview_ready", (event) => {
       const payload = event.payload;
       currentDoc = "doc" in payload && payload.doc ? payload.doc : payload;
       workPanel.hidden = true;
       previewPanel.hidden = false;
-      safeSetHTML(previewInner, rewriteAssetURLs(currentDoc.html, currentDoc.assets || []));
+      safeSetHTML(previewInner, rewriteAssetURLs(currentDoc.html, currentDoc.assets || [], safeSetHTML, convertFileSrc));
       loadBtn.textContent = "\u4F7F\u7528\u8349\u7A3F";
       loadBtn.dataset.action = "accept";
       loadBtn.disabled = false;
@@ -2575,15 +2907,15 @@
     function setTargetURL(url) {
       setWindowState({ aimdWebClipTarget: url });
     }
-    function normalizeText(value) {
+    function normalizeText2(value) {
       return value.replace(/\s+/g, " ").trim();
     }
     function textContent(selector) {
       const node = Array.from(document.querySelectorAll(selector)).find((el) => !el.closest(".aimd-clip-shell"));
-      return normalizeText(node?.textContent || "");
+      return normalizeText2(node?.textContent || "");
     }
     function metaContent(selector) {
-      return normalizeText(document.querySelector(selector)?.content || "");
+      return normalizeText2(document.querySelector(selector)?.content || "");
     }
     function extractPageTitle() {
       const h1 = textContent("main h1") || textContent("article h1") || textContent("h1");
@@ -2591,223 +2923,6 @@
       const metaTitle = metaContent('meta[property="og:title"]') || metaContent('meta[name="twitter:title"]');
       if (metaTitle) return metaTitle;
       return document.title.replace(/\s+\|.*$/, "").replace(/\s+-\s+.*$/, "").trim() || document.title;
-    }
-    function absoluteHTTPURL(value) {
-      const raw = (value || "").trim();
-      if (!raw || raw.startsWith("data:") || raw.startsWith("blob:") || /["'{}<>\s]/.test(raw) || raw.includes(':"')) return "";
-      try {
-        const url = new URL(raw, location.href);
-        return url.protocol === "http:" || url.protocol === "https:" ? url.toString() : "";
-      } catch {
-        return "";
-      }
-    }
-    function setupImageProxyForPage() {
-      if (!isRemotePage()) return;
-      const requestId = startupParams.requestId || getRequestId();
-      if (!requestId) return;
-      setRequestId(requestId);
-      void configureImageProxyContext(requestId);
-      const rewrite = () => rewriteDocumentImages(requestId);
-      rewrite();
-      window.addEventListener("DOMContentLoaded", rewrite, { once: true });
-      window.addEventListener("load", rewrite);
-      const root = document.documentElement || document;
-      const observer = new MutationObserver((mutations) => {
-        for (const mutation of mutations) {
-          if (mutation.type === "childList") {
-            mutation.addedNodes.forEach((node) => {
-              if (node instanceof Element) rewriteImageTree(node, requestId);
-            });
-          } else if (mutation.type === "attributes" && mutation.target instanceof Element) {
-            rewriteImageTree(mutation.target, requestId);
-          }
-        }
-      });
-      observer.observe(root, {
-        childList: true,
-        subtree: true,
-        attributes: true,
-        attributeFilter: ["src", "srcset", ...LAZY_IMAGE_ATTRS]
-      });
-    }
-    async function configureImageProxyContext(requestId) {
-      const context = {
-        requestId,
-        pageUrl: location.href,
-        userAgent: navigator.userAgent || "",
-        referer: document.referrer || location.href,
-        cookie: safeDocumentCookie(),
-        acceptLanguage: navigator.languages?.join(",") || navigator.language || ""
-      };
-      try {
-        await invoke("configure_web_clip_image_proxy", { context });
-      } catch (err) {
-        record("warn", "image proxy context setup failed", {
-          error: err instanceof Error ? `${err.name}: ${err.message}` : String(err)
-        });
-      }
-    }
-    function safeDocumentCookie() {
-      try {
-        return document.cookie || "";
-      } catch {
-        return "";
-      }
-    }
-    function rewriteDocumentImages(requestId) {
-      rewriteImageTree(document.documentElement, requestId);
-    }
-    function rewriteImageTree(root, requestId) {
-      if (!root) return;
-      const elements = [];
-      if (root instanceof Element && (root.matches("img") || root.matches("source"))) {
-        elements.push(root);
-      }
-      root.querySelectorAll?.("img,source").forEach((el) => elements.push(el));
-      for (const el of elements) {
-        if (el.closest(".aimd-clip-shell")) continue;
-        if (el instanceof HTMLImageElement) rewriteImageElement(el, requestId);
-        else rewriteSourceElement(el, requestId);
-      }
-    }
-    function rewriteImageElement(img, requestId) {
-      bindProxyImageDiagnostics(img);
-      const srcProxy = rewriteImageURLAttribute(img, "src", requestId);
-      const lazyProxy = LAZY_IMAGE_ATTRS.map((attr) => rewriteImageURLAttribute(img, attr, requestId)).find(Boolean) || "";
-      rewriteSrcsetAttribute(img, "srcset", requestId);
-      const selectedProxy = srcProxy || lazyProxy;
-      const currentSrc = img.getAttribute("src") || "";
-      if (selectedProxy && (!currentSrc || currentSrc.startsWith("data:") || currentSrc.startsWith("blob:"))) {
-        img.setAttribute("src", selectedProxy);
-        img.dataset.aimdProxySrc = selectedProxy;
-      }
-    }
-    function rewriteSourceElement(source, requestId) {
-      rewriteSrcsetAttribute(source, "srcset", requestId);
-      for (const attr of LAZY_IMAGE_ATTRS) rewriteImageURLAttribute(source, attr, requestId);
-    }
-    function rewriteImageURLAttribute(el, attr, requestId) {
-      const raw = el.getAttribute(attr);
-      const original = originalImageURL(raw);
-      if (!original) return "";
-      const proxy = imageProxyURL(requestId, original);
-      if (raw === proxy) return proxy;
-      if (!el.getAttribute("data-aimd-original-src")) el.setAttribute("data-aimd-original-src", original);
-      el.setAttribute("data-aimd-proxy-src", proxy);
-      el.setAttribute(attr, proxy);
-      return proxy;
-    }
-    function rewriteSrcsetAttribute(el, attr, requestId) {
-      const raw = el.getAttribute(attr) || "";
-      if (!raw.trim()) return "";
-      const parts = parseSrcset(raw);
-      let changed = false;
-      let firstProxy = "";
-      const next = parts.map((part) => {
-        const original = originalImageURL(part.url);
-        if (!original) return part.raw;
-        const proxy = imageProxyURL(requestId, original);
-        if (!firstProxy) firstProxy = proxy;
-        changed = changed || proxy !== part.url;
-        return [proxy, part.descriptor].filter(Boolean).join(" ");
-      }).join(", ");
-      if (!changed) return firstProxy;
-      if (!el.getAttribute("data-aimd-original-srcset")) el.setAttribute("data-aimd-original-srcset", raw);
-      if (firstProxy && !el.getAttribute("data-aimd-original-src")) {
-        const firstOriginal = originalImageURL(parts[0]?.url || "");
-        if (firstOriginal) el.setAttribute("data-aimd-original-src", firstOriginal);
-      }
-      el.setAttribute(attr, next);
-      return firstProxy;
-    }
-    function bindProxyImageDiagnostics(img) {
-      if (img.dataset.aimdProxyObserved === "1") return;
-      img.dataset.aimdProxyObserved = "1";
-      img.addEventListener("load", () => {
-        const proxyUrl = img.getAttribute("data-aimd-proxy-src") || "";
-        if (!proxyUrl || img.currentSrc !== proxyUrl && img.getAttribute("src") !== proxyUrl) return;
-        record("debug", "proxy image fetch ok", {
-          url: img.getAttribute("data-aimd-original-src") || originalURLFromProxyURL(proxyUrl) || proxyUrl
-        });
-      });
-      img.addEventListener("error", () => {
-        const proxyUrl = img.getAttribute("data-aimd-proxy-src") || "";
-        if (!proxyUrl) return;
-      });
-    }
-    async function prefetchProxyImages(images) {
-      const requestId = startupParams.requestId || getRequestId();
-      if (!requestId || !images.length) return;
-      await configureImageProxyContext(requestId);
-      const urls = Array.from(new Set(images.map((img) => {
-        const original = img.originalUrl || originalURLFromProxyURL(img.proxyUrl || "") || originalURLFromProxyURL(img.url) || img.url;
-        return absoluteHTTPURL(original);
-      }).filter(Boolean)));
-      if (!urls.length) return;
-      let fetchedCount = 0;
-      let failedCount = 0;
-      for (let index = 0; index < urls.length; index += IMAGE_PROXY_PREFETCH_CONCURRENCY) {
-        const chunk = urls.slice(index, index + IMAGE_PROXY_PREFETCH_CONCURRENCY);
-        const results = await Promise.allSettled(chunk.map((url) => invoke("prefetch_web_clip_image_proxy", { requestId, url })));
-        results.forEach((result, resultIndex) => {
-          const fallbackURL = chunk[resultIndex] || "";
-          if (result.status === "fulfilled") {
-            const item = result.value;
-            if (item.ok) {
-              fetchedCount += 1;
-              record("debug", "proxy image fetch ok", {
-                url: item.url || fallbackURL,
-                bytes: item.bytes || 0,
-                mime: item.mime || ""
-              });
-            } else {
-              failedCount += 1;
-              record("warn", "proxy image fetch failed", {
-                url: item.url || fallbackURL,
-                error: item.error || "unknown error"
-              });
-            }
-          } else {
-            failedCount += 1;
-            record("warn", "proxy image fetch failed", {
-              url: fallbackURL,
-              error: result.reason instanceof Error ? `${result.reason.name}: ${result.reason.message}` : String(result.reason)
-            });
-          }
-        });
-      }
-      record("info", "proxy image prefetch finished", {
-        total: urls.length,
-        fetchedCount,
-        failedCount
-      });
-    }
-    function imageProxyURL(requestId, originalURL) {
-      return `${IMAGE_PROXY_SCHEME}://${IMAGE_PROXY_HOST}/${encodeURIComponent(requestId)}/image?u=${encodeURIComponent(originalURL)}`;
-    }
-    function originalURLFromProxyURL(value) {
-      const raw = (value || "").trim();
-      if (!raw) return "";
-      try {
-        const url = new URL(raw);
-        const isProxyScheme = url.protocol === `${IMAGE_PROXY_SCHEME}:`;
-        const isWindowsAlias = url.protocol === "http:" && url.hostname === `${IMAGE_PROXY_SCHEME}.localhost`;
-        if (!isProxyScheme && !isWindowsAlias) return "";
-        return absoluteHTTPURL(url.searchParams.get("u"));
-      } catch {
-        return "";
-      }
-    }
-    function originalImageURL(value) {
-      return originalURLFromProxyURL(value) || absoluteHTTPURL(value);
-    }
-    function parseSrcset(srcset) {
-      return srcset.split(",").map((raw) => {
-        const trimmed = raw.trim();
-        const [url = "", ...rest] = trimmed.split(/\s+/);
-        return { raw: trimmed, url, descriptor: rest.join(" ") };
-      }).filter((part) => part.url);
     }
     function stripNoise(root) {
       root.querySelectorAll(".aimd-clip-shell, script, style, link[rel~='stylesheet'], noscript, template, nav, header, footer, aside, form, dialog, iframe, button, input, textarea, select, [role='navigation'], [role='banner'], [role='contentinfo'], [role='search'], [hidden], [aria-hidden='true']").forEach((node) => {
@@ -2871,7 +2986,7 @@
           record("warn", "readability failed, using fallback extractor", {
             error: err instanceof Error ? `${err.name}: ${err.message}` : String(err)
           });
-          article = fallbackExtractArticle(pageTitle);
+          article = fallbackExtractArticle(pageTitle, extractPageTitle);
         }
         record("info", "readability finished", { success: Boolean(article), title: article?.title || "", pageTitle, contentChars: article?.content?.length || 0 });
         if (!article) {
@@ -2879,8 +2994,13 @@
           return;
         }
         const articleContent = article.content || "";
-        const images = extractImagePayloadsFromHTML(articleContent);
-        await prefetchProxyImages(images);
+        const images = extractImagePayloadsFromHTML(articleContent, safeSetHTML);
+        await prefetchProxyImages(images, {
+          startupRequestId: startupParams.requestId,
+          getRequestId,
+          record,
+          invokeFn: invoke
+        });
         article.content = articleContent;
         record("info", "image payloads handed to backend", {
           count: images.length,
@@ -2897,27 +3017,6 @@
         extracting = false;
       }
     }
-    function assetIDFromURL(value) {
-      if (!value.startsWith(ASSET_URI_PREFIX)) return "";
-      const rest = value.slice(ASSET_URI_PREFIX.length);
-      const end = rest.search(/[?#]/);
-      return end >= 0 ? rest.slice(0, end) : rest;
-    }
-    function rewriteAssetURLs(html, assets) {
-      if (!assets.length || !html.includes(ASSET_URI_PREFIX)) return html;
-      const tpl = document.createElement("template");
-      safeSetHTML(tpl, html);
-      const byID = new Map(assets.map((asset) => [asset.id, asset]));
-      tpl.content.querySelectorAll("img").forEach((img) => {
-        const source = img.getAttribute("src") || "";
-        const id = img.getAttribute("data-asset-id") || assetIDFromURL(source);
-        const asset = id ? byID.get(id) : null;
-        const localPath = asset?.localPath || asset?.url || "";
-        if (!localPath) return;
-        img.src = convertFileSrc(localPath);
-      });
-      return tpl.innerHTML;
-    }
     function safeSetHTML(target, html) {
       try {
         target.innerHTML = html;
@@ -2928,76 +3027,6 @@
         if (target instanceof HTMLTemplateElement) return;
         target.textContent = html;
       }
-    }
-    function extractImagePayloadsFromHTML(html) {
-      const tpl = document.createElement("template");
-      safeSetHTML(tpl, html);
-      const byOriginal = /* @__PURE__ */ new Map();
-      const addURL = (value, fallbackOriginal) => {
-        const proxyOriginal = originalURLFromProxyURL(value);
-        const original = proxyOriginal || originalImageURL(value) || originalImageURL(fallbackOriginal || "");
-        if (!original) return;
-        const existing = byOriginal.get(original) || { url: original, originalUrl: original, data: [] };
-        if (proxyOriginal && value) existing.proxyUrl = value.trim();
-        byOriginal.set(original, existing);
-      };
-      tpl.content.querySelectorAll("img,source").forEach((el) => {
-        addURL(el.getAttribute("src"), el.getAttribute("data-aimd-original-src"));
-        for (const attr of LAZY_IMAGE_ATTRS) addURL(el.getAttribute(attr), el.getAttribute("data-aimd-original-src"));
-        for (const part of parseSrcset(el.getAttribute("srcset") || "")) addURL(part.url, el.getAttribute("data-aimd-original-src"));
-        for (const part of parseSrcset(el.getAttribute("data-aimd-original-srcset") || "")) addURL(part.url);
-      });
-      return Array.from(byOriginal.values());
-    }
-    function fallbackExtractArticle(pageTitle) {
-      const root = document.querySelector("article") || document.querySelector("main") || document.querySelector('[role="main"]') || document.body;
-      if (!root) return null;
-      const blocks = [];
-      const seen = /* @__PURE__ */ new Set();
-      const selector = "h1,h2,h3,h4,p,li,blockquote,pre,img";
-      root.querySelectorAll(selector).forEach((el) => {
-        if (isNoiseElement(el)) return;
-        if (el.tagName === "IMG") {
-          const src = originalImageURL(el.getAttribute("src")) || originalImageURL(el.getAttribute("data-src")) || originalImageURL(el.getAttribute("data-aimd-original-src"));
-          if (!src || seen.has(`img:${src}`)) return;
-          seen.add(`img:${src}`);
-          const alt = normalizeText(el.getAttribute("alt") || "");
-          blocks.push(`<p><img src="${escapeHTML(src)}" alt="${escapeHTML(alt)}"></p>`);
-          return;
-        }
-        const text = normalizeText(el.textContent || "");
-        if (text.length < 2) return;
-        if (seen.has(text)) return;
-        seen.add(text);
-        if (looksLikeNoiseText(text)) return;
-        const tag = el.tagName.toLowerCase();
-        if (/^h[1-4]$/.test(tag)) {
-          const level = tag === "h1" ? "h1" : tag === "h2" ? "h2" : "h3";
-          blocks.push(`<${level}>${escapeHTML(text)}</${level}>`);
-        } else if (tag === "li") {
-          blocks.push(`<ul><li>${escapeHTML(text)}</li></ul>`);
-        } else if (tag === "blockquote") {
-          blocks.push(`<blockquote><p>${escapeHTML(text)}</p></blockquote>`);
-        } else if (tag === "pre") {
-          blocks.push(`<pre><code>${escapeHTML(el.textContent || "")}</code></pre>`);
-        } else {
-          blocks.push(`<p>${escapeHTML(text)}</p>`);
-        }
-      });
-      const title = pageTitle || extractPageTitle() || document.title || "\u7F51\u9875\u8349\u7A3F";
-      const content = [`<h1>${escapeHTML(title)}</h1>`, ...blocks].join("\n");
-      return normalizeText(blocks.join("")).length > 80 ? { title, content } : null;
-    }
-    function isNoiseElement(el) {
-      return Boolean(el.closest(
-        ".aimd-clip-shell,nav,header,footer,aside,form,dialog,script,style,noscript,template,iframe,button,input,textarea,select,[role='navigation'],[role='banner'],[role='contentinfo'],[role='search'],[hidden],[aria-hidden='true']"
-      ));
-    }
-    function looksLikeNoiseText(text) {
-      return /^(share|subscribe|sign in|sign up|read more|learn more|cookie|privacy|terms|all rights reserved)$/i.test(text) || /^\d+\s*(min|minutes?)\s+read$/i.test(text) || /^\d{1,2}:\d{2}$/.test(text);
-    }
-    function escapeHTML(value) {
-      return value.replaceAll("&", "&amp;").replaceAll("<", "&lt;").replaceAll(">", "&gt;").replaceAll('"', "&quot;");
     }
   })().catch((err) => {
     const injected = window.__AIMD_WEB_CLIP_STARTUP__;

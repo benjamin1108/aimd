@@ -50,6 +50,10 @@ jobs:
         working-directory: apps/desktop
         run: npm ci
 
+      - name: Frontend checks
+        working-directory: apps/desktop
+        run: npm run check
+
       - name: Build desktop app
         working-directory: apps/desktop
         run: npm run build
