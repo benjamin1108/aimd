@@ -103,6 +103,28 @@ test.describe("⋯ 菜单：不再用危险分组", () => {
     await expect(page.locator("#close")).not.toHaveClass(/action-menu-item--danger/);
     await expect(page.locator("#more-menu .action-menu-sep")).toBeVisible();
   });
+
+  test("窄窗口下长状态和菜单文字不会撑坏按钮形状", async ({ page }) => {
+    await page.setViewportSize({ width: 520, height: 620 });
+    await installTauriMock(page);
+    await page.goto("/");
+    await page.locator("#empty-open").click();
+    await page.evaluate(() => {
+      document.querySelector<HTMLElement>("#status")!.textContent = "网页导入失败: ".repeat(20);
+      document.querySelector<HTMLElement>("#status-pill")!.dataset.tone = "warn";
+    });
+
+    const footBox = await page.locator(".workspace-foot").boundingBox();
+    const statusBox = await page.locator("#status-pill").boundingBox();
+    expect(statusBox!.x + statusBox!.width).toBeLessThanOrEqual(footBox!.x + footBox!.width + 1);
+    await expect(page.locator("#status")).toHaveCSS("text-overflow", "ellipsis");
+
+    await page.locator("#more-menu-toggle").click();
+    const menuBox = await page.locator("#more-menu").boundingBox();
+    expect(menuBox!.x).toBeGreaterThanOrEqual(0);
+    expect(menuBox!.x + menuBox!.width).toBeLessThanOrEqual(520);
+    await expect(page.locator("#more-menu .action-menu-item").first()).toHaveCSS("overflow", "hidden");
+  });
 });
 
 test.describe("已移除的导览入口", () => {

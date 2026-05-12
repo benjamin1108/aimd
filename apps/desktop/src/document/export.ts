@@ -31,7 +31,7 @@ async function checkBeforeExport(): Promise<boolean> {
     }
     if (report.status === "risk") {
       showHealthReport(report);
-      setStatus("导出前发现交付风险，已继续导出", "info");
+      setStatus("导出前发现资源风险，已继续导出", "info");
     }
   } catch {
     // 不让健康检查失败阻断用户导出；具体导出命令仍会给出错误。

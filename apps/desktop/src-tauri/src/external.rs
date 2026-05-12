@@ -35,9 +35,14 @@ fn is_document_webview(label: &str) -> bool {
 
 fn is_app_internal_url(url: &Url) -> bool {
     match url.scheme() {
-        "about" | "asset" | "ipc" | "tauri" => true,
+        "about" | "asset" | "ipc" | "tauri" | "aimd-image-proxy" => true,
         "http" | "https" => match url.host_str() {
-            Some("asset.localhost" | "ipc.localhost" | "tauri.localhost") => true,
+            Some(
+                "asset.localhost"
+                | "ipc.localhost"
+                | "tauri.localhost"
+                | "aimd-image-proxy.localhost",
+            ) => true,
             Some("127.0.0.1" | "localhost") => url.port_or_known_default() == Some(1420),
             _ => false,
         },
@@ -92,6 +97,12 @@ mod tests {
         ));
         assert!(is_app_internal_url(
             &Url::parse("http://asset.localhost/file.png").unwrap()
+        ));
+        assert!(is_app_internal_url(
+            &Url::parse(
+                "aimd-image-proxy://localhost/request/image?u=https%3A%2F%2Fexample.com%2Fa.png"
+            )
+            .unwrap()
         ));
         assert!(!is_app_internal_url(
             &Url::parse("https://example.com/").unwrap()

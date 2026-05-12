@@ -199,9 +199,9 @@ pub fn check_document_health_with_threshold(
         HealthStatus::OfflineReady
     };
     let summary = match status {
-        HealthStatus::OfflineReady => "可离线交付".to_string(),
-        HealthStatus::Risk => "有风险，但可保存".to_string(),
-        HealthStatus::Missing => "有缺失资源，应修复".to_string(),
+        HealthStatus::OfflineReady => "资源完整，可离线打开".to_string(),
+        HealthStatus::Risk => "存在资源风险".to_string(),
+        HealthStatus::Missing => "资源缺失，需要修复".to_string(),
     };
 
     DocumentHealthReport {

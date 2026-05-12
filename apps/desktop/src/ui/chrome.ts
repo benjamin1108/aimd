@@ -5,7 +5,7 @@ import {
   sidebarOutlineAssetResizerEl,
   starterActionsEl, docActionsEl, sidebarFootEl,
   sidebarNewEl, sidebarSaveEl, saveEl, saveLabelEl, saveAsEl, closeEl,
-  packageLocalImagesEl, healthCheckEl, exportMarkdownEl, exportHtmlEl, exportPdfEl,
+  packageLocalImagesEl, healthCheckEl, webImportEl, exportMarkdownEl, exportHtmlEl, exportPdfEl,
   newWindowEl, findToggleEl,
   modeReadEl, modeEditEl, modeSourceEl, docToolbarEl,
 } from "../core/dom";
@@ -100,6 +100,7 @@ export function updateChrome() {
   saveAsEl().disabled = !doc;
   packageLocalImagesEl().disabled = doc?.format !== "markdown";
   healthCheckEl().disabled = !doc;
+  webImportEl().disabled = !doc;
   exportMarkdownEl().disabled = !doc || doc.format === "markdown";
   exportHtmlEl().disabled = !doc;
   exportPdfEl().disabled = !doc;

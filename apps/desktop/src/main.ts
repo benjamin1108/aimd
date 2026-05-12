@@ -1,4 +1,4 @@
-import { invoke } from "@tauri-apps/api/core";
+import { invoke, isTauri } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import "./styles.css";
 
@@ -8,10 +8,11 @@ import { APP_HTML } from "./ui/template";
 document.querySelector<HTMLDivElement>("#app")!.innerHTML = APP_HTML;
 
 import { state } from "./core/state";
+import type { AimdDocument } from "./core/types";
 import {
   markdownEl, inlineEditorEl, modeReadEl, modeEditEl, modeSourceEl,
   saveEl, saveAsEl, closeEl,
-  moreMenuToggleEl, moreMenuEl,
+  moreMenuToggleEl, moreMenuEl, webImportEl,
   debugIndicatorEl, debugIndicatorCountEl,
 } from "./core/dom";
 import { setMode, refreshSourceBanner } from "./ui/mode";
@@ -42,23 +43,26 @@ import {
   onWindowDragOver, onWindowDragLeave, onWindowDrop,
 } from "./drag/window-drop";
 import { persistSessionSnapshot, restoreSession } from "./session/snapshot";
+import { applyDocument } from "./document/apply";
 import { debugLog, installDebugConsole, openDebugConsole, onDebugChange } from "./debug/console";
 
 installDebugConsole();
-void listen<{ level?: string; traceId?: string; elapsedMs?: number; message?: string }>("aimd-pdf-log", (event) => {
-  const payload = event.payload || {};
-  const level = payload.level === "error"
-    ? "error"
-    : payload.level === "warn"
-      ? "warn"
-      : payload.level === "debug"
-        ? "debug"
-        : "info";
-  debugLog(
-    level,
-    `[pdf:${payload.traceId || "-"} +${payload.elapsedMs ?? "?"}ms] ${payload.message || ""}`,
-  );
-});
+if (isTauri()) {
+  void listen<{ level?: string; traceId?: string; elapsedMs?: number; message?: string }>("aimd-pdf-log", (event) => {
+    const payload = event.payload || {};
+    const level = payload.level === "error"
+      ? "error"
+      : payload.level === "warn"
+        ? "warn"
+        : payload.level === "debug"
+          ? "debug"
+          : "info";
+    debugLog(
+      level,
+      `[pdf:${payload.traceId || "-"} +${payload.elapsedMs ?? "?"}ms] ${payload.message || ""}`,
+    );
+  });
+}
 
 // footer 状态条上的隐式调试指示器：只有出现 warn / error 时才显示，
 // 文案 "调试 · N"，点击就开 Debug 窗口；不再用最小化 / 最小化条。
@@ -120,6 +124,7 @@ modeSourceEl().addEventListener("click", () => setMode("source"));
 saveEl().addEventListener("click", saveDocument);
 saveAsEl().addEventListener("click", () => { closeActionMenus(); void saveDocumentAs(); });
 $("#package-local-images").addEventListener("click", () => { closeActionMenus(); void packageLocalImages(); });
+webImportEl().addEventListener("click", () => { closeActionMenus(); void importWebClip(); });
 $("#health-check").addEventListener("click", () => { closeActionMenus(); void runHealthCheck(); });
 $("#export-markdown").addEventListener("click", () => { closeActionMenus(); void exportMarkdownAssets(); });
 $("#export-html").addEventListener("click", () => { closeActionMenus(); void exportHTML(); });
@@ -270,6 +275,12 @@ window.addEventListener("DOMContentLoaded", async () => {
   } catch {
     // Ignore event binding failures outside the Tauri shell.
   }
+  let initialDraftPath: string | null = null;
+  try {
+    initialDraftPath = await invoke<string | null>("initial_draft_path");
+  } catch {
+    // Older builds / browser e2e mocks may not provide draft-window boot data.
+  }
   let initialPath: string | null = null;
   try {
     initialPath = await invoke<string | null>("initial_open_path");
@@ -277,6 +288,19 @@ window.addEventListener("DOMContentLoaded", async () => {
     // Running outside of Tauri (vite dev / e2e).
   }
   try {
+    if (initialDraftPath) {
+      const doc = await invoke<AimdDocument>("open_aimd", { path: initialDraftPath });
+      applyDocument({
+        ...doc,
+        path: "",
+        isDraft: true,
+        dirty: true,
+        draftSourcePath: initialDraftPath,
+        format: "aimd",
+      }, "read");
+      setStatus("网页草稿已打开，保存后选择位置", "idle");
+      return;
+    }
     if (initialPath) {
       await routeOpenedPath(initialPath, { skipConfirm: true });
       return;

@@ -69,6 +69,18 @@ fn render_preserves_asset_uri_without_resolver() {
 }
 
 #[test]
+fn render_preserves_remote_https_image_url() {
+    let url = "https://storage.googleapis.com/gweb-uniblog-publish-prod/images/gemini-3.1-pro_deep-research-and-.width-200.format-webp.webp";
+    let html = render(&format!("![Gemini Deep Research Agent]({})", url), None);
+
+    assert!(
+        html.contains(&format!("src=\"{}\"", url)),
+        "https image URL must survive Markdown render, got:\n{}",
+        html
+    );
+}
+
+#[test]
 fn render_rewrites_asset_uri_when_resolver_provided() {
     let r = open_fixture();
     let md_bytes = r.main_markdown().unwrap();

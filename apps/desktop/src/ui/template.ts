@@ -88,6 +88,14 @@ export const APP_HTML = `
                   <span class="action-menu-icon">${ICONS.image}</span>
                   <span>保存为 AIMD</span>
                 </button>
+                <button id="web-import" class="action-menu-item" type="button" disabled>
+                  <span class="action-menu-icon">${ICONS.link}</span>
+                  <span>从网页导入</span>
+                </button>
+                <button id="health-check" class="action-menu-item" type="button" disabled>
+                  <span class="action-menu-icon">${ICONS.info}</span>
+                  <span>资源检查</span>
+                </button>
                 <hr class="action-menu-divider" role="separator">
                 <button id="export-markdown" class="action-menu-item" type="button" disabled>
                   <span class="action-menu-icon">${ICONS.source}</span>
@@ -133,11 +141,6 @@ export const APP_HTML = `
 
           <div class="doc-toolbar-spacer"></div>
 
-          <button id="health-check" class="secondary-btn sm" type="button" disabled>
-            <span class="secondary-btn-icon">${ICONS.info}</span>
-            <span>交付状态</span>
-          </button>
-
           <button id="find-toggle" class="secondary-btn sm" type="button" disabled>
             <span>查找</span>
           </button>
@@ -146,8 +149,8 @@ export const APP_HTML = `
             <input id="find-input" class="find-input" type="search" placeholder="查找" autocomplete="off" />
             <input id="replace-input" class="find-input replace-input" type="text" placeholder="替换" autocomplete="off" />
             <span id="find-count" class="find-count">0/0</span>
-            <button id="find-prev" class="find-icon-btn" type="button" title="上一个">${ICONS.source}</button>
-            <button id="find-next" class="find-icon-btn" type="button" title="下一个">${ICONS.source}</button>
+            <button id="find-prev" class="find-icon-btn" type="button" title="上一个" aria-label="上一个">↑</button>
+            <button id="find-next" class="find-icon-btn" type="button" title="下一个" aria-label="下一个">↓</button>
             <button id="replace-one" class="secondary-btn sm" type="button">替换</button>
             <button id="replace-all" class="secondary-btn sm" type="button">全部</button>
             <button id="find-close" class="find-icon-btn" type="button" title="关闭">${ICONS.close}</button>
@@ -205,10 +208,30 @@ export const APP_HTML = `
           </div>
         </div>
 
+        <div id="web-clip-panel" class="web-clip-panel" hidden>
+          <div class="web-clip-panel-head">
+            <div>
+              <div class="web-clip-title">从网页导入</div>
+              <div id="web-clip-message" class="web-clip-message">从网页创建未保存草稿</div>
+            </div>
+            <button id="web-clip-close" class="ft-btn" type="button" title="关闭">${ICONS.close}</button>
+          </div>
+          <label class="web-clip-field" for="web-clip-url">
+            <span>网页 URL</span>
+            <input id="web-clip-url" type="url" placeholder="https://example.com/article" autocomplete="off" spellcheck="false" />
+          </label>
+          <div id="web-clip-error" class="web-clip-error" hidden></div>
+          <div class="web-clip-actions">
+            <button id="web-clip-fallback" class="secondary-btn sm" type="button" hidden>在提取窗口中打开</button>
+            <button id="web-clip-cancel" class="secondary-btn sm" type="button">取消</button>
+            <button id="web-clip-submit" class="primary-btn sm" type="button">提取</button>
+          </div>
+        </div>
+
         <div id="health-panel" class="health-panel" hidden>
           <div class="health-panel-head">
             <div>
-              <div class="health-title">交付状态</div>
+              <div class="health-title">资源检查</div>
               <div id="health-summary" class="health-summary">未检查</div>
             </div>
             <button id="health-close" class="ft-btn" type="button" title="关闭">${ICONS.close}</button>
@@ -241,7 +264,7 @@ export const APP_HTML = `
               </button>
               <button id="empty-import-web" class="secondary-btn" type="button">
                 <span class="secondary-btn-icon">${ICONS.link}</span>
-                <span>一键网页提取</span>
+                <span>从网页导入</span>
               </button>
               <button id="empty-import-md-project" class="secondary-btn" type="button">
                 <span class="secondary-btn-icon">${ICONS.source}</span>

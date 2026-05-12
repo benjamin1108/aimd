@@ -6,6 +6,9 @@ use tauri::{AppHandle, Manager, WebviewUrl, WebviewWindowBuilder};
 #[derive(Default)]
 pub struct WindowPending(pub Mutex<HashMap<String, String>>);
 
+#[derive(Default)]
+pub struct WindowPendingDrafts(pub Mutex<HashMap<String, String>>);
+
 /// 维护"已打开文件路径（规范化）→ 窗口 label"映射，用于同文件去重。
 #[derive(Default)]
 pub struct OpenedWindows(pub Mutex<HashMap<PathBuf, String>>);
@@ -167,6 +170,46 @@ pub async fn open_in_new_window(app: AppHandle, path: Option<String>) -> Result<
 
     builder.build().map_err(|e| e.to_string())?;
     Ok(())
+}
+
+#[tauri::command]
+pub async fn open_draft_in_new_window(app: AppHandle, path: String) -> Result<(), String> {
+    if path.trim().is_empty() {
+        return Err("草稿路径为空".to_string());
+    }
+
+    let nanos = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map(|d| d.as_nanos())
+        .unwrap_or(0);
+    let label = format!("doc-{}", nanos);
+    if let Some(pending) = app.try_state::<WindowPendingDrafts>() {
+        if let Ok(mut map) = pending.0.lock() {
+            map.insert(label.clone(), path);
+        }
+    }
+
+    let builder = WebviewWindowBuilder::new(&app, &label, WebviewUrl::App("index.html".into()))
+        .title("AIMD Desktop")
+        .inner_size(1180.0, 820.0)
+        .min_inner_size(860.0, 620.0);
+
+    #[cfg(not(target_os = "macos"))]
+    let builder = {
+        let menu = crate::menu::build_app_menu(&app).map_err(|e| e.to_string())?;
+        builder.menu(menu)
+    };
+
+    builder.build().map_err(|e| e.to_string())?;
+    Ok(())
+}
+
+#[tauri::command]
+pub fn initial_draft_path(
+    window: tauri::Window,
+    pending: tauri::State<'_, WindowPendingDrafts>,
+) -> Option<String> {
+    pending.0.lock().ok()?.remove(window.label())
 }
 
 /// 兜底关闭当前窗口：前端 `getCurrentWindow().close()` 在部分 webview / Tauri 版本下

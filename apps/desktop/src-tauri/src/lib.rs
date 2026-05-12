@@ -14,6 +14,7 @@ mod llm;
 mod macos_assoc;
 mod menu;
 mod settings;
+mod web_clip_image_proxy;
 mod windows;
 
 #[cfg(any(target_os = "macos", target_os = "ios"))]
@@ -27,7 +28,12 @@ use documents::{is_supported_doc_extension, PendingOpenPaths};
 pub fn run() {
     dev_log::init();
 
-    let builder = tauri::Builder::default().plugin(external::link_navigation_guard());
+    let builder = tauri::Builder::default()
+        .plugin(external::link_navigation_guard())
+        .register_asynchronous_uri_scheme_protocol(
+            web_clip_image_proxy::PROXY_SCHEME,
+            web_clip_image_proxy::handle_image_proxy_request,
+        );
 
     #[cfg(any(target_os = "windows", target_os = "linux"))]
     let builder = builder.plugin(tauri_plugin_single_instance::init(|app, args, _cwd| {
@@ -44,7 +50,10 @@ pub fn run() {
     let app = builder
         .manage(PendingOpenPaths::default())
         .manage(windows::WindowPending::default())
+        .manage(windows::WindowPendingDrafts::default())
         .manage(windows::OpenedWindows::default())
+        .manage(importer::WebClipSessionState::default())
+        .manage(web_clip_image_proxy::WebClipImageProxyState::default())
         .setup(|app| {
             let menu = menu::build_app_menu(app)?;
             // macOS 必须用 app.set_menu 才能显示全局菜单。
@@ -80,6 +89,7 @@ pub fn run() {
             dialogs::choose_export_pdf_file,
             dialogs::confirm_discard_changes,
             dialogs::confirm_upgrade_to_aimd,
+            dialogs::confirm_keep_online_images,
             dialogs::reveal_in_finder,
             documents::initial_open_path,
             documents::open_aimd,
@@ -91,6 +101,7 @@ pub fn run() {
             documents::import_markdown,
             documents::package_markdown_as_aimd,
             documents::package_local_images,
+            documents::package_remote_images,
             documents::check_document_health,
             documents::export_markdown_assets,
             documents::export_html,
@@ -103,10 +114,14 @@ pub fn run() {
             drafts::cleanup_old_drafts,
             importer::start_url_extraction,
             importer::web_clip_raw_extracted,
+            importer::web_clip_progress,
             importer::web_clip_accept,
             importer::close_extractor_window,
             importer::extract_complete,
             importer::show_extractor_window,
+            web_clip_image_proxy::configure_web_clip_image_proxy,
+            web_clip_image_proxy::prefetch_web_clip_image_proxy,
+            web_clip_image_proxy::clear_web_clip_image_proxy,
             importer::localize_web_clip_images,
             importer::save_web_clip,
             importer::refine_markdown,
@@ -120,6 +135,8 @@ pub fn run() {
             settings::save_settings,
             llm::test_model_connection,
             windows::open_in_new_window,
+            windows::open_draft_in_new_window,
+            windows::initial_draft_path,
             windows::open_settings_window,
             windows::close_current_window,
             windows::focus_doc_window,
@@ -164,7 +181,12 @@ pub fn run() {
         } => {
             windows::unregister_window_label(app_handle, &label);
             if label == "extractor" {
-                let _ = app_handle.emit("web_clip_closed", ());
+                let request_id = importer::take_current_request_id(app_handle);
+                web_clip_image_proxy::clear_session_for_app(app_handle, request_id.as_deref());
+                let _ = app_handle.emit(
+                    "web_clip_closed",
+                    importer::WebClipClosedPayload { request_id },
+                );
             }
         }
         _ => {}

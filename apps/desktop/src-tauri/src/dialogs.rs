@@ -125,6 +125,24 @@ pub fn confirm_upgrade_to_aimd(message: String) -> bool {
 }
 
 #[tauri::command]
+pub fn confirm_keep_online_images(message: String) -> bool {
+    let result = rfd::MessageDialog::new()
+        .set_title("AIMD Desktop")
+        .set_description(&message)
+        .set_level(rfd::MessageLevel::Warning)
+        .set_buttons(rfd::MessageButtons::OkCancelCustom(
+            "保留在线图片并保存".into(),
+            "取消保存".into(),
+        ))
+        .show();
+    match result {
+        rfd::MessageDialogResult::Ok => true,
+        rfd::MessageDialogResult::Custom(s) if s == "保留在线图片并保存" => true,
+        _ => false,
+    }
+}
+
+#[tauri::command]
 pub fn reveal_in_finder(path: String) -> Result<(), String> {
     #[cfg(target_os = "macos")]
     {

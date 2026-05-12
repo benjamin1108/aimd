@@ -2210,6 +2210,10 @@
 
   // src/webview/injector.ts
   var ASSET_URI_PREFIX = "asset://";
+  var IMAGE_PROXY_SCHEME = "aimd-image-proxy";
+  var IMAGE_PROXY_HOST = "localhost";
+  var IMAGE_PROXY_PREFETCH_CONCURRENCY = 4;
+  var LAZY_IMAGE_ATTRS = ["data-src", "data-original", "data-lazy-src", "data-lazy", "data-url"];
   (async () => {
     const installState = window;
     if (installState.__aimdWebClipInstalled || installState.__aimdWebClipInstalling) return;
@@ -2225,6 +2229,7 @@
     const diagnostics = [];
     let currentDoc = null;
     let extracting = false;
+    const startupParams = readStartupParams();
     const record = (level, message, data) => {
       diagnostics.push({ level, message, data });
       const args = data === void 0 ? [`[web-clip:extractor] ${message}`] : [`[web-clip:extractor] ${message}`, data];
@@ -2233,6 +2238,7 @@
       else if (level === "warn") console.warn(...args);
       else console.error(...args);
     };
+    void setupImageProxyForPage();
     const style = document.createElement("style");
     style.textContent = `
     .aimd-clip-shell, .aimd-clip-shell * { box-sizing: border-box; }
@@ -2296,60 +2302,119 @@
     document.head.appendChild(style);
     const shell = document.createElement("div");
     shell.className = "aimd-clip-shell";
-    shell.innerHTML = `
-    <div class="aimd-clip-bar" hidden>
-      <input class="aimd-clip-url" type="url" placeholder="https://example.com/article" />
-      <button class="aimd-clip-btn" data-action="load">\u786E\u5B9A</button>
-      <button class="aimd-clip-btn secondary" data-action="cancel">\u53D6\u6D88</button>
-    </div>
-    <div class="aimd-clip-start">
-      <div class="aimd-clip-card">
-        <h1>\u4E00\u952E\u63D0\u53D6\u7F51\u9875</h1>
-        <p>\u7C98\u8D34\u6587\u7AE0\u94FE\u63A5\uFF0C\u5148\u6253\u5F00\u7F51\u9875\u786E\u8BA4\u5185\u5BB9\uFF0C\u518D\u63D0\u53D6\u6210 AIMD \u8349\u7A3F\u3002</p>
-        <div class="aimd-clip-home-form">
-          <div class="aimd-clip-home-field">
-            <label class="aimd-clip-label" for="aimd-clip-home-url">\u7F51\u9875 URL</label>
-            <input id="aimd-clip-home-url" class="aimd-clip-url" data-role="home-url" type="url" placeholder="https://example.com/article" />
-          </div>
-          <button class="aimd-clip-btn" data-action="home-load">\u786E\u5B9A</button>
-        </div>
-        <div class="aimd-clip-meta">
-          <span>\u5148\u6D4F\u89C8\u539F\u7F51\u9875</span>
-          <span>\u518D\u751F\u6210\u9884\u89C8</span>
-          <span>\u786E\u8BA4\u540E\u5199\u5165\u4E3B\u7A97\u53E3</span>
-        </div>
-      </div>
-    </div>
-    <div class="aimd-clip-work" hidden>
-      <div class="aimd-clip-work-card">
-        <div class="aimd-clip-skeleton">
-          <span></span>
-          <span></span>
-          <span></span>
-        </div>
-        <div class="aimd-clip-work-text">\u5927\u6A21\u578B\u6B63\u5728\u683C\u5F0F\u5316</div>
-        <div class="aimd-clip-work-sub">\u6B63\u5728\u6E05\u7406\u6B63\u6587\u3001\u4E0B\u8F7D\u56FE\u7247\u5E76\u751F\u6210\u9884\u89C8</div>
-      </div>
-    </div>
-    <div class="aimd-clip-preview" hidden>
-      <div class="aimd-clip-preview-inner"></div>
-    </div>
-  `;
+    const clipBar = document.createElement("div");
+    clipBar.className = "aimd-clip-bar";
+    clipBar.hidden = true;
+    const urlInput = document.createElement("input");
+    urlInput.className = "aimd-clip-url";
+    urlInput.type = "url";
+    urlInput.placeholder = "https://example.com/article";
+    const loadBtn = createButton("\u6253\u5F00", "aimd-clip-btn", "load");
+    const cancelBtn = createButton("\u53D6\u6D88", "aimd-clip-btn secondary", "cancel");
+    clipBar.append(urlInput, loadBtn, cancelBtn);
+    const startPanel = document.createElement("div");
+    startPanel.className = "aimd-clip-start";
+    const startCard = document.createElement("div");
+    startCard.className = "aimd-clip-card";
+    const startTitle = document.createElement("h1");
+    startTitle.textContent = "\u4ECE\u7F51\u9875\u5BFC\u5165";
+    const startText = document.createElement("p");
+    startText.textContent = "\u7C98\u8D34\u6587\u7AE0\u94FE\u63A5\uFF0C\u6253\u5F00\u7F51\u9875\u540E\u63D0\u53D6\u6210 AIMD \u8349\u7A3F\u3002";
+    const homeForm = document.createElement("div");
+    homeForm.className = "aimd-clip-home-form";
+    const homeField = document.createElement("div");
+    homeField.className = "aimd-clip-home-field";
+    const homeLabel = document.createElement("label");
+    homeLabel.className = "aimd-clip-label";
+    homeLabel.htmlFor = "aimd-clip-home-url";
+    homeLabel.textContent = "\u7F51\u9875 URL";
+    const homeUrlInput = document.createElement("input");
+    homeUrlInput.id = "aimd-clip-home-url";
+    homeUrlInput.className = "aimd-clip-url";
+    homeUrlInput.dataset.role = "home-url";
+    homeUrlInput.type = "url";
+    homeUrlInput.placeholder = "https://example.com/article";
+    homeField.append(homeLabel, homeUrlInput);
+    const homeLoadBtn = createButton("\u6253\u5F00\u7F51\u9875", "aimd-clip-btn", "home-load");
+    homeForm.append(homeField, homeLoadBtn);
+    const meta = document.createElement("div");
+    meta.className = "aimd-clip-meta";
+    for (const label of ["\u6253\u5F00\u7F51\u9875", "\u63D0\u53D6\u6B63\u6587", "\u751F\u6210\u8349\u7A3F"]) {
+      const item = document.createElement("span");
+      item.textContent = label;
+      meta.appendChild(item);
+    }
+    startCard.append(startTitle, startText, homeForm, meta);
+    startPanel.appendChild(startCard);
+    const workPanel = document.createElement("div");
+    workPanel.className = "aimd-clip-work";
+    workPanel.hidden = true;
+    resetWorkPanel();
+    const previewPanel = document.createElement("div");
+    previewPanel.className = "aimd-clip-preview";
+    previewPanel.hidden = true;
+    const previewInner = document.createElement("div");
+    previewInner.className = "aimd-clip-preview-inner";
+    previewPanel.appendChild(previewInner);
+    shell.append(clipBar, startPanel, workPanel, previewPanel);
+    function createButton(text, className, action) {
+      const button = document.createElement("button");
+      button.className = className;
+      button.dataset.action = action;
+      button.textContent = text;
+      return button;
+    }
+    function resetWorkPanel(message = "\u6B63\u5728\u63D0\u53D6\u6B63\u6587", detail = "\u6B63\u5728\u6E05\u7406\u6B63\u6587\u3001\u8BFB\u53D6\u9875\u9762\u56FE\u7247\u5E76\u751F\u6210\u8349\u7A3F") {
+      const card = document.createElement("div");
+      card.className = "aimd-clip-work-card";
+      const skeleton = document.createElement("div");
+      skeleton.className = "aimd-clip-skeleton";
+      skeleton.append(document.createElement("span"), document.createElement("span"), document.createElement("span"));
+      const text = document.createElement("div");
+      text.className = "aimd-clip-work-text";
+      text.textContent = message;
+      const sub = document.createElement("div");
+      sub.className = "aimd-clip-work-sub";
+      sub.textContent = detail;
+      card.append(skeleton, text, sub);
+      workPanel.replaceChildren(card);
+    }
     function mount() {
       if (document.body && !document.body.contains(shell)) {
         document.body.appendChild(shell);
-        const target = isExtractEntryPage() ? "" : isRemotePage() ? getTargetURL() || location.href : "";
+        if (startupParams.requestId) setRequestId(startupParams.requestId);
+        if (startupParams.url) setTargetURL(startupParams.url);
+        if (startupParams.requestId) setAutoMode(startupParams.auto);
+        if (startupParams.url && isExtractEntryPage()) {
+          setTargetURL(startupParams.url);
+          setAutoMode(startupParams.auto);
+          shell.hidden = true;
+          void reportProgress("\u6B63\u5728\u6253\u5F00\u7F51\u9875...");
+          window.location.href = startupParams.url;
+          return;
+        }
+        const target = isExtractEntryPage() ? "" : isRemotePage() ? getTargetURL() || startupParams.url || location.href : "";
         if (target) {
+          const autoMode = getAutoMode();
+          if (autoMode) {
+            shell.hidden = true;
+            startPanel.hidden = true;
+            clipBar.hidden = true;
+            window.setTimeout(() => {
+              void runExtraction();
+            }, 300);
+            return;
+          }
           clipBar.hidden = false;
           urlInput.value = target;
           homeUrlInput.value = target;
           startPanel.hidden = true;
-          loadBtn.textContent = "\u667A\u80FD\u63D0\u53D6";
+          loadBtn.textContent = "\u63D0\u53D6";
           loadBtn.dataset.action = "extract";
         } else if (isExtractEntryPage() || !isRemotePage()) {
           clipBar.hidden = true;
           startPanel.hidden = false;
-          loadBtn.textContent = "\u786E\u5B9A";
+          loadBtn.textContent = "\u6253\u5F00";
           loadBtn.dataset.action = "load";
           window.setTimeout(() => homeUrlInput.focus(), 50);
         }
@@ -2373,36 +2438,21 @@
         }, 20);
       });
     }
-    const urlInput = shell.querySelector(".aimd-clip-url");
-    const homeUrlInput = shell.querySelector('[data-role="home-url"]');
-    const clipBar = shell.querySelector(".aimd-clip-bar");
-    const loadBtn = shell.querySelector('[data-action="load"]');
-    const homeLoadBtn = shell.querySelector('[data-action="home-load"]');
-    const cancelBtn = shell.querySelector('[data-action="cancel"]');
-    const startPanel = shell.querySelector(".aimd-clip-start");
-    const workPanel = shell.querySelector(".aimd-clip-work");
-    const previewPanel = shell.querySelector(".aimd-clip-preview");
-    const previewInner = shell.querySelector(".aimd-clip-preview-inner");
-    const loadingWorkPanelHTML = workPanel.innerHTML;
     mount();
     await listen("web_clip_preview_ready", (event) => {
-      currentDoc = event.payload;
+      const payload = event.payload;
+      currentDoc = "doc" in payload && payload.doc ? payload.doc : payload;
       workPanel.hidden = true;
       previewPanel.hidden = false;
-      previewInner.innerHTML = rewriteAssetURLs(currentDoc.html, currentDoc.assets || []);
-      loadBtn.textContent = "\u786E\u5B9A";
+      safeSetHTML(previewInner, rewriteAssetURLs(currentDoc.html, currentDoc.assets || []));
+      loadBtn.textContent = "\u4F7F\u7528\u8349\u7A3F";
       loadBtn.dataset.action = "accept";
       loadBtn.disabled = false;
     });
     await listen("web_clip_preview_failed", (event) => {
       workPanel.hidden = false;
-      workPanel.innerHTML = `
-      <div class="aimd-clip-work-card">
-        <div class="aimd-clip-work-text">\u63D0\u53D6\u5931\u8D25</div>
-        <div class="aimd-clip-work-sub">${escapeHTML(event.payload?.error || "\u672A\u77E5\u9519\u8BEF")}</div>
-      </div>
-    `;
-      loadBtn.textContent = "\u667A\u80FD\u63D0\u53D6";
+      resetWorkPanel("\u63D0\u53D6\u5931\u8D25", event.payload?.error || "\u672A\u77E5\u9519\u8BEF");
+      loadBtn.textContent = "\u63D0\u53D6";
       loadBtn.dataset.action = "extract";
       loadBtn.disabled = false;
     });
@@ -2417,7 +2467,7 @@
         return;
       }
       if (action === "accept" && currentDoc) {
-        void invoke("web_clip_accept", { doc: currentDoc });
+        void invoke("web_clip_accept", { requestId: getRequestId() || null, doc: currentDoc });
       }
     });
     homeLoadBtn.addEventListener("click", () => {
@@ -2442,7 +2492,7 @@
       }
     });
     cancelBtn.addEventListener("click", () => {
-      void invoke("close_extractor_window");
+      void invoke("close_extractor_window", { requestId: getRequestId() || null });
     });
     function normalizeURL(value) {
       const raw = value.trim();
@@ -2462,6 +2512,16 @@
     function isExtractEntryPage() {
       return location.pathname.endsWith("/extractor.html") || location.pathname === "/extractor.html";
     }
+    function readStartupParams() {
+      const params = new URLSearchParams(location.search);
+      const injected = window.__AIMD_WEB_CLIP_STARTUP__;
+      const injectedTask = injected && typeof injected === "object" ? injected : {};
+      const requestId = typeof injectedTask.requestId === "string" ? injectedTask.requestId : params.get("requestId") || "";
+      const rawURL = typeof injectedTask.url === "string" ? injectedTask.url : params.get("url") || "";
+      const url = normalizeURL(rawURL) || "";
+      const auto = typeof injectedTask.auto === "boolean" ? injectedTask.auto : params.get("auto") !== "0";
+      return { requestId, url, auto };
+    }
     function loadURLFromInput(input) {
       const url = normalizeURL(input.value);
       if (!url) {
@@ -2469,24 +2529,51 @@
         return;
       }
       setTargetURL(url);
+      setAutoMode(false);
       window.location.href = url;
     }
-    function getTargetURL() {
+    function getWindowState() {
       try {
-        const parsed = JSON.parse(window.name || "{}");
-        return typeof parsed.aimdWebClipTarget === "string" ? parsed.aimdWebClipTarget : "";
+        return JSON.parse(window.name || "{}");
       } catch {
-        return "";
+        return {};
       }
     }
-    function setTargetURL(url) {
-      let parsed = {};
+    function setWindowState(patch) {
+      window.name = JSON.stringify({ ...getWindowState(), ...patch });
+    }
+    function getTargetURL() {
+      const parsed = getWindowState();
+      return typeof parsed.aimdWebClipTarget === "string" ? parsed.aimdWebClipTarget : "";
+    }
+    function getRequestId() {
+      const parsed = getWindowState();
+      return typeof parsed.aimdWebClipRequestId === "string" ? parsed.aimdWebClipRequestId : "";
+    }
+    function setRequestId(requestId) {
+      setWindowState({ aimdWebClipRequestId: requestId });
+    }
+    function getAutoMode() {
+      const parsed = getWindowState();
+      return parsed.aimdWebClipAuto === true;
+    }
+    function setAutoMode(auto) {
+      setWindowState({ aimdWebClipAuto: auto });
+    }
+    async function reportProgress(status) {
+      const requestId = getRequestId();
+      if (!requestId) return;
       try {
-        parsed = JSON.parse(window.name || "{}");
+        await invoke("web_clip_progress", { payload: { requestId, status } });
       } catch {
       }
-      parsed.aimdWebClipTarget = url;
-      window.name = JSON.stringify(parsed);
+    }
+    function getPayloadBase() {
+      const requestId = getRequestId();
+      return requestId ? { requestId } : {};
+    }
+    function setTargetURL(url) {
+      setWindowState({ aimdWebClipTarget: url });
     }
     function normalizeText(value) {
       return value.replace(/\s+/g, " ").trim();
@@ -2514,6 +2601,213 @@
       } catch {
         return "";
       }
+    }
+    function setupImageProxyForPage() {
+      if (!isRemotePage()) return;
+      const requestId = startupParams.requestId || getRequestId();
+      if (!requestId) return;
+      setRequestId(requestId);
+      void configureImageProxyContext(requestId);
+      const rewrite = () => rewriteDocumentImages(requestId);
+      rewrite();
+      window.addEventListener("DOMContentLoaded", rewrite, { once: true });
+      window.addEventListener("load", rewrite);
+      const root = document.documentElement || document;
+      const observer = new MutationObserver((mutations) => {
+        for (const mutation of mutations) {
+          if (mutation.type === "childList") {
+            mutation.addedNodes.forEach((node) => {
+              if (node instanceof Element) rewriteImageTree(node, requestId);
+            });
+          } else if (mutation.type === "attributes" && mutation.target instanceof Element) {
+            rewriteImageTree(mutation.target, requestId);
+          }
+        }
+      });
+      observer.observe(root, {
+        childList: true,
+        subtree: true,
+        attributes: true,
+        attributeFilter: ["src", "srcset", ...LAZY_IMAGE_ATTRS]
+      });
+    }
+    async function configureImageProxyContext(requestId) {
+      const context = {
+        requestId,
+        pageUrl: location.href,
+        userAgent: navigator.userAgent || "",
+        referer: document.referrer || location.href,
+        cookie: safeDocumentCookie(),
+        acceptLanguage: navigator.languages?.join(",") || navigator.language || ""
+      };
+      try {
+        await invoke("configure_web_clip_image_proxy", { context });
+      } catch (err) {
+        record("warn", "image proxy context setup failed", {
+          error: err instanceof Error ? `${err.name}: ${err.message}` : String(err)
+        });
+      }
+    }
+    function safeDocumentCookie() {
+      try {
+        return document.cookie || "";
+      } catch {
+        return "";
+      }
+    }
+    function rewriteDocumentImages(requestId) {
+      rewriteImageTree(document.documentElement, requestId);
+    }
+    function rewriteImageTree(root, requestId) {
+      if (!root) return;
+      const elements = [];
+      if (root instanceof Element && (root.matches("img") || root.matches("source"))) {
+        elements.push(root);
+      }
+      root.querySelectorAll?.("img,source").forEach((el) => elements.push(el));
+      for (const el of elements) {
+        if (el.closest(".aimd-clip-shell")) continue;
+        if (el instanceof HTMLImageElement) rewriteImageElement(el, requestId);
+        else rewriteSourceElement(el, requestId);
+      }
+    }
+    function rewriteImageElement(img, requestId) {
+      bindProxyImageDiagnostics(img);
+      const srcProxy = rewriteImageURLAttribute(img, "src", requestId);
+      const lazyProxy = LAZY_IMAGE_ATTRS.map((attr) => rewriteImageURLAttribute(img, attr, requestId)).find(Boolean) || "";
+      rewriteSrcsetAttribute(img, "srcset", requestId);
+      const selectedProxy = srcProxy || lazyProxy;
+      const currentSrc = img.getAttribute("src") || "";
+      if (selectedProxy && (!currentSrc || currentSrc.startsWith("data:") || currentSrc.startsWith("blob:"))) {
+        img.setAttribute("src", selectedProxy);
+        img.dataset.aimdProxySrc = selectedProxy;
+      }
+    }
+    function rewriteSourceElement(source, requestId) {
+      rewriteSrcsetAttribute(source, "srcset", requestId);
+      for (const attr of LAZY_IMAGE_ATTRS) rewriteImageURLAttribute(source, attr, requestId);
+    }
+    function rewriteImageURLAttribute(el, attr, requestId) {
+      const raw = el.getAttribute(attr);
+      const original = originalImageURL(raw);
+      if (!original) return "";
+      const proxy = imageProxyURL(requestId, original);
+      if (raw === proxy) return proxy;
+      if (!el.getAttribute("data-aimd-original-src")) el.setAttribute("data-aimd-original-src", original);
+      el.setAttribute("data-aimd-proxy-src", proxy);
+      el.setAttribute(attr, proxy);
+      return proxy;
+    }
+    function rewriteSrcsetAttribute(el, attr, requestId) {
+      const raw = el.getAttribute(attr) || "";
+      if (!raw.trim()) return "";
+      const parts = parseSrcset(raw);
+      let changed = false;
+      let firstProxy = "";
+      const next = parts.map((part) => {
+        const original = originalImageURL(part.url);
+        if (!original) return part.raw;
+        const proxy = imageProxyURL(requestId, original);
+        if (!firstProxy) firstProxy = proxy;
+        changed = changed || proxy !== part.url;
+        return [proxy, part.descriptor].filter(Boolean).join(" ");
+      }).join(", ");
+      if (!changed) return firstProxy;
+      if (!el.getAttribute("data-aimd-original-srcset")) el.setAttribute("data-aimd-original-srcset", raw);
+      if (firstProxy && !el.getAttribute("data-aimd-original-src")) {
+        const firstOriginal = originalImageURL(parts[0]?.url || "");
+        if (firstOriginal) el.setAttribute("data-aimd-original-src", firstOriginal);
+      }
+      el.setAttribute(attr, next);
+      return firstProxy;
+    }
+    function bindProxyImageDiagnostics(img) {
+      if (img.dataset.aimdProxyObserved === "1") return;
+      img.dataset.aimdProxyObserved = "1";
+      img.addEventListener("load", () => {
+        const proxyUrl = img.getAttribute("data-aimd-proxy-src") || "";
+        if (!proxyUrl || img.currentSrc !== proxyUrl && img.getAttribute("src") !== proxyUrl) return;
+        record("debug", "proxy image fetch ok", {
+          url: img.getAttribute("data-aimd-original-src") || originalURLFromProxyURL(proxyUrl) || proxyUrl
+        });
+      });
+      img.addEventListener("error", () => {
+        const proxyUrl = img.getAttribute("data-aimd-proxy-src") || "";
+        if (!proxyUrl) return;
+      });
+    }
+    async function prefetchProxyImages(images) {
+      const requestId = startupParams.requestId || getRequestId();
+      if (!requestId || !images.length) return;
+      await configureImageProxyContext(requestId);
+      const urls = Array.from(new Set(images.map((img) => {
+        const original = img.originalUrl || originalURLFromProxyURL(img.proxyUrl || "") || originalURLFromProxyURL(img.url) || img.url;
+        return absoluteHTTPURL(original);
+      }).filter(Boolean)));
+      if (!urls.length) return;
+      let fetchedCount = 0;
+      let failedCount = 0;
+      for (let index = 0; index < urls.length; index += IMAGE_PROXY_PREFETCH_CONCURRENCY) {
+        const chunk = urls.slice(index, index + IMAGE_PROXY_PREFETCH_CONCURRENCY);
+        const results = await Promise.allSettled(chunk.map((url) => invoke("prefetch_web_clip_image_proxy", { requestId, url })));
+        results.forEach((result, resultIndex) => {
+          const fallbackURL = chunk[resultIndex] || "";
+          if (result.status === "fulfilled") {
+            const item = result.value;
+            if (item.ok) {
+              fetchedCount += 1;
+              record("debug", "proxy image fetch ok", {
+                url: item.url || fallbackURL,
+                bytes: item.bytes || 0,
+                mime: item.mime || ""
+              });
+            } else {
+              failedCount += 1;
+              record("warn", "proxy image fetch failed", {
+                url: item.url || fallbackURL,
+                error: item.error || "unknown error"
+              });
+            }
+          } else {
+            failedCount += 1;
+            record("warn", "proxy image fetch failed", {
+              url: fallbackURL,
+              error: result.reason instanceof Error ? `${result.reason.name}: ${result.reason.message}` : String(result.reason)
+            });
+          }
+        });
+      }
+      record("info", "proxy image prefetch finished", {
+        total: urls.length,
+        fetchedCount,
+        failedCount
+      });
+    }
+    function imageProxyURL(requestId, originalURL) {
+      return `${IMAGE_PROXY_SCHEME}://${IMAGE_PROXY_HOST}/${encodeURIComponent(requestId)}/image?u=${encodeURIComponent(originalURL)}`;
+    }
+    function originalURLFromProxyURL(value) {
+      const raw = (value || "").trim();
+      if (!raw) return "";
+      try {
+        const url = new URL(raw);
+        const isProxyScheme = url.protocol === `${IMAGE_PROXY_SCHEME}:`;
+        const isWindowsAlias = url.protocol === "http:" && url.hostname === `${IMAGE_PROXY_SCHEME}.localhost`;
+        if (!isProxyScheme && !isWindowsAlias) return "";
+        return absoluteHTTPURL(url.searchParams.get("u"));
+      } catch {
+        return "";
+      }
+    }
+    function originalImageURL(value) {
+      return originalURLFromProxyURL(value) || absoluteHTTPURL(value);
+    }
+    function parseSrcset(srcset) {
+      return srcset.split(",").map((raw) => {
+        const trimmed = raw.trim();
+        const [url = "", ...rest] = trimmed.split(/\s+/);
+        return { raw: trimmed, url, descriptor: rest.join(" ") };
+      }).filter((part) => part.url);
     }
     function stripNoise(root) {
       root.querySelectorAll(".aimd-clip-shell, script, style, link[rel~='stylesheet'], noscript, template, nav, header, footer, aside, form, dialog, iframe, button, input, textarea, select, [role='navigation'], [role='banner'], [role='contentinfo'], [role='search'], [hidden], [aria-hidden='true']").forEach((node) => {
@@ -2556,42 +2850,49 @@
       loadBtn.textContent = "\u63D0\u53D6\u4E2D";
       startPanel.hidden = true;
       previewPanel.hidden = true;
-      workPanel.innerHTML = loadingWorkPanelHTML;
+      resetWorkPanel();
       workPanel.hidden = false;
       document.body.style.overflow = "hidden";
       const startedAt = performance.now();
       try {
+        await reportProgress("\u6B63\u5728\u63D0\u53D6\u6B63\u6587...");
         const pageTitle = extractPageTitle();
         record("info", "extraction started", { url: location.href });
         await autoScroll();
         await new Promise((r) => setTimeout(r, 800));
         const documentClone = document.cloneNode(true);
         stripNoise(documentClone);
-        const reader = new import_readability.Readability(documentClone);
-        const article = reader.parse();
+        let article = null;
+        try {
+          const reader = new import_readability.Readability(documentClone);
+          const parsed = reader.parse();
+          article = parsed ? { title: parsed.title || "", content: parsed.content || "" } : null;
+        } catch (err) {
+          record("warn", "readability failed, using fallback extractor", {
+            error: err instanceof Error ? `${err.name}: ${err.message}` : String(err)
+          });
+          article = fallbackExtractArticle(pageTitle);
+        }
         record("info", "readability finished", { success: Boolean(article), title: article?.title || "", pageTitle, contentChars: article?.content?.length || 0 });
         if (!article) {
-          await invoke("web_clip_raw_extracted", { payload: { success: false, title: document.title, diagnostics } });
+          await invoke("web_clip_raw_extracted", { payload: { ...getPayloadBase(), success: false, title: document.title, diagnostics } });
           return;
         }
-        const tempDiv = document.createElement("div");
-        tempDiv.innerHTML = article.content || "";
-        stripNoise(tempDiv);
-        article.content = tempDiv.innerHTML;
-        const uniqueUrls = /* @__PURE__ */ new Set();
-        tempDiv.querySelectorAll("img").forEach((img) => {
-          const src = absoluteHTTPURL(img.getAttribute("src"));
-          if (src) uniqueUrls.add(src);
+        const articleContent = article.content || "";
+        const images = extractImagePayloadsFromHTML(articleContent);
+        await prefetchProxyImages(images);
+        article.content = articleContent;
+        record("info", "image payloads handed to backend", {
+          count: images.length,
+          proxyRefs: images.filter((img) => img.proxyUrl).length
         });
-        const images = Array.from(uniqueUrls).map((url) => ({ url, data: [] }));
-        record("info", "image urls handed to backend", { count: images.length });
         record("info", "extraction completed", { elapsedMs: Math.round(performance.now() - startedAt) });
         await invoke("web_clip_raw_extracted", {
-          payload: { success: true, title: pageTitle || article.title, content: article.content, images, diagnostics }
+          payload: { ...getPayloadBase(), success: true, title: pageTitle || article.title, content: article.content, images, diagnostics }
         });
       } catch (err) {
         record("error", "extraction error", { elapsedMs: Math.round(performance.now() - startedAt), error: err instanceof Error ? `${err.name}: ${err.message}` : String(err) });
-        await invoke("web_clip_raw_extracted", { payload: { success: false, error: err.message || "Unknown error", diagnostics } });
+        await invoke("web_clip_raw_extracted", { payload: { ...getPayloadBase(), success: false, error: err.message || "Unknown error", diagnostics } });
       } finally {
         extracting = false;
       }
@@ -2605,7 +2906,7 @@
     function rewriteAssetURLs(html, assets) {
       if (!assets.length || !html.includes(ASSET_URI_PREFIX)) return html;
       const tpl = document.createElement("template");
-      tpl.innerHTML = html;
+      safeSetHTML(tpl, html);
       const byID = new Map(assets.map((asset) => [asset.id, asset]));
       tpl.content.querySelectorAll("img").forEach((img) => {
         const source = img.getAttribute("src") || "";
@@ -2617,8 +2918,101 @@
       });
       return tpl.innerHTML;
     }
+    function safeSetHTML(target, html) {
+      try {
+        target.innerHTML = html;
+      } catch (err) {
+        record("warn", "HTML assignment blocked by page policy", {
+          error: err instanceof Error ? `${err.name}: ${err.message}` : String(err)
+        });
+        if (target instanceof HTMLTemplateElement) return;
+        target.textContent = html;
+      }
+    }
+    function extractImagePayloadsFromHTML(html) {
+      const tpl = document.createElement("template");
+      safeSetHTML(tpl, html);
+      const byOriginal = /* @__PURE__ */ new Map();
+      const addURL = (value, fallbackOriginal) => {
+        const proxyOriginal = originalURLFromProxyURL(value);
+        const original = proxyOriginal || originalImageURL(value) || originalImageURL(fallbackOriginal || "");
+        if (!original) return;
+        const existing = byOriginal.get(original) || { url: original, originalUrl: original, data: [] };
+        if (proxyOriginal && value) existing.proxyUrl = value.trim();
+        byOriginal.set(original, existing);
+      };
+      tpl.content.querySelectorAll("img,source").forEach((el) => {
+        addURL(el.getAttribute("src"), el.getAttribute("data-aimd-original-src"));
+        for (const attr of LAZY_IMAGE_ATTRS) addURL(el.getAttribute(attr), el.getAttribute("data-aimd-original-src"));
+        for (const part of parseSrcset(el.getAttribute("srcset") || "")) addURL(part.url, el.getAttribute("data-aimd-original-src"));
+        for (const part of parseSrcset(el.getAttribute("data-aimd-original-srcset") || "")) addURL(part.url);
+      });
+      return Array.from(byOriginal.values());
+    }
+    function fallbackExtractArticle(pageTitle) {
+      const root = document.querySelector("article") || document.querySelector("main") || document.querySelector('[role="main"]') || document.body;
+      if (!root) return null;
+      const blocks = [];
+      const seen = /* @__PURE__ */ new Set();
+      const selector = "h1,h2,h3,h4,p,li,blockquote,pre,img";
+      root.querySelectorAll(selector).forEach((el) => {
+        if (isNoiseElement(el)) return;
+        if (el.tagName === "IMG") {
+          const src = originalImageURL(el.getAttribute("src")) || originalImageURL(el.getAttribute("data-src")) || originalImageURL(el.getAttribute("data-aimd-original-src"));
+          if (!src || seen.has(`img:${src}`)) return;
+          seen.add(`img:${src}`);
+          const alt = normalizeText(el.getAttribute("alt") || "");
+          blocks.push(`<p><img src="${escapeHTML(src)}" alt="${escapeHTML(alt)}"></p>`);
+          return;
+        }
+        const text = normalizeText(el.textContent || "");
+        if (text.length < 2) return;
+        if (seen.has(text)) return;
+        seen.add(text);
+        if (looksLikeNoiseText(text)) return;
+        const tag = el.tagName.toLowerCase();
+        if (/^h[1-4]$/.test(tag)) {
+          const level = tag === "h1" ? "h1" : tag === "h2" ? "h2" : "h3";
+          blocks.push(`<${level}>${escapeHTML(text)}</${level}>`);
+        } else if (tag === "li") {
+          blocks.push(`<ul><li>${escapeHTML(text)}</li></ul>`);
+        } else if (tag === "blockquote") {
+          blocks.push(`<blockquote><p>${escapeHTML(text)}</p></blockquote>`);
+        } else if (tag === "pre") {
+          blocks.push(`<pre><code>${escapeHTML(el.textContent || "")}</code></pre>`);
+        } else {
+          blocks.push(`<p>${escapeHTML(text)}</p>`);
+        }
+      });
+      const title = pageTitle || extractPageTitle() || document.title || "\u7F51\u9875\u8349\u7A3F";
+      const content = [`<h1>${escapeHTML(title)}</h1>`, ...blocks].join("\n");
+      return normalizeText(blocks.join("")).length > 80 ? { title, content } : null;
+    }
+    function isNoiseElement(el) {
+      return Boolean(el.closest(
+        ".aimd-clip-shell,nav,header,footer,aside,form,dialog,script,style,noscript,template,iframe,button,input,textarea,select,[role='navigation'],[role='banner'],[role='contentinfo'],[role='search'],[hidden],[aria-hidden='true']"
+      ));
+    }
+    function looksLikeNoiseText(text) {
+      return /^(share|subscribe|sign in|sign up|read more|learn more|cookie|privacy|terms|all rights reserved)$/i.test(text) || /^\d+\s*(min|minutes?)\s+read$/i.test(text) || /^\d{1,2}:\d{2}$/.test(text);
+    }
     function escapeHTML(value) {
       return value.replaceAll("&", "&amp;").replaceAll("<", "&lt;").replaceAll(">", "&gt;").replaceAll('"', "&quot;");
     }
-  })();
+  })().catch((err) => {
+    const injected = window.__AIMD_WEB_CLIP_STARTUP__;
+    const requestId = injected && typeof injected.requestId === "string" ? injected.requestId : new URLSearchParams(location.search).get("requestId") || void 0;
+    const message = err instanceof Error ? `${err.name}: ${err.message}` : String(err);
+    console.error("[web-clip:extractor] installation failed", err);
+    void invoke("web_clip_raw_extracted", {
+      payload: {
+        requestId,
+        success: false,
+        title: document.title,
+        error: `\u63D0\u53D6\u811A\u672C\u521D\u59CB\u5316\u5931\u8D25: ${message}`,
+        diagnostics: [{ level: "error", message: "extractor installation failed", data: { error: message } }]
+      }
+    }).catch(() => {
+    });
+  });
 })();

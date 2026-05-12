@@ -35,6 +35,8 @@
 
 .more-menu-wrap {
   position: relative;
+  flex: 0 0 auto;
+  min-width: 30px;
 }
 
 .secondary-btn.icon-only {
@@ -88,7 +90,9 @@
   top: calc(100% + 6px);
   right: 0;
   z-index: 8000;
+  width: min(240px, calc(100vw - 24px));
   min-width: 188px;
+  max-width: calc(100vw - 24px);
   padding: 5px;
   border: 1px solid var(--hairline-strong);
   border-radius: 9px;
@@ -104,12 +108,22 @@
   align-items: center;
   gap: 8px;
   width: 100%;
+  min-width: 0;
   min-height: 32px;
+  max-height: 38px;
   padding: 6px 9px;
   border-radius: 7px;
   color: var(--ink);
   text-align: left;
   font-size: 12.5px;
+  overflow: hidden;
+}
+
+.action-menu-item > span:last-child {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .action-menu-item:hover:not(:disabled) {
@@ -130,6 +144,8 @@
 .action-menu-icon {
   display: grid;
   place-items: center;
+  min-width: 0;
+  width: 18px;
   color: var(--ink-muted);
 }
 
@@ -206,6 +222,8 @@
   align-items: center;
   gap: 5px;
   min-width: 0;
+  max-width: 100%;
+  flex: 1 1 360px;
   padding: 3px;
   border: 1px solid var(--hairline);
   border-radius: 9px;
@@ -216,6 +234,9 @@
 
 .find-input {
   width: 132px;
+  min-width: 64px;
+  max-width: 132px;
+  flex: 1 1 96px;
   height: 26px;
   border: 1px solid var(--hairline-strong);
   border-radius: 7px;
@@ -228,6 +249,7 @@
 
 .replace-input {
   width: 120px;
+  max-width: 120px;
 }
 
 .find-input:focus {
@@ -237,6 +259,7 @@
 
 .find-count {
   min-width: 38px;
+  flex: 0 0 auto;
   color: var(--ink-muted);
   font-family: var(--font-mono);
   font-size: 11px;
@@ -246,10 +269,14 @@
 .find-icon-btn {
   display: inline-grid;
   place-items: center;
+  flex: 0 0 26px;
   width: 26px;
   height: 24px;
   border-radius: 6px;
   color: var(--ink-muted);
+  font-size: 14px;
+  font-weight: 700;
+  line-height: 1;
 }
 
 .find-icon-btn svg {

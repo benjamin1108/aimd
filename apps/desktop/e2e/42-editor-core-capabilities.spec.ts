@@ -54,6 +54,10 @@ async function installEditorCoreMock(page: Page) {
       openedUrls: [] as string[],
       exportPdfCalls: [] as Array<Record<string, unknown>>,
       healthMode: "remote" as "remote" | "missing" | "unused" | "large" | "clean",
+      remotePackageMode: "success" as "success" | "fail",
+      remotePackageCalls: [] as Array<Record<string, unknown>>,
+      keepOnlineConfirmCalls: [] as Array<Record<string, unknown>>,
+      saveCalls: [] as Array<Record<string, unknown>>,
     };
     const convertFileSrc = (path: string, protocol = "asset") => `${protocol}://localhost${encodeURI(path)}`;
     const renderFromMarkdown = (markdown: string) => ({
@@ -106,38 +110,41 @@ async function installEditorCoreMock(page: Page) {
         ].join(""),
         dirty: false,
       }),
-      save_aimd: (a) => ({ ...s.doc, markdown: String((a as any)?.markdown ?? s.doc.markdown), dirty: false }),
+      save_aimd: (a) => {
+        runtime.saveCalls.push({ ...((a || {}) as Record<string, unknown>) });
+        return { ...s.doc, markdown: String((a as any)?.markdown ?? s.doc.markdown), dirty: false };
+      },
       render_markdown: (a) => renderFromMarkdown(String((a as any)?.markdown ?? "")),
       render_markdown_standalone: (a) => renderFromMarkdown(String((a as any)?.markdown ?? "")),
       list_aimd_assets: () => [],
       check_document_health: () => {
         if (runtime.healthMode === "missing") return {
           status: "missing",
-          summary: "有缺失资源，应修复",
+          summary: "资源缺失，需要修复",
           counts: { errors: 1, warnings: 0, infos: 0 },
           issues: [{ kind: "missing_asset", severity: "error", message: "正文引用的资源不存在: missing-001", id: "missing-001" }],
         };
         if (runtime.healthMode === "unused") return {
           status: "risk",
-          summary: "有风险，但可保存",
+          summary: "存在资源风险",
           counts: { errors: 0, warnings: 0, infos: 1 },
           issues: [{ kind: "unreferenced_asset", severity: "info", message: "资源未被正文引用: unused-001", id: "unused-001" }],
         };
         if (runtime.healthMode === "large") return {
           status: "risk",
-          summary: "有风险，但可保存",
+          summary: "存在资源风险",
           counts: { errors: 0, warnings: 1, infos: 0 },
           issues: [{ kind: "large_asset", severity: "warning", message: "资源体积较大: img-001", id: "img-001", mime: "image/png" }],
         };
         if (runtime.healthMode === "clean") return {
           status: "ready",
-          summary: "可离线交付",
+          summary: "资源完整，可离线打开",
           counts: { errors: 0, warnings: 0, infos: 0 },
           issues: [],
         };
         return {
           status: "risk",
-          summary: "有风险，但可保存",
+          summary: "存在资源风险",
           counts: { errors: 0, warnings: 1, infos: 0 },
           issues: [{ kind: "remote_image", severity: "warning", message: "正文仍依赖远程图片: https://example.com/a.png", url: "https://example.com/a.png" }],
         };
@@ -156,6 +163,35 @@ async function installEditorCoreMock(page: Page) {
         return { path: String((a as any)?.outputPath ?? "/mock/export.pdf") };
       },
       package_local_images: (a) => ({ ...s.doc, markdown: String((a as any)?.markdown ?? s.doc.markdown), dirty: false }),
+      package_remote_images: (a) => {
+        runtime.remotePackageCalls.push({ ...((a || {}) as Record<string, unknown>) });
+        if (runtime.remotePackageMode === "fail") {
+          throw new Error("1 张远程图片下载失败: https://example.com/a.png: HTTP 403");
+        }
+        runtime.healthMode = "clean";
+        return {
+          ...s.doc,
+          markdown: String((a as any)?.markdown ?? s.doc.markdown).replace("https://example.com/a.png", "asset://remote-001"),
+          assets: [
+            ...s.doc.assets,
+            {
+              id: "remote-001",
+              path: "assets/remote.png",
+              mime: "image/png",
+              size: 16,
+              sha256: "remote-hash",
+              role: "content-image",
+              url: "/tmp/remote.png",
+              localPath: "/tmp/remote.png",
+            },
+          ],
+          dirty: false,
+        };
+      },
+      confirm_keep_online_images: (a) => {
+        runtime.keepOnlineConfirmCalls.push({ ...((a || {}) as Record<string, unknown>) });
+        return true;
+      },
       open_in_new_window: (a) => {
         runtime.openWindowPaths.push(((a as any)?.path ?? null) as string | null);
         return null;
@@ -173,6 +209,10 @@ async function installEditorCoreMock(page: Page) {
       getOpenWindowPaths: () => runtime.openWindowPaths,
       getOpenedUrls: () => runtime.openedUrls,
       getExportPdfCalls: () => runtime.exportPdfCalls,
+      setRemotePackageMode: (mode: typeof runtime.remotePackageMode) => { runtime.remotePackageMode = mode; },
+      getRemotePackageCalls: () => runtime.remotePackageCalls,
+      getKeepOnlineConfirmCalls: () => runtime.keepOnlineConfirmCalls,
+      getSaveCalls: () => runtime.saveCalls,
     };
     (window as any).__TAURI_INTERNALS__ = {
       invoke: async (cmd: string, a?: Args) => {
@@ -222,6 +262,52 @@ test.describe("Editor core capabilities", () => {
     await expect(page.locator("#save")).not.toBeDisabled();
   });
 
+  test("source textarea uses native visible selection", async ({ page }) => {
+    await installEditorCoreMock(page);
+    await page.goto("/");
+    await page.locator("#empty-open").click();
+    await page.locator("#mode-source").click();
+
+    const style = await page.locator("#markdown").evaluate((textarea) => {
+      const computed = getComputedStyle(textarea);
+      const shell = textarea.closest(".source-editor-shell")!;
+      const shellComputed = getComputedStyle(shell);
+      return {
+        color: computed.color,
+        textFill: computed.getPropertyValue("-webkit-text-fill-color"),
+        background: computed.backgroundColor,
+        position: computed.position,
+        overflowWrap: computed.overflowWrap,
+        wordBreak: computed.wordBreak,
+        overflowY: computed.overflowY,
+        shellDisplay: shellComputed.display,
+      };
+    });
+    expect(style.color).not.toBe("rgba(0, 0, 0, 0)");
+    expect(style.textFill).not.toBe("rgba(0, 0, 0, 0)");
+    expect(style.background).not.toBe("rgba(0, 0, 0, 0)");
+    expect(style.position).toBe("static");
+    expect(style.overflowWrap).toBe("normal");
+    expect(style.wordBreak).toBe("normal");
+    expect(["auto", "scroll"]).toContain(style.overflowY);
+    expect(style.shellDisplay).toBe("flex");
+
+    const selected = await page.locator("#markdown").evaluate((textarea: HTMLTextAreaElement) => {
+      textarea.focus();
+      textarea.setSelectionRange(0, 8);
+      return textarea.value.slice(textarea.selectionStart, textarea.selectionEnd);
+    });
+    expect(selected.length).toBe(8);
+
+    const hitTarget = await page.locator("#markdown").evaluate((textarea: HTMLTextAreaElement) => {
+      textarea.value = Array.from({ length: 160 }, (_, index) => `Line ${index + 1}: source text`).join("\n");
+      textarea.scrollTop = textarea.scrollHeight;
+      const rect = textarea.getBoundingClientRect();
+      return document.elementFromPoint(rect.left + 24, rect.bottom - 24)?.id ?? "";
+    });
+    expect(hitTarget).toBe("markdown");
+  });
+
   test("table and fenced code block insertion survive edit to source", async ({ page }) => {
     await installEditorCoreMock(page);
     await page.goto("/");
@@ -263,10 +349,15 @@ test.describe("Editor core capabilities", () => {
     await page.goto("/");
     await page.locator("#empty-open").click();
 
+    await page.locator("#more-menu-toggle").click();
     await page.locator("#health-check").click();
     await expect(page.locator("#health-panel")).toBeVisible();
-    await expect(page.locator("#health-summary")).toContainText("有风险");
+    await expect(page.locator("#health-summary")).toContainText("资源风险");
     await expect(page.locator("#health-list")).toContainText("远程图片");
+    await expect(page.locator("#health-package-local")).toContainText("嵌入远程图片");
+    await expect(page.locator("#health-package-local")).not.toBeDisabled();
+    await page.locator("#health-package-local").click();
+    await expect(page.locator("#health-summary")).toContainText("资源完整");
 
     await page.locator("#more-menu-toggle").click();
     await page.locator("#export-html").click();
@@ -281,14 +372,15 @@ test.describe("Editor core capabilities", () => {
     await page.locator("#more-menu-toggle").click();
     await expect(page.locator("#package-local-images")).toContainText("保存为 AIMD");
     await expect(page.locator("#package-local-images")).toBeDisabled();
-    await expect(page.locator("#more-menu #health-check")).toHaveCount(0);
-    await expect(page.locator("#health-check")).toContainText("交付状态");
-    await expect(page.locator("#health-check")).not.toBeDisabled();
+    await expect(page.locator("#more-menu #web-import")).toContainText("从网页导入");
+    await expect(page.locator("#more-menu #web-import")).not.toBeDisabled();
+    await expect(page.locator("#more-menu #health-check")).toContainText("资源检查");
+    await expect(page.locator("#more-menu #health-check")).not.toBeDisabled();
     await expect(page.locator("#export-markdown")).toContainText("导出 Markdown");
     await expect(page.locator("#export-markdown")).not.toBeDisabled();
     await expect(page.locator("#export-pdf")).toContainText("导出 PDF");
     await expect(page.locator("#export-pdf")).not.toBeDisabled();
-    await expect(page.locator("#more-menu .action-menu-item")).toHaveCount(7);
+    await expect(page.locator("#more-menu .action-menu-item")).toHaveCount(9);
     await expect(page.locator("#new-window")).toContainText("新建窗口");
     await page.locator("#new-window").click();
     await expect(page.locator("#status")).toContainText("已打开新窗口");
@@ -324,24 +416,55 @@ test.describe("Editor core capabilities", () => {
     expect(Object.keys(calls[calls.length - 1])).not.toContain(`debug${"Webkit"}`);
   });
 
+  test("saving AIMD silently collects remote images and only confirms when collection fails", async ({ page }) => {
+    await installEditorCoreMock(page);
+    await page.goto("/");
+    await page.locator("#empty-open").click();
+
+    await page.locator("#mode-source").click();
+    await page.locator("#markdown").fill("# Save Remote\n\n![remote](https://example.com/a.png)\n");
+    await expect(page.locator("#save")).not.toBeDisabled();
+    await page.locator("#save").click();
+
+    await expect(page.locator("#status")).toContainText("在线图片已收进文件");
+    let calls = await page.evaluate(() => (window as any).__aimdEditorCoreMock.getSaveCalls());
+    expect(calls[calls.length - 1].markdown).toContain("asset://remote-001");
+    expect(await page.evaluate(() => (window as any).__aimdEditorCoreMock.getKeepOnlineConfirmCalls())).toHaveLength(0);
+
+    await page.evaluate(() => (window as any).__aimdEditorCoreMock.setRemotePackageMode("fail"));
+    await page.locator("#markdown").fill("# Save Remote\n\n![remote](https://example.com/a.png)\n\nkeep online\n");
+    await expect(page.locator("#save")).not.toBeDisabled();
+    const saveCountBeforeFailure = (await page.evaluate(() => (window as any).__aimdEditorCoreMock.getSaveCalls())).length;
+    await page.locator("#save").click();
+
+    await expect.poll(() => page.evaluate(() => (window as any).__aimdEditorCoreMock.getSaveCalls().length)).toBe(saveCountBeforeFailure + 1);
+    await expect(page.locator("#status")).toContainText("仍使用在线链接");
+    calls = await page.evaluate(() => (window as any).__aimdEditorCoreMock.getSaveCalls());
+    expect(calls[calls.length - 1].markdown).toContain("https://example.com/a.png");
+    expect(await page.evaluate(() => (window as any).__aimdEditorCoreMock.getKeepOnlineConfirmCalls())).toHaveLength(1);
+  });
+
   test("health panel surfaces missing, unused cleanup, and large asset risks", async ({ page }) => {
     await installEditorCoreMock(page);
     await page.goto("/");
     await page.locator("#empty-open").click();
 
     await page.evaluate(() => (window as any).__aimdEditorCoreMock.setHealthMode("missing"));
+    await page.locator("#more-menu-toggle").click();
     await page.locator("#health-check").click();
-    await expect(page.locator("#health-summary")).toContainText("缺失资源");
+    await expect(page.locator("#health-summary")).toContainText("资源缺失");
     await expect(page.locator("#health-list")).toContainText("missing-001");
 
     await page.evaluate(() => (window as any).__aimdEditorCoreMock.setHealthMode("unused"));
+    await page.locator("#more-menu-toggle").click();
     await page.locator("#health-check").click();
     await expect(page.locator("#health-clean-unused")).not.toBeDisabled();
     await page.evaluate(() => (window as any).__aimdEditorCoreMock.setHealthMode("clean"));
     await page.locator("#health-clean-unused").click();
-    await expect(page.locator("#health-summary")).toContainText("可离线交付");
+    await expect(page.locator("#health-summary")).toContainText("资源完整");
 
     await page.evaluate(() => (window as any).__aimdEditorCoreMock.setHealthMode("large"));
+    await page.locator("#more-menu-toggle").click();
     await page.locator("#health-check").click();
     await expect(page.locator("#health-list")).toContainText("资源体积较大");
   });

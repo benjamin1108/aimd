@@ -71,18 +71,24 @@
 
 .source-editor-shell {
   position: relative;
+  display: flex;
   flex: 1 1 auto;
   min-height: 0;
   overflow: hidden;
   background: #fcfaf5;
 }
 
-#markdown,
 .markdown-highlight {
-  position: absolute;
-  inset: 0;
+  display: none;
+}
+
+#markdown {
+  display: block;
+  flex: 1 1 auto;
   width: 100%;
   height: 100%;
+  min-width: 0;
+  min-height: 0;
   margin: 0;
   padding: 22px 28px 36px 32px;
   border: 0;
@@ -90,27 +96,16 @@
   font-size: 13px;
   line-height: 1.7;
   letter-spacing: 0;
-  white-space: pre-wrap;
-  overflow-wrap: anywhere;
   tab-size: 2;
-}
-
-.markdown-highlight {
-  z-index: 0;
+  white-space: pre-wrap;
+  overflow-wrap: normal;
+  word-break: normal;
   overflow: auto;
-  pointer-events: none;
-  color: var(--ink);
-}
-
-#markdown {
-  flex: 1 1 auto;
-  min-height: 0;
   resize: none;
   outline: 0;
-  z-index: 1;
-  background: transparent;
-  color: transparent;
-  -webkit-text-fill-color: transparent;
+  background: #fcfaf5;
+  color: var(--ink);
+  -webkit-text-fill-color: currentColor;
   caret-color: var(--accent);
   scrollbar-width: thin;
   scrollbar-color: var(--hairline-strong) transparent;

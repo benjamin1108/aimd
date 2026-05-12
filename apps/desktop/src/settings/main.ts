@@ -112,15 +112,15 @@ root.innerHTML = `
 
           <section class="settings-section" data-section="webclip" role="tabpanel" aria-labelledby="settings-tab-webclip" hidden>
             <header class="settings-section-head">
-              <h2>一键提取 (Web Clip)</h2>
-              <p>配置网页提取时的行为与大模型排版。</p>
+              <h2>从网页导入</h2>
+              <p>配置从网页创建草稿时的正文清洗与智能排版。</p>
             </header>
 
             <label class="field" style="flex-direction: row; align-items: center; gap: 8px; cursor: pointer;">
               <input type="checkbox" id="webclip-llm-enabled" style="margin: 0; width: 16px; height: 16px;" />
               <span class="field-label" style="margin: 0;">开启大模型智能排版与清洗</span>
             </label>
-            <p style="font-size: 13px; color: var(--text-muted); margin-bottom: 16px;">启用后，提取到的网页内容将发送给配置的大模型进行深度排版、摘要和去除杂质。这可能会增加一些等待时间。</p>
+            <p style="font-size: 13px; color: var(--text-muted); margin-bottom: 16px;">启用后，会把提取到的网页正文发送给所选模型，并生成摘要、核心观点和层级化分章正文。这可能会增加一些等待时间。</p>
 
             <label class="field">
               <span class="field-label">使用已配置的模型 (Provider)</span>

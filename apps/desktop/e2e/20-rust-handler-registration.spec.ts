@@ -38,6 +38,14 @@ function readLibRs(): string {
   return fs.readFileSync(LIB_RS, "utf-8");
 }
 
+function getCspDirective(csp: string, name: string): string[] {
+  const directive = csp
+    .split(";")
+    .map((part) => part.trim())
+    .find((part) => part.startsWith(`${name} `));
+  return directive ? directive.split(/\s+/).slice(1) : [];
+}
+
 /**
  * 从 lib.rs 文本中提取 tauri::generate_handler![ ... ] 的内容。
  * 先去掉 // 行注释，再提取宏内部字符串，确保被注释掉的命令名不被误识别为已注册。
@@ -74,6 +82,7 @@ test.describe("Rust invoke_handler 命令注册校验", () => {
     "choose_save_aimd_file",
     "confirm_discard_changes",
     "confirm_upgrade_to_aimd",
+    "confirm_keep_online_images",
     "reveal_in_finder",
     "initial_open_path",
     "open_aimd",
@@ -83,6 +92,9 @@ test.describe("Rust invoke_handler 命令注册校验", () => {
     "render_markdown",
     "render_markdown_standalone",
     "import_markdown",
+    "package_markdown_as_aimd",
+    "package_local_images",
+    "package_remote_images",
     "convert_md_to_draft",
     "save_markdown",
     "create_aimd_draft",
@@ -90,10 +102,14 @@ test.describe("Rust invoke_handler 命令注册校验", () => {
     "cleanup_old_drafts",
     "start_url_extraction",
     "web_clip_raw_extracted",
+    "web_clip_progress",
     "web_clip_accept",
     "close_extractor_window",
     "extract_complete",
     "show_extractor_window",
+    "configure_web_clip_image_proxy",
+    "prefetch_web_clip_image_proxy",
+    "clear_web_clip_image_proxy",
     "localize_web_clip_images",
     "save_web_clip",
     "refine_markdown",
@@ -107,6 +123,8 @@ test.describe("Rust invoke_handler 命令注册校验", () => {
     "save_settings",
     "test_model_connection",
     "open_in_new_window",
+    "open_draft_in_new_window",
+    "initial_draft_path",
     "open_settings_window",
     "close_current_window",
     "focus_doc_window",
@@ -150,5 +168,19 @@ test.describe("MD 文件关联源码校验", () => {
     expect(src, 'Info.plist 缺少 CFBundleTypeName>Markdown Document').toContain(
       "<string>Markdown Document</string>",
     );
+  });
+});
+
+test.describe("Tauri 内容安全策略源码校验", () => {
+  test("img-src 允许 HTTPS Markdown 远程图片", () => {
+    const conf = JSON.parse(fs.readFileSync(TAURI_CONF, "utf-8"));
+    const csp = String(conf?.app?.security?.csp ?? "");
+    const imgSrc = getCspDirective(csp, "img-src");
+
+    expect(imgSrc, "CSP 缺少 img-src 指令").not.toHaveLength(0);
+    expect(
+      imgSrc,
+      "Markdown 中的 https:// 图片会被 Tauri CSP 拦截，请在 img-src 中保留 https:",
+    ).toContain("https:");
   });
 });
