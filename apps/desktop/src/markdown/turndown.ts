@@ -18,7 +18,13 @@ turndown.addRule("aimdImage", {
     const img = node as Element;
     const alt = img.getAttribute("alt") || "";
     const cid = img.getAttribute("data-asset-id");
-    const src = cid ? `asset://${cid}` : (img.getAttribute("src") || "");
+    const markdownSrc = img.getAttribute("data-aimd-markdown-src");
+    const localPath = img.getAttribute("data-aimd-local-image-path");
+    const localSuffix = img.getAttribute("data-aimd-local-image-suffix") || "";
+    const renderedSrc = img.getAttribute("src") || "";
+    const src = cid
+      ? `asset://${cid}`
+      : (markdownSrc || (renderedSrc.startsWith("blob:") && localPath ? `${localPath}${localSuffix}` : renderedSrc));
     return `![${alt}](${src})`;
   },
 });

@@ -126,6 +126,7 @@ export function rewriteMarkdownLocalImageURLs(html: string, markdownPath: string
     if (!src || src.startsWith(ASSET_URI_PREFIX) || src.startsWith("data:") || /^https?:\/\//i.test(src)) return;
     const { suffix } = splitURLSuffix(src);
     const localPath = resolveMarkdownImagePath(markdownPath, src);
+    img.dataset.aimdMarkdownSrc = src;
     img.dataset.aimdLocalImagePath = localPath;
     img.dataset.aimdLocalImageSuffix = suffix;
     img.src = filePathToAssetURL(localPath) + suffix;

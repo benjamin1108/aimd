@@ -89,6 +89,50 @@ async function installTauriMock(page: Page) {
   }, seed);
 }
 
+async function installMarkdownLocalImageMock(page: Page) {
+  const markdownPath = "/mock/README.md";
+  const imageRef = "README.assets/iShot_2025-03-23_12.40.08.png";
+  const markdown = `# Channel 系统架构解析\n\n![Channel System Overview](${imageRef})\n\n正文。\n`;
+  await page.addInitScript((s: { markdownPath: string; imageRef: string; markdown: string }) => {
+    type Args = Record<string, unknown> | undefined;
+    const convertFileSrc = (path: string, protocol = "asset") => `${protocol}://localhost${encodeURI(path)}`;
+    const handlers: Record<string, (a: Args) => unknown> = {
+      initial_open_path: () => null,
+      choose_doc_file: () => s.markdownPath,
+      focus_doc_window: () => null,
+      convert_md_to_draft: () => ({
+        title: "Channel 系统架构解析",
+        markdown: s.markdown,
+        html: `<h1>Channel 系统架构解析</h1><p><img src="${s.imageRef}" alt="Channel System Overview"></p><p>正文。</p>`,
+      }),
+      render_markdown_standalone: () => ({
+        html: `<h1>Channel 系统架构解析</h1><p><img src="${s.imageRef}" alt="Channel System Overview"></p><p>正文。</p>`,
+      }),
+      read_image_bytes: () => [137, 80, 78, 71, 13, 10, 26, 10],
+      list_aimd_assets: () => [],
+    };
+    (window as any).__TAURI_INTERNALS__ = {
+      invoke: async (cmd: string, a?: Args) => {
+        const fn = handlers[cmd];
+        if (!fn) throw new Error(`mock invoke: unknown command ${cmd}`);
+        return fn(a);
+      },
+      transformCallback: (cb: Function) => cb,
+      convertFileSrc,
+    };
+    (window as any).__TAURI__ = {
+      ...(window as any).__TAURI__,
+      core: {
+        ...((window as any).__TAURI__?.core ?? {}),
+        convertFileSrc,
+      },
+    };
+    (window as any).__TAURI_EVENT_PLUGIN_INTERNALS__ = {
+      unregisterListener: () => {},
+    };
+  }, { markdownPath, imageRef, markdown });
+}
+
 test.describe("Desktop asset display and round-trip", () => {
   test("opening an asset-backed document renders images via asset/file URLs, never data URLs", async ({ page }) => {
     await installTauriMock(page);
@@ -139,6 +183,32 @@ test.describe("Desktop asset display and round-trip", () => {
     expect(markdown).toContain(`asset://${ASSET_ID}`);
     expect(markdown).not.toContain("data:image/");
     expect(markdown).not.toContain(ASSET_DISPLAY_URL);
+  });
+
+  test("markdown local image links stay compatible after inline edit", async ({ page }) => {
+    await installMarkdownLocalImageMock(page);
+    await page.goto("/");
+    await page.locator("#empty-open").click();
+
+    await page.locator("#mode-edit").click();
+    const inlineImg = page.locator("#inline-editor img");
+    await expect(inlineImg).toHaveCount(1);
+    await expect(inlineImg).toHaveAttribute("data-aimd-markdown-src", "README.assets/iShot_2025-03-23_12.40.08.png");
+    await expect(inlineImg).toHaveAttribute("src", /blob:/);
+
+    await page.locator("#inline-editor").evaluate((el: HTMLElement) => {
+      const p = document.createElement("p");
+      p.textContent = "只修改一个字符";
+      el.appendChild(p);
+      el.dispatchEvent(new Event("input"));
+    });
+
+    await page.waitForTimeout(900);
+
+    const markdown = await page.evaluate(() => (document.getElementById("markdown") as HTMLTextAreaElement).value);
+    expect(markdown).toContain("![Channel System Overview](README.assets/iShot_2025-03-23_12.40.08.png)");
+    expect(markdown).not.toContain("blob:");
+    expect(markdown).not.toContain("asset://localhost");
   });
 
   test("save propagates asset:// (not rendered asset URLs or data:) to the backend", async ({ page }) => {
