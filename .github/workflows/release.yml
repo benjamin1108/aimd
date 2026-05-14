@@ -27,7 +27,7 @@ jobs:
             artifact_glob: "target/release/bundle/dmg/*.dmg"
           - name: Windows x64
             os: windows-latest
-            artifact_glob: "target/release/bundle/nsis/*.exe target/release/bundle/msi/*.msi"
+            artifact_glob: "dist/AIMD-Desktop_*_windows_x64-setup.exe"
 
     steps:
       - name: Checkout
@@ -44,16 +44,28 @@ jobs:
         uses: dtolnay/rust-toolchain@stable
 
       - name: Install frontend dependencies
+        if: runner.os != 'Windows'
         working-directory: apps/desktop
         run: npm ci
 
       - name: Frontend checks
+        if: runner.os != 'Windows'
         working-directory: apps/desktop
         run: npm run check
 
       - name: Build desktop app
+        if: runner.os != 'Windows'
         working-directory: apps/desktop
         run: npm run build
+
+      - name: Build Windows installer
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          .\scripts\build-windows-installer.ps1 -SkipEnv
+          target\release\aimd.exe version
+          target\release\aimd.exe set-title --help
+          target\release\aimd.exe skill doctor --json
 
       - name: Upload release assets
         env:

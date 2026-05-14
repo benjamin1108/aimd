@@ -269,6 +269,14 @@ fn find_skill_source() -> Result<PathBuf, String> {
             return Ok(candidate);
         }
     }
+    if let Ok(exe) = env::current_exe() {
+        if let Some(install_root) = exe.parent().and_then(Path::parent) {
+            let installed = install_root.join("share/skill/aimd");
+            if installed.join("SKILL.md").is_file() {
+                return Ok(installed);
+            }
+        }
+    }
     if let Ok(cwd) = env::current_dir() {
         let repo = cwd.join("skill");
         if repo.join("SKILL.md").is_file() {
@@ -279,15 +287,23 @@ fn find_skill_source() -> Result<PathBuf, String> {
     if system.join("SKILL.md").is_file() {
         return Ok(system);
     }
+    if let Ok(local_app_data) = env::var("LOCALAPPDATA") {
+        let windows_user = PathBuf::from(local_app_data).join("AIMD/share/skill/aimd");
+        if windows_user.join("SKILL.md").is_file() {
+            return Ok(windows_user);
+        }
+    }
     Err(
-        "AIMD skill source not found; install the macOS PKG or run from the AIMD repository"
+        "AIMD skill source not found; install the AIMD CLI/skill package or run from the AIMD repository"
             .to_string(),
     )
 }
 
 fn expand_tilde(path: &str) -> Result<PathBuf, String> {
     if let Some(rest) = path.strip_prefix("~/") {
-        let home = env::var("HOME").map_err(|_| "HOME is not set".to_string())?;
+        let home = env::var("HOME")
+            .or_else(|_| env::var("USERPROFILE"))
+            .map_err(|_| "HOME or USERPROFILE is not set".to_string())?;
         Ok(PathBuf::from(home).join(rest))
     } else {
         Ok(PathBuf::from(path))
@@ -345,8 +361,11 @@ struct SkillDoctorAgent {
 #[cfg(test)]
 mod tests {
     use std::fs;
+    use std::sync::Mutex;
 
     use super::*;
+
+    static ENV_LOCK: Mutex<()> = Mutex::new(());
 
     #[test]
     fn agent_aliases_and_paths_work() {
@@ -354,6 +373,27 @@ mod tests {
         assert_eq!(codex.project_dir, ".agents/skills");
         let qoder = find_agent("qoderwork").unwrap();
         assert_eq!(qoder.user_dir, "~/.qoderwork/skills");
+    }
+
+    #[test]
+    fn expand_tilde_uses_windows_userprofile_when_home_is_missing() {
+        let _guard = ENV_LOCK.lock().unwrap();
+        let original_home = env::var_os("HOME");
+        let original_userprofile = env::var_os("USERPROFILE");
+        env::remove_var("HOME");
+        env::set_var("USERPROFILE", r"C:\Users\AIMD");
+
+        let expanded = expand_tilde("~/AppData").unwrap();
+        assert_eq!(expanded, PathBuf::from(r"C:\Users\AIMD").join("AppData"));
+
+        if let Some(home) = original_home {
+            env::set_var("HOME", home);
+        }
+        if let Some(userprofile) = original_userprofile {
+            env::set_var("USERPROFILE", userprofile);
+        } else {
+            env::remove_var("USERPROFILE");
+        }
     }
 
     #[test]

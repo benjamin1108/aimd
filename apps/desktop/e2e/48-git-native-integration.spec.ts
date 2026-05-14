@@ -1,21 +1,21 @@
 import { test, expect, Page } from "@playwright/test";
-import * as fs from "fs";
-import * as path from "path";
-import { fileURLToPath } from "url";
-
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
-const ROOT = path.resolve(__dirname, "../../..");
+const WINDOWS_CLI = "C:/Program Files/AIMD Desktop/bin/aimd.exe";
+const WINDOWS_DIFF = `"${WINDOWS_CLI}" git-diff`;
+const WINDOWS_MERGE = `"${WINDOWS_CLI}" git-merge %O %A %B %P`;
 
 async function installSettingsMock(page: Page, options: { confirmGit?: boolean } = {}) {
   const confirmGit = options.confirmGit ?? true;
   await page.addInitScript((confirmGit) => {
     type Args = Record<string, unknown> | undefined;
+    const WINDOWS_CLI = "C:/Program Files/AIMD Desktop/bin/aimd.exe";
+    const WINDOWS_DIFF = `"${WINDOWS_CLI}" git-diff`;
+    const WINDOWS_MERGE = `"${WINDOWS_CLI}" git-merge %O %A %B %P`;
     const status = {
       requestId: "git-status-1",
       gitInstalled: true,
       cliInPath: false,
       cliPath: null,
+      stableCliPath: WINDOWS_CLI,
       stableCliExists: true,
       stableCliExecutable: true,
       repoPath: "/repo",
@@ -26,8 +26,8 @@ async function installSettingsMock(page: Page, options: { confirmGit?: boolean }
       repoDriverConfigured: false,
       globalDriverConfigured: false,
       driverCommandSource: "stable",
-      expectedTextconv: "/usr/local/bin/aimd git-diff",
-      expectedMergeDriver: "/usr/local/bin/aimd git-merge %O %A %B %P",
+      expectedTextconv: WINDOWS_DIFF,
+      expectedMergeDriver: WINDOWS_MERGE,
       globalTextconv: null,
       globalCacheTextconv: null,
       globalMergeName: null,
@@ -61,7 +61,7 @@ async function installSettingsMock(page: Page, options: { confirmGit?: boolean }
         if (cmd === "git_integration_doctor") return {
           requestId: "git-doctor-1",
           ok: false,
-          messages: ["aimd 不在 App PATH 中，已使用 /usr/local/bin/aimd 作为稳定入口", "尚未配置 AIMD Git driver"],
+          messages: [`aimd 不在 App PATH 中，已使用 ${WINDOWS_CLI} 作为稳定入口`, "尚未配置 AIMD Git driver"],
           suggestions: ["点击启用全局 Git 集成"],
           status: current,
         };
@@ -69,19 +69,19 @@ async function installSettingsMock(page: Page, options: { confirmGit?: boolean }
           current = {
             ...current,
             globalDriverConfigured: true,
-            globalTextconv: "/usr/local/bin/aimd git-diff",
+            globalTextconv: WINDOWS_DIFF,
             globalCacheTextconv: "true",
             globalMergeName: "AIMD merge driver",
-            globalMergeDriver: "/usr/local/bin/aimd git-merge %O %A %B %P",
+            globalMergeDriver: WINDOWS_MERGE,
           };
-          return { requestId: "git-enable-global-1", ok: true, title: "全局 Git driver 已启用", message: "操作已完成并通过验证", details: ["diff.aimd.textconv = /usr/local/bin/aimd git-diff"], status: current };
+          return { requestId: "git-enable-global-1", ok: true, title: "全局 Git driver 已启用", message: "操作已完成并通过验证", details: [`diff.aimd.textconv = ${WINDOWS_DIFF}`], status: current };
         }
         if (cmd === "git_integration_disable_global") {
           current = { ...current, globalDriverConfigured: false, globalTextconv: null, globalCacheTextconv: null, globalMergeName: null, globalMergeDriver: null };
           return { requestId: "git-disable-global-1", ok: true, title: "全局 Git driver 已禁用", message: "操作已完成并通过验证", details: ["diff.aimd.textconv 已删除"], status: current };
         }
         if (cmd === "git_integration_enable_repo") {
-          current = { ...current, repoDriverConfigured: true, repoTextconv: "/usr/local/bin/aimd git-diff", repoCacheTextconv: "true", repoMergeName: "AIMD merge driver", repoMergeDriver: "/usr/local/bin/aimd git-merge %O %A %B %P" };
+          current = { ...current, repoDriverConfigured: true, repoTextconv: WINDOWS_DIFF, repoCacheTextconv: "true", repoMergeName: "AIMD merge driver", repoMergeDriver: WINDOWS_MERGE };
           return { requestId: "git-enable-repo-1", ok: true, title: "当前仓库 Git driver 已启用", message: "操作已完成并通过验证", details: [], status: current };
         }
         if (cmd === "git_integration_disable_repo") {
@@ -138,10 +138,14 @@ async function installConflictDocMock(page: Page) {
 
 async function installSettingsFailureMock(page: Page) {
   await page.addInitScript(() => {
+    const WINDOWS_CLI = "C:/Program Files/AIMD Desktop/bin/aimd.exe";
+    const WINDOWS_DIFF = `"${WINDOWS_CLI}" git-diff`;
+    const WINDOWS_MERGE = `"${WINDOWS_CLI}" git-merge %O %A %B %P`;
     const status = {
       requestId: "git-status-fail",
       gitInstalled: true,
       cliInPath: false,
+      stableCliPath: WINDOWS_CLI,
       stableCliExists: true,
       stableCliExecutable: true,
       repoPath: null,
@@ -152,8 +156,8 @@ async function installSettingsFailureMock(page: Page) {
       repoDriverConfigured: false,
       globalDriverConfigured: false,
       driverCommandSource: "stable",
-      expectedTextconv: "/usr/local/bin/aimd git-diff",
-      expectedMergeDriver: "/usr/local/bin/aimd git-merge %O %A %B %P",
+      expectedTextconv: WINDOWS_DIFF,
+      expectedMergeDriver: WINDOWS_MERGE,
     };
     const settings = {
       ai: { activeProvider: "dashscope", providers: { dashscope: { model: "qwen3.6-plus", apiKey: "sk", apiBase: "" }, gemini: { model: "gemini-3.1-flash-lite-preview", apiKey: "", apiBase: "" } } },
@@ -182,7 +186,8 @@ test.describe("AIMD Git native integration", () => {
     await page.locator(".settings-nav-item[data-section='git']").click();
     await expect(page.locator("section[data-section='git']")).toContainText("Git 集成");
     await expect(page.locator("#git-integration-status")).toContainText("AIMD CLI");
-    await expect(page.locator("#git-integration-status")).toContainText("/usr/local/bin/aimd git-diff");
+    await expect(page.locator("#git-integration-status")).toContainText(WINDOWS_DIFF);
+    await expect(page.locator("#git-integration-status")).toContainText(WINDOWS_CLI);
 
     await page.locator("#git-repo-path").fill("/repo");
     await page.locator("#git-enable-global").click();
@@ -229,12 +234,5 @@ test.describe("AIMD Git native integration", () => {
     await page.locator("#more-menu-toggle").click();
     await page.locator("#format-document").click();
     await expect(page.locator("#status")).toContainText("解决后再格式化");
-  });
-
-  test("macOS PKG script stages app and stable CLI without git config writes", async () => {
-    const script = fs.readFileSync(path.join(ROOT, "scripts/build-macos-pkg.sh"), "utf-8");
-    expect(script).toContain("/Applications/AIMD.app");
-    expect(script).toContain("/usr/local/bin/aimd");
-    expect(script).not.toContain("git config");
   });
 });

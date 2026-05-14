@@ -1,5 +1,7 @@
 import { defineConfig, devices } from "@playwright/test";
 
+const useWebServer = process.env.PLAYWRIGHT_NO_WEB_SERVER !== "1";
+
 export default defineConfig({
   testDir: "./e2e",
   fullyParallel: false,
@@ -23,12 +25,14 @@ export default defineConfig({
       use: { ...devices["Desktop Chrome"] },
     },
   ],
-  webServer: {
-    command: "npm run dev:web",
-    url: "http://127.0.0.1:1420",
-    reuseExistingServer: !process.env.CI,
-    timeout: 30_000,
-    stdout: "pipe",
-    stderr: "pipe",
-  },
+  webServer: useWebServer
+    ? {
+        command: "node node_modules/vite/bin/vite.js --host 127.0.0.1 --port 1420",
+        url: "http://127.0.0.1:1420",
+        reuseExistingServer: !process.env.CI,
+        timeout: 30_000,
+        stdout: "pipe",
+        stderr: "pipe",
+      }
+    : undefined,
 });

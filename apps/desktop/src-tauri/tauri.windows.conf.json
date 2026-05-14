@@ -1,0 +1,17 @@
+{
+  "bundle": {
+    "targets": ["nsis"],
+    "resources": {
+      "windows/resources/aimd-cli/aimd.exe": "aimd-cli/aimd.exe",
+      "windows/resources/aimd-skill/": "aimd-skill/",
+      "windows/installer/postinstall.ps1": "aimd-installer/postinstall.ps1",
+      "windows/installer/preuninstall.ps1": "aimd-installer/preuninstall.ps1"
+    },
+    "windows": {
+      "nsis": {
+        "installMode": "currentUser",
+        "installerHooks": "./windows/hooks.nsh"
+      }
+    }
+  }
+}

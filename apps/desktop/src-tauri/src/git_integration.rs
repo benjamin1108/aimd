@@ -4,6 +4,8 @@ use std::{fs, path::Path};
 mod config;
 #[path = "git_integration/support.rs"]
 mod support;
+#[cfg(test)]
+use config::stable_cli_path;
 use config::{
     canonical_repo_root, config_value, driver_commands, driver_configured, ensure_repo,
     find_in_path, is_executable, write_gitattributes_line, write_global_config, write_repo_config,
@@ -12,10 +14,13 @@ use config::{
 use support::{log_event, new_request_id, run_git, stderr_or_stdout};
 const BARE_DIFF_TEXTCONV: &str = "aimd git-diff";
 const BARE_MERGE_DRIVER: &str = "aimd git-merge %O %A %B %P";
+#[cfg(not(windows))]
 const STABLE_DIFF_TEXTCONV: &str = "/usr/local/bin/aimd git-diff";
+#[cfg(not(windows))]
 const STABLE_MERGE_DRIVER: &str = "/usr/local/bin/aimd git-merge %O %A %B %P";
 const MERGE_NAME: &str = "AIMD merge driver";
 const GITATTRIBUTES_LINE: &str = "*.aimd diff=aimd merge=aimd";
+#[cfg(not(windows))]
 const STABLE_CLI_PATH: &str = "/usr/local/bin/aimd";
 #[derive(Debug, Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -25,6 +30,7 @@ pub struct GitIntegrationStatus {
     pub git_error: Option<String>,
     pub cli_in_path: bool,
     pub cli_path: Option<String>,
+    pub stable_cli_path: String,
     pub stable_cli_exists: bool,
     pub stable_cli_executable: bool,
     pub stable_cli_error: Option<String>,
@@ -189,17 +195,22 @@ pub fn git_integration_doctor(repo_path: Option<String>) -> Result<GitDoctorResu
     }
     if status.stable_cli_executable {
         if !status.cli_in_path {
-            messages
-                .push("aimd 不在 App PATH 中，已使用 /usr/local/bin/aimd 作为稳定入口".to_string());
+            messages.push(format!(
+                "aimd 不在 App PATH 中，已使用 {} 作为稳定入口",
+                status.stable_cli_path
+            ));
         }
     } else {
         messages.push(
             status
                 .stable_cli_error
                 .clone()
-                .unwrap_or_else(|| "/usr/local/bin/aimd 不可执行".to_string()),
+                .unwrap_or_else(|| format!("{} 不可执行", status.stable_cli_path)),
         );
-        suggestions.push("安装系统级 AIMD PKG，确保 /usr/local/bin/aimd 可执行".to_string());
+        suggestions.push(format!(
+            "安装 AIMD Windows 安装包，确保 {} 可执行",
+            status.stable_cli_path
+        ));
     }
     if !status.repo_path_requested {
         messages.push("未设置仓库路径，仓库 driver 和 .gitattributes 检查不适用".to_string());
@@ -252,15 +263,21 @@ fn status_impl(repo_path: Option<&str>, request_id: String) -> GitIntegrationSta
         Ok(out) => Some(stderr_or_stdout(&out)),
         Err(err) => Some(err),
     };
-    let cli_path = find_in_path("aimd").map(|p| p.to_string_lossy().to_string());
-    let stable = Path::new(STABLE_CLI_PATH);
+    let cli_path_buf = find_in_path("aimd");
+    let cli_path = cli_path_buf
+        .as_ref()
+        .map(|p| p.to_string_lossy().to_string());
+    let stable = config::stable_cli_path();
     let stable_cli_exists = stable.exists();
-    let stable_cli_executable = is_executable(stable);
-    let commands = driver_commands(cli_path.is_some(), stable_cli_executable);
+    let stable_cli_executable = is_executable(&stable);
+    let commands = driver_commands(
+        cli_path_buf.as_deref(),
+        stable_cli_executable.then_some(stable.as_path()),
+    );
     let stable_cli_error = if stable_cli_exists && !stable_cli_executable {
-        Some("/usr/local/bin/aimd 存在但不可执行".to_string())
+        Some(format!("{} 存在但不可执行", stable.display()))
     } else if !stable_cli_exists {
-        Some("/usr/local/bin/aimd 不存在".to_string())
+        Some(format!("{} 不存在", stable.display()))
     } else {
         None
     };
@@ -288,6 +305,7 @@ fn status_impl(repo_path: Option<&str>, request_id: String) -> GitIntegrationSta
         git_error,
         cli_in_path: cli_path.is_some(),
         cli_path,
+        stable_cli_path: stable.to_string_lossy().to_string(),
         stable_cli_exists,
         stable_cli_executable,
         stable_cli_error,

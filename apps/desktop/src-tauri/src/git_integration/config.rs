@@ -4,10 +4,9 @@ use std::{
 };
 
 use super::support::{run_git, run_git_logged, stderr_or_stdout};
-use super::{
-    BARE_DIFF_TEXTCONV, BARE_MERGE_DRIVER, GITATTRIBUTES_LINE, MERGE_NAME, STABLE_CLI_PATH,
-    STABLE_DIFF_TEXTCONV, STABLE_MERGE_DRIVER,
-};
+use super::{BARE_DIFF_TEXTCONV, BARE_MERGE_DRIVER, GITATTRIBUTES_LINE, MERGE_NAME};
+#[cfg(not(windows))]
+use super::{STABLE_CLI_PATH, STABLE_DIFF_TEXTCONV, STABLE_MERGE_DRIVER};
 
 #[derive(Debug, Clone)]
 pub(super) struct DriverCommands {
@@ -43,8 +42,12 @@ fn write_config(
     request_id: &str,
 ) -> Result<WriteConfigReport, String> {
     let cli_path = find_in_path("aimd");
-    let stable_cli_executable = is_executable(Path::new(STABLE_CLI_PATH));
-    let commands = driver_commands(cli_path.is_some(), stable_cli_executable);
+    let stable = stable_cli_path();
+    let stable_cli_executable = is_executable(&stable);
+    let commands = driver_commands(
+        cli_path.as_deref(),
+        stable_cli_executable.then_some(stable.as_path()),
+    );
     let writes = [
         ("diff.aimd.textconv", Some(commands.textconv.as_str())),
         ("diff.aimd.cachetextconv", Some("false")),
@@ -171,18 +174,30 @@ fn verify_config(
     }
 }
 
-pub(super) fn driver_commands(cli_in_path: bool, stable_cli_executable: bool) -> DriverCommands {
-    if cli_in_path {
+pub(super) fn driver_commands(
+    cli_in_path: Option<&Path>,
+    stable_cli: Option<&Path>,
+) -> DriverCommands {
+    if cli_in_path.is_some() {
         DriverCommands {
             source: "path".to_string(),
             textconv: BARE_DIFF_TEXTCONV.to_string(),
             merge_driver: BARE_MERGE_DRIVER.to_string(),
         }
-    } else if stable_cli_executable {
+    } else if let Some(stable_cli) = stable_cli {
+        #[cfg(windows)]
+        let textconv = format!("{} git-diff", git_command_path(stable_cli));
+        #[cfg(windows)]
+        let merge_driver = format!("{} git-merge %O %A %B %P", git_command_path(stable_cli));
+        #[cfg(not(windows))]
+        let textconv = STABLE_DIFF_TEXTCONV.to_string();
+        #[cfg(not(windows))]
+        let merge_driver = STABLE_MERGE_DRIVER.to_string();
+
         DriverCommands {
             source: "stable".to_string(),
-            textconv: STABLE_DIFF_TEXTCONV.to_string(),
-            merge_driver: STABLE_MERGE_DRIVER.to_string(),
+            textconv,
+            merge_driver,
         }
     } else {
         DriverCommands {
@@ -193,15 +208,78 @@ pub(super) fn driver_commands(cli_in_path: bool, stable_cli_executable: bool) ->
     }
 }
 
+#[cfg(windows)]
+pub(super) fn stable_cli_path() -> PathBuf {
+    if let Some(path) = std::env::var_os("AIMD_CLI_PATH").map(PathBuf::from) {
+        return path;
+    }
+    if let Ok(exe) = std::env::current_exe() {
+        if let Some(dir) = exe.parent() {
+            return dir.join("bin").join("aimd.exe");
+        }
+    }
+    PathBuf::from(r"C:\Program Files\AIMD Desktop\bin\aimd.exe")
+}
+
+#[cfg(not(windows))]
+pub(super) fn stable_cli_path() -> PathBuf {
+    PathBuf::from(STABLE_CLI_PATH)
+}
+
+#[cfg(windows)]
+fn git_command_path(path: &Path) -> String {
+    let value = path.to_string_lossy().replace('\\', "/");
+    quote_git_command_arg(&value)
+}
+
+#[cfg(windows)]
+fn quote_git_command_arg(value: &str) -> String {
+    if value
+        .chars()
+        .any(|c| c.is_whitespace() || matches!(c, '"' | '\'' | '&' | '(' | ')' | ';'))
+    {
+        format!("\"{}\"", value.replace('"', "\\\""))
+    } else {
+        value.to_string()
+    }
+}
+
 pub(super) fn find_in_path(name: &str) -> Option<PathBuf> {
     let path = std::env::var_os("PATH")?;
+    let names = executable_names(name);
     for dir in std::env::split_paths(&path) {
-        let candidate = dir.join(name);
-        if is_executable(&candidate) {
-            return Some(candidate);
+        for name in &names {
+            let candidate = dir.join(name);
+            if is_executable(&candidate) {
+                return Some(candidate);
+            }
         }
     }
     None
+}
+
+#[cfg(windows)]
+fn executable_names(name: &str) -> Vec<String> {
+    let has_extension = Path::new(name).extension().is_some();
+    if has_extension {
+        return vec![name.to_string()];
+    }
+    let pathext = std::env::var_os("PATHEXT")
+        .and_then(|v| v.into_string().ok())
+        .unwrap_or_else(|| ".COM;.EXE;.BAT;.CMD".to_string());
+    let mut names = vec![name.to_string()];
+    for ext in pathext.split(';').filter(|ext| !ext.trim().is_empty()) {
+        names.push(format!("{name}{}", ext.trim().to_ascii_lowercase()));
+        names.push(format!("{name}{}", ext.trim().to_ascii_uppercase()));
+    }
+    names.sort();
+    names.dedup();
+    names
+}
+
+#[cfg(not(windows))]
+fn executable_names(name: &str) -> Vec<String> {
+    vec![name.to_string()]
 }
 
 #[cfg(unix)]
@@ -215,4 +293,53 @@ pub(super) fn is_executable(path: &Path) -> bool {
 #[cfg(not(unix))]
 pub(super) fn is_executable(path: &Path) -> bool {
     path.is_file()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[cfg(windows)]
+    #[test]
+    fn windows_stable_driver_command_quotes_cli_path() {
+        let cli = Path::new(r"C:\Program Files\AIMD Desktop\bin\aimd.exe");
+        let commands = driver_commands(None, Some(cli));
+        assert_eq!(
+            commands.textconv,
+            "\"C:/Program Files/AIMD Desktop/bin/aimd.exe\" git-diff"
+        );
+        assert_eq!(
+            commands.merge_driver,
+            "\"C:/Program Files/AIMD Desktop/bin/aimd.exe\" git-merge %O %A %B %P"
+        );
+    }
+
+    #[cfg(windows)]
+    #[test]
+    fn windows_find_in_path_uses_pathext_for_exe() {
+        let tmp = tempfile::tempdir().unwrap();
+        let bin = tmp.path().join("aimd.exe");
+        fs::write(&bin, b"").unwrap();
+        let old_path = std::env::var_os("PATH");
+        let old_pathext = std::env::var_os("PATHEXT");
+        std::env::set_var("PATH", tmp.path());
+        std::env::set_var("PATHEXT", ".EXE");
+        let found = find_in_path("aimd");
+        match old_path {
+            Some(value) => std::env::set_var("PATH", value),
+            None => std::env::remove_var("PATH"),
+        }
+        match old_pathext {
+            Some(value) => std::env::set_var("PATHEXT", value),
+            None => std::env::remove_var("PATHEXT"),
+        }
+        assert!(found.is_some());
+        assert_eq!(
+            found
+                .as_ref()
+                .and_then(|path| path.file_name())
+                .map(|name| name.to_string_lossy().to_ascii_lowercase()),
+            Some("aimd.exe".to_string())
+        );
+    }
 }

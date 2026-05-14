@@ -25,9 +25,11 @@ fn repo_config_enable_and_disable_round_trips() {
         return;
     }
 
+    let cli_path = find_in_path("aimd");
+    let stable = stable_cli_path();
     let commands = driver_commands(
-        find_in_path("aimd").is_some(),
-        is_executable(Path::new(STABLE_CLI_PATH)),
+        cli_path.as_deref(),
+        is_executable(&stable).then_some(stable.as_path()),
     );
     write_repo_config(tmp.path(), true, "test-repo-enable").unwrap();
     assert!(driver_configured(Some(tmp.path()), &commands));
@@ -54,7 +56,8 @@ fn textconv_cache_true_is_not_considered_configured() {
         return;
     }
 
-    let commands = driver_commands(false, true);
+    let stable = stable_cli_path();
+    let commands = driver_commands(None, Some(stable.as_path()));
     for (key, value) in [
         ("diff.aimd.textconv", commands.textconv.as_str()),
         ("diff.aimd.cachetextconv", "true"),
@@ -74,10 +77,19 @@ fn textconv_cache_true_is_not_considered_configured() {
 
 #[test]
 fn stable_cli_is_used_when_path_cli_is_missing() {
-    let commands = driver_commands(false, true);
+    let stable = stable_cli_path();
+    let commands = driver_commands(None, Some(stable.as_path()));
     assert_eq!(commands.source, "stable");
+    #[cfg(not(windows))]
     assert_eq!(commands.textconv, STABLE_DIFF_TEXTCONV);
+    #[cfg(not(windows))]
     assert_eq!(commands.merge_driver, STABLE_MERGE_DRIVER);
+    #[cfg(windows)]
+    {
+        assert!(commands.textconv.ends_with(" git-diff"));
+        assert!(commands.merge_driver.ends_with(" git-merge %O %A %B %P"));
+        assert!(commands.merge_driver.contains("aimd.exe"));
+    }
 }
 
 #[test]

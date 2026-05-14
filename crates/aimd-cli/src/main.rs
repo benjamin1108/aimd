@@ -30,6 +30,10 @@ fn main() {
 fn run() -> Result<(), String> {
     let cli = Cli::parse();
     match cli.command {
+        Command::Version => {
+            println!("{}", env!("CARGO_PKG_VERSION"));
+            Ok(())
+        }
         Command::Read { file } => cmd_read(&file),
         Command::Info { file, json } => cmd_info(&file, json),
         Command::Manifest { file } => cmd_manifest(&file),

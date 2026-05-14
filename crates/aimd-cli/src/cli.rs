@@ -6,6 +6,7 @@ use serde::Serialize;
 #[derive(Parser)]
 #[command(
     name = "aimd",
+    version,
     about = "Read, edit, validate, package, and integrate AIMD documents"
 )]
 pub struct Cli {
@@ -15,6 +16,8 @@ pub struct Cli {
 
 #[derive(Subcommand)]
 pub enum Command {
+    /// Print the AIMD CLI version.
+    Version,
     /// Print main.md from an AIMD document.
     Read { file: PathBuf },
     /// Print document metadata and health summary.

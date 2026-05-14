@@ -85,5 +85,5 @@ fn write_json_line(category: &str, event: &str, payload: Value) {
 
 #[cfg(debug_assertions)]
 fn log_dir() -> PathBuf {
-    PathBuf::from("/tmp/aimd-dev-logs")
+    std::env::temp_dir().join("aimd-dev-logs")
 }

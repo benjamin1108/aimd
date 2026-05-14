@@ -6,6 +6,7 @@ type GitIntegrationStatus = {
   gitError?: string;
   cliInPath: boolean;
   cliPath?: string;
+  stableCliPath?: string;
   stableCliExists: boolean;
   stableCliExecutable: boolean;
   stableCliError?: string;
@@ -124,7 +125,7 @@ export function setupGitIntegration(root: HTMLElement) {
     const cliDetail = status.cliInPath && status.cliPath
       ? `${status.cliPath}（来自 PATH）`
       : systemCliOk
-        ? "/usr/local/bin/aimd（系统安装，App 会使用它）"
+        ? `${status.stableCliPath || status.expectedTextconv.replace(/\s+git-diff$/, "")}（稳定安装入口，App 会使用它）`
         : status.stableCliError || "需要安装 AIMD PKG，或在开发环境 PATH 中提供 aimd";
     const globalDetail = status.globalDriverConfigured
       ? "已启用，.aimd diff / merge 会调用 AIMD"

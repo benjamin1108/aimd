@@ -142,7 +142,8 @@ npm run test:e2e
 # output: dist/AIMD-<version>.pkg
 
 # Windows
-build-windows.bat
+./scripts/build-windows-installer.cmd
+# output: dist/AIMD-Desktop_<version>_windows_x64-setup.exe
 ```
 
 ---
@@ -168,13 +169,6 @@ aimd/
 examples/ai-daily-2026-04-30.aimd
 ```
 
----
-
-## 路线图
-
-已完成：`.aimd` 单文件容器、Markdown 正文和图片资源封装、macOS / Windows 桌面应用、阅读 / 编辑 / 源码模式、图片粘贴与资源管理、普通 `.md` 按需另存为 `.aimd`。
-
-计划中：AI 来源和溯源信息、文档健康检查、HTML / PDF 导出、浏览器查看器、文件格式规范、SDK。
 
 ---
 
