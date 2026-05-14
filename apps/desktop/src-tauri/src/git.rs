@@ -170,6 +170,14 @@ fn run_git_ok_limited(root: &Path, args: &[&str], limit: usize) -> Result<(Strin
     })
 }
 
+fn git_file_diff_args(cached: bool, rel: &str) -> Vec<&str> {
+    if cached {
+        vec!["diff", "--no-ext-diff", "--textconv", "--cached", "--", rel]
+    } else {
+        vec!["diff", "--no-ext-diff", "--textconv", "--", rel]
+    }
+}
+
 fn state_from_xy(ch: char, untracked: bool, conflict: bool) -> GitFileState {
     if conflict {
         return GitFileState::Conflicted;
@@ -350,21 +358,13 @@ pub async fn get_git_file_diff(root: String, path: String) -> Result<GitFileDiff
         let root = canonical_root(&root)?;
         ensure_git_root(&root)?;
         let rel = safe_git_path(&root, &path)?;
-        let (staged_diff, staged_truncated) = run_git_ok_limited(
-            &root,
-            &[
-                "diff",
-                "--no-ext-diff",
-                "--no-textconv",
-                "--cached",
-                "--",
-                &rel,
-            ],
-            DIFF_OUTPUT_LIMIT,
-        )?;
+        let staged_args = git_file_diff_args(true, &rel);
+        let (staged_diff, staged_truncated) =
+            run_git_ok_limited(&root, &staged_args, DIFF_OUTPUT_LIMIT)?;
+        let unstaged_args = git_file_diff_args(false, &rel);
         let (unstaged_diff, unstaged_truncated) = run_git_ok_limited(
             &root,
-            &["diff", "--no-ext-diff", "--no-textconv", "--", &rel],
+            &unstaged_args,
             DIFF_OUTPUT_LIMIT,
         )?;
         let combined = format!("{staged_diff}\n{unstaged_diff}");

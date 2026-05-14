@@ -9,6 +9,7 @@ import { applyHTML } from "../ui/outline";
 import { setMode } from "../ui/mode";
 import { updateChrome } from "../ui/chrome";
 import { refreshSourceHighlight } from "../editor/source-highlight";
+import { createSourceModel } from "../editor/source-preserve";
 
 export function normalizeAssets(assets: AimdAsset[]): AimdAsset[] {
   return assets.map((asset) => {
@@ -55,6 +56,9 @@ export function inferFormat(doc: AimdDocument): "aimd" | "markdown" {
 export function applyDocument(doc: AimdDocument, mode: Mode) {
   const normalized = normalizeDocument(doc);
   state.doc = normalized;
+  state.sourceModel = createSourceModel(normalized.markdown);
+  state.sourceDirtyRefs.clear();
+  state.sourceStructuralDirty = false;
   state.mainView = "document";
   markdownEl().value = normalized.markdown;
   refreshSourceHighlight();

@@ -54,6 +54,7 @@ import { bindGitPanel, refreshGitStatus } from "./ui/git";
 import { bindGitDiffView } from "./ui/git-diff";
 import { bindSelectionBoundary } from "./ui/selection";
 import { loadAppSettings, type AppSettings } from "./core/settings";
+import { createSourceModel } from "./editor/source-preserve";
 
 installDebugConsole();
 bindSelectionBoundary("main");
@@ -162,6 +163,9 @@ document.addEventListener("click", (event) => {
 markdownEl().addEventListener("input", () => {
   if (!state.doc) return;
   state.doc.markdown = markdownEl().value;
+  state.sourceModel = createSourceModel(state.doc.markdown);
+  state.sourceDirtyRefs.clear();
+  state.sourceStructuralDirty = false;
   state.doc.dirty = true;
   state.doc.hasGitConflicts = hasGitConflictMarkers(state.doc.markdown);
   state.doc.hasExternalImageReferences = hasExternalImageReferences(state.doc.markdown);

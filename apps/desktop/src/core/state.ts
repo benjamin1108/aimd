@@ -3,6 +3,7 @@ import type {
   GitFileDiff,
   GitRepoStatus,
   MainView,
+  MarkdownSourceModel,
   Mode,
   OutlineNode,
   SidebarDocTab,
@@ -87,6 +88,9 @@ export const state: {
   };
   uiSettings: UiSettings;
   inlineDirty: boolean;
+  sourceModel: MarkdownSourceModel | null;
+  sourceDirtyRefs: Set<string>;
+  sourceStructuralDirty: boolean;
   isBootstrappingSession: boolean;
 } = {
   doc: null,
@@ -131,5 +135,8 @@ export const state: {
   // the last flush / paint. flushInline skips its (expensive) turndown call when
   // false — this is what keeps mode hops snappy on long documents.
   inlineDirty: false,
+  sourceModel: null,
+  sourceDirtyRefs: new Set(),
+  sourceStructuralDirty: false,
   isBootstrappingSession: false,
 };

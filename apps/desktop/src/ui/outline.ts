@@ -11,6 +11,7 @@ import { setStatus } from "./chrome";
 import { persistSessionSnapshot } from "../session/snapshot";
 import { enhanceRenderedDocument } from "../editor/interactive";
 import { renderDocPanelTabs } from "./doc-panel";
+import { annotateSourceBlocks, createSourceModel } from "../editor/source-preserve";
 
 export function scheduleRender() {
   if (state.renderTimer) window.clearTimeout(state.renderTimer);
@@ -36,6 +37,11 @@ export async function renderPreview() {
 }
 
 export function applyHTML(html: string) {
+  if (state.doc && state.sourceModel?.markdown !== state.doc.markdown) {
+    state.sourceModel = createSourceModel(state.doc.markdown);
+    state.sourceDirtyRefs.clear();
+    state.sourceStructuralDirty = false;
+  }
   const shouldHydrateMarkdownImages = state.doc?.format === "markdown" && Boolean(state.doc.path);
   const withMarkdownImages = state.doc?.format === "markdown" && state.doc.path
     ? rewriteMarkdownLocalImageURLs(html, state.doc.path)
@@ -52,6 +58,7 @@ export function applyHTML(html: string) {
     tmp.querySelectorAll(".aimd-frontmatter").forEach((el) => el.remove());
     inlineEditorEl().innerHTML = tmp.innerHTML;
     tagAssetImages(inlineEditorEl(), state.doc.assets);
+    if (state.sourceModel) annotateSourceBlocks(inlineEditorEl(), state.sourceModel);
     state.paintedVersion.edit = state.htmlVersion;
     state.inlineDirty = false;
   }
@@ -166,6 +173,7 @@ export function paintPaneIfStale(mode: Mode) {
     tmpEdit.querySelectorAll(".aimd-frontmatter").forEach((el) => el.remove());
     inlineEditorEl().innerHTML = tmpEdit.innerHTML;
     tagAssetImages(inlineEditorEl(), state.doc.assets);
+    if (state.sourceModel) annotateSourceBlocks(inlineEditorEl(), state.sourceModel);
     enhanceRenderedDocument(inlineEditorEl(), { taskToggle: true, linkOpen: "modifier" });
     if (state.doc.format === "markdown") void hydrateMarkdownLocalImages(inlineEditorEl());
     state.inlineDirty = false;

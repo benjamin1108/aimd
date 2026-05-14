@@ -1,6 +1,6 @@
 import { state, ASSET_URI_PREFIX } from "../core/state";
 import { inlineEditorEl, markdownEl } from "../core/dom";
-import { updateChrome } from "../ui/chrome";
+import { setStatus, updateChrome } from "../ui/chrome";
 import {
   extractOutlineFromHTML, renderOutline,
 } from "../ui/outline";
@@ -8,6 +8,7 @@ import { persistSessionSnapshot } from "../session/snapshot";
 import { htmlToMarkdown } from "./markdown";
 import { hasAimdImageReferences, hasExternalImageReferences } from "../document/assets";
 import { joinFrontmatter, splitFrontmatter } from "../markdown/frontmatter";
+import { appendedStructuralHTML, createSourceModel, patchDirtySource, sourceRefFromEvent } from "./source-preserve";
 
 export function lightNormalize(root: HTMLElement) {
   root.querySelectorAll<HTMLElement>("h1[style], h2[style], h3[style], h4[style], h5[style], h6[style], p[style]").forEach((el) => el.removeAttribute("style"));
@@ -47,6 +48,9 @@ function enforceTitleLength(root: HTMLElement) {
 export function onInlineInput(event?: Event) {
   if (!state.doc) return;
   const composing = (event as InputEvent | undefined)?.isComposing;
+  const sourceRef = sourceRefFromEvent(event);
+  if (sourceRef) state.sourceDirtyRefs.add(sourceRef);
+  else state.sourceStructuralDirty = true;
   state.inlineDirty = true;
   state.doc.dirty = true;
   lightNormalize(inlineEditorEl());
@@ -110,9 +114,41 @@ export function flushInline() {
   state.inlineDirty = false;
   const html = inlineEditorEl().innerHTML;
   const existing = splitFrontmatter(state.doc.markdown);
-  const md = joinFrontmatter(existing.frontmatter, htmlToMarkdown(html));
+  let structuralMarkdown: string | null = null;
+  if (state.sourceStructuralDirty) {
+    const appended = appendedStructuralHTML(inlineEditorEl());
+    if (appended !== null && state.sourceModel?.markdown === state.doc.markdown) {
+      const serialized = htmlToMarkdown(appended).trim();
+      structuralMarkdown = serialized
+        ? `${state.doc.markdown.replace(/\s*$/, "")}\n\n${serialized}\n`
+        : state.doc.markdown;
+    } else {
+      state.inlineDirty = true;
+      setStatus("当前可视化结构编辑不能安全保持 Markdown 原文，请切到源码模式完成这次结构修改", "warn");
+      updateChrome();
+      return;
+    }
+  }
+  const patched = state.sourceModel?.markdown === state.doc.markdown && state.sourceDirtyRefs.size > 0
+    ? patchDirtySource(inlineEditorEl(), state.sourceModel, state.sourceDirtyRefs)
+    : null;
+  if (patched && !patched.ok) {
+    state.inlineDirty = true;
+    setStatus(`可视化保存受限: ${patched.reason}，请切到源码模式保存该结构`, "warn");
+    updateChrome();
+    return;
+  }
+  const md = structuralMarkdown
+    ?? (patched?.ok
+    ? patched.markdown
+    : joinFrontmatter(existing.frontmatter, htmlToMarkdown(html)));
+  if (patched?.ok || structuralMarkdown !== null) {
+    state.sourceDirtyRefs.clear();
+    state.sourceStructuralDirty = false;
+  }
   if (md !== state.doc.markdown) {
     state.doc.markdown = md;
+    state.sourceModel = createSourceModel(md);
     markdownEl().value = md;
     state.doc.hasExternalImageReferences = hasExternalImageReferences(md);
     if (state.doc.format === "markdown") {

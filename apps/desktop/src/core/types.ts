@@ -29,6 +29,29 @@ export type RenderResult = {
   html: string;
 };
 
+export type MarkdownSourceCell = {
+  id: string;
+  start: number;
+  end: number;
+  contentStart: number;
+  contentEnd: number;
+};
+
+export type MarkdownSourceBlock = {
+  id: string;
+  kind: "heading" | "paragraph" | "list_item" | "blockquote" | "table" | "code" | "other";
+  start: number;
+  end: number;
+  contentStart: number;
+  contentEnd: number;
+  cells?: MarkdownSourceCell[];
+};
+
+export type MarkdownSourceModel = {
+  markdown: string;
+  blocks: MarkdownSourceBlock[];
+};
+
 export type SessionSnapshot = {
   path: string;
   title: string;

@@ -37,6 +37,84 @@ fn truncates_large_diff_output_with_flag() {
 }
 
 #[test]
+fn file_diff_args_keep_textconv_enabled() {
+    let staged = git_file_diff_args(true, "doc.aimd");
+    assert!(staged.contains(&"--textconv"));
+    assert!(!staged.contains(&"--no-textconv"));
+    assert!(staged.contains(&"--cached"));
+
+    let unstaged = git_file_diff_args(false, "doc.aimd");
+    assert!(unstaged.contains(&"--textconv"));
+    assert!(!unstaged.contains(&"--no-textconv"));
+    assert!(!unstaged.contains(&"--cached"));
+}
+
+#[cfg(unix)]
+#[test]
+fn file_diff_uses_configured_textconv_for_aimd() {
+    use std::os::unix::fs::PermissionsExt;
+    use std::process::Command;
+
+    let dir = root();
+    let repo = dir.path();
+    Command::new("git")
+        .args(["init"])
+        .current_dir(repo)
+        .output()
+        .unwrap();
+    Command::new("git")
+        .args(["config", "user.email", "aimd@example.test"])
+        .current_dir(repo)
+        .output()
+        .unwrap();
+    Command::new("git")
+        .args(["config", "user.name", "AIMD Test"])
+        .current_dir(repo)
+        .output()
+        .unwrap();
+
+    let textconv = repo.join("textconv.sh");
+    fs::write(
+        &textconv,
+        "#!/bin/sh\nprintf '%s\\n' '--- AIMD main.md ---'\ncat \"$1\"\n",
+    )
+    .unwrap();
+    let mut permissions = fs::metadata(&textconv).unwrap().permissions();
+    permissions.set_mode(0o755);
+    fs::set_permissions(&textconv, permissions).unwrap();
+
+    fs::write(repo.join(".gitattributes"), "*.aimd diff=aimd\n").unwrap();
+    Command::new("git")
+        .args([
+            "config",
+            "diff.aimd.textconv",
+            textconv.to_str().unwrap(),
+        ])
+        .current_dir(repo)
+        .output()
+        .unwrap();
+    fs::write(repo.join("doc.aimd"), "old semantic\n").unwrap();
+    Command::new("git")
+        .args(["add", "."])
+        .current_dir(repo)
+        .output()
+        .unwrap();
+    Command::new("git")
+        .args(["commit", "-m", "seed"])
+        .current_dir(repo)
+        .output()
+        .unwrap();
+
+    fs::write(repo.join("doc.aimd"), "new semantic\n").unwrap();
+    let args = git_file_diff_args(false, "doc.aimd");
+    let (diff, truncated) = run_git_ok_limited(repo, &args, DIFF_OUTPUT_LIMIT).unwrap();
+    assert!(!truncated);
+    assert!(diff.contains("--- AIMD main.md ---"));
+    assert!(diff.contains("+new semantic"));
+    assert!(!diff.contains("Binary files"));
+}
+
+#[test]
 fn parses_branch_upstream_and_ahead_behind() {
     let raw =
         b"# branch.oid abc\0# branch.head main\0# branch.upstream origin/main\0# branch.ab +2 -1\0";

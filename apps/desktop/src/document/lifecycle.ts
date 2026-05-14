@@ -15,6 +15,7 @@ import { triggerOptimizeOnOpen } from "./optimize";
 import { saveDocument } from "./persist";
 import { deleteDocumentDraft } from "./drafts";
 import { clearSessionSnapshot, clearLastSessionPath } from "../session/snapshot";
+import { createSourceModel } from "../editor/source-preserve";
 
 export type OpenRouteResult = "opened" | "focused" | "current" | "cancelled" | "failed" | "unsupported";
 
@@ -132,6 +133,9 @@ export async function newDocument() {
     format: "aimd",
   };
   state.doc = doc;
+  state.sourceModel = createSourceModel(markdown);
+  state.sourceDirtyRefs.clear();
+  state.sourceStructuralDirty = false;
   markdownEl().value = markdown;
   try {
     const out = await invoke<RenderResult>("render_markdown_standalone", { markdown });
@@ -187,6 +191,9 @@ export async function closeDocument() {
   state.doc = null;
   state.outline = [];
   state.inlineDirty = false;
+  state.sourceModel = null;
+  state.sourceDirtyRefs.clear();
+  state.sourceStructuralDirty = false;
   markdownEl().value = "";
   inlineEditorEl().innerHTML = "";
   previewEl().innerHTML = "";
