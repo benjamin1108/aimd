@@ -1,5 +1,6 @@
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
+use std::collections::BTreeMap;
 use std::io::{self, Read, Write};
 
 pub const FORMAT_NAME: &str = "aimd";
@@ -35,6 +36,8 @@ pub struct Manifest {
     pub assets: Vec<Asset>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub rendering: Option<Rendering>,
+    #[serde(flatten)]
+    pub extra: BTreeMap<String, serde_json::Value>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -68,6 +71,8 @@ pub struct Asset {
     pub size: i64,
     #[serde(default, skip_serializing_if = "String::is_empty")]
     pub role: String,
+    #[serde(flatten)]
+    pub extra: BTreeMap<String, serde_json::Value>,
 }
 
 fn is_zero_i64(v: &i64) -> bool {
@@ -96,6 +101,7 @@ impl Manifest {
             generated_by: None,
             assets: Vec::new(),
             rendering: None,
+            extra: BTreeMap::new(),
         }
     }
 
@@ -206,6 +212,7 @@ mod tests {
             sha256: "deadbeef".to_string(),
             size: 1024,
             role: "content-image".to_string(),
+            extra: Default::default(),
         });
 
         let mut buf = Vec::new();
@@ -263,6 +270,7 @@ mod tests {
             sha256: "aabbcc".to_string(),
             size: 100,
             role: "content-image".to_string(),
+            extra: Default::default(),
         });
 
         let found = m.find_asset("img-001");

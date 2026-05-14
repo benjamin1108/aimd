@@ -1,4 +1,5 @@
 use sha2::{Digest, Sha256};
+use std::collections::BTreeMap;
 use std::io::{self, Write as _};
 use std::path::Path;
 use zip::{write::FileOptions, CompressionMethod, DateTime, ZipWriter};
@@ -37,6 +38,31 @@ impl Writer {
         data: &[u8],
         role: &str,
     ) -> io::Result<crate::manifest::Asset> {
+        self.add_asset_with_mime(id, filename, data, role, None)
+    }
+
+    /// Writes a binary asset with an optional explicit MIME override.
+    pub fn add_asset_with_mime(
+        &mut self,
+        id: &str,
+        filename: &str,
+        data: &[u8],
+        role: &str,
+        mime: Option<&str>,
+    ) -> io::Result<crate::manifest::Asset> {
+        self.add_asset_with_mime_and_extra(id, filename, data, role, mime, BTreeMap::new())
+    }
+
+    /// Writes a binary asset and preserves caller-owned manifest extension fields.
+    pub fn add_asset_with_mime_and_extra(
+        &mut self,
+        id: &str,
+        filename: &str,
+        data: &[u8],
+        role: &str,
+        mime: Option<&str>,
+        extra: BTreeMap<String, serde_json::Value>,
+    ) -> io::Result<crate::manifest::Asset> {
         let rel_path = format!("assets/{}", filename);
         self.write_entry(&rel_path, data)?;
         let hash = {
@@ -47,10 +73,14 @@ impl Writer {
         let asset = crate::manifest::Asset {
             id: id.to_string(),
             path: rel_path,
-            mime: mime_by_ext(filename).to_string(),
+            mime: mime
+                .filter(|m| !m.trim().is_empty())
+                .unwrap_or_else(|| mime_by_ext(filename))
+                .to_string(),
             sha256: hash,
             size: data.len() as i64,
             role: role.to_string(),
+            extra,
         };
         self.manifest.assets.push(asset.clone());
         Ok(asset)

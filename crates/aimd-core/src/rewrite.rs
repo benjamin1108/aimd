@@ -1,6 +1,7 @@
 use chrono::Utc;
 use regex::bytes::Regex as BytesRegex;
 use sha2::{Digest, Sha256};
+use std::collections::BTreeMap;
 use std::collections::HashSet;
 use std::io;
 use std::path::Path;
@@ -18,6 +19,8 @@ pub struct NewAsset {
     pub filename: String,
     pub data: Vec<u8>,
     pub role: String,
+    pub mime: Option<String>,
+    pub extra: BTreeMap<String, serde_json::Value>,
 }
 
 pub struct PackageFile {
@@ -28,6 +31,7 @@ pub struct PackageFile {
 /// Controls an in-place rewrite of an AIMD file.
 pub struct RewriteOptions {
     pub markdown: Vec<u8>,
+    pub title: Option<String>,
     pub delete_assets: Option<HashSet<String>>,
     pub add_assets: Vec<NewAsset>,
     pub add_files: Vec<PackageFile>,
@@ -56,7 +60,11 @@ pub fn referenced_asset_ids(markdown: &[u8]) -> HashSet<String> {
 pub fn rewrite_file<P: AsRef<Path>>(path: P, opt: RewriteOptions) -> io::Result<()> {
     let path = path.as_ref();
     let r = Reader::open(path)?;
+    r.verify_assets()?;
     let mut mf = r.manifest.clone();
+    if let Some(title) = opt.title {
+        mf.title = title;
+    }
     mf.assets = Vec::new();
     mf.updated_at = Utc::now();
 
@@ -90,6 +98,12 @@ pub fn rewrite_file<P: AsRef<Path>>(path: P, opt: RewriteOptions) -> io::Result<
             filename,
             data,
             role: asset.role.clone(),
+            mime: if asset.mime.is_empty() {
+                None
+            } else {
+                Some(asset.mime.clone())
+            },
+            extra: asset.extra.clone(),
         });
     }
 
@@ -130,7 +144,14 @@ pub fn rewrite_file<P: AsRef<Path>>(path: P, opt: RewriteOptions) -> io::Result<
         } else {
             asset.role.clone()
         };
-        w.add_asset(&asset.id, &asset.filename, &asset.data, &role)?;
+        w.add_asset_with_mime_and_extra(
+            &asset.id,
+            &asset.filename,
+            &asset.data,
+            &role,
+            asset.mime.as_deref(),
+            asset.extra,
+        )?;
     }
     let bytes = w.finish_bytes()?;
 
@@ -143,6 +164,25 @@ pub fn rewrite_file<P: AsRef<Path>>(path: P, opt: RewriteOptions) -> io::Result<
     std::fs::rename(&tmp_path, path).inspect_err(|_| {
         let _ = std::fs::remove_file(&tmp_path);
     })
+}
+
+/// Updates only the manifest title and updatedAt timestamp while preserving body and assets.
+pub fn set_title_file<P: AsRef<Path>>(path: P, title: String) -> io::Result<()> {
+    let path = path.as_ref();
+    let reader = Reader::open(path)?;
+    let markdown = reader.main_markdown()?;
+    rewrite_file(
+        path,
+        RewriteOptions {
+            markdown,
+            title: Some(title),
+            delete_assets: None,
+            add_assets: Vec::new(),
+            add_files: Vec::new(),
+            delete_files: HashSet::new(),
+            gc_unreferenced: false,
+        },
+    )
 }
 
 /// Returns a collision-free id and filename for a new asset.

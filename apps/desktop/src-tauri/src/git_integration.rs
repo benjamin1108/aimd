@@ -1,8 +1,15 @@
 use serde::Serialize;
-use std::{fs, path::{Path, PathBuf}};
+use std::{fs, path::Path};
+#[path = "git_integration/config.rs"]
+mod config;
 #[path = "git_integration/support.rs"]
 mod support;
-use support::{log_event, new_request_id, run_git, run_git_logged, stderr_or_stdout};
+use config::{
+    canonical_repo_root, config_value, driver_commands, driver_configured, ensure_repo,
+    find_in_path, is_executable, write_gitattributes_line, write_global_config, write_repo_config,
+    WriteConfigReport,
+};
+use support::{log_event, new_request_id, run_git, stderr_or_stdout};
 const BARE_DIFF_TEXTCONV: &str = "aimd git-diff";
 const BARE_MERGE_DRIVER: &str = "aimd git-merge %O %A %B %P";
 const STABLE_DIFF_TEXTCONV: &str = "/usr/local/bin/aimd git-diff";
@@ -67,7 +74,17 @@ pub struct GitIntegrationActionResult {
 pub fn git_integration_status(repo_path: Option<String>) -> Result<GitIntegrationStatus, String> {
     let request_id = new_request_id("status");
     let status = status_impl(repo_path.as_deref(), request_id.clone());
-    log_event(&request_id, "status", "status", repo_path.as_deref(), None, None, None, "ok", "status checked");
+    log_event(
+        &request_id,
+        "status",
+        "status",
+        repo_path.as_deref(),
+        None,
+        None,
+        None,
+        "ok",
+        "status checked",
+    );
     Ok(status)
 }
 
@@ -102,7 +119,9 @@ pub fn git_integration_disable_global() -> Result<GitIntegrationActionResult, St
 }
 
 #[tauri::command]
-pub fn git_integration_enable_repo(repo_path: String) -> Result<GitIntegrationActionResult, String> {
+pub fn git_integration_enable_repo(
+    repo_path: String,
+) -> Result<GitIntegrationActionResult, String> {
     let request_id = new_request_id("repo-enable");
     let repo = ensure_repo(&repo_path)?;
     let result = write_repo_config(&repo, true, &request_id);
@@ -118,7 +137,9 @@ pub fn git_integration_enable_repo(repo_path: String) -> Result<GitIntegrationAc
 }
 
 #[tauri::command]
-pub fn git_integration_disable_repo(repo_path: String) -> Result<GitIntegrationActionResult, String> {
+pub fn git_integration_disable_repo(
+    repo_path: String,
+) -> Result<GitIntegrationActionResult, String> {
     let request_id = new_request_id("repo-disable");
     let repo = ensure_repo(&repo_path)?;
     let result = write_repo_config(&repo, false, &request_id);
@@ -168,7 +189,8 @@ pub fn git_integration_doctor(repo_path: Option<String>) -> Result<GitDoctorResu
     }
     if status.stable_cli_executable {
         if !status.cli_in_path {
-            messages.push("aimd 不在 App PATH 中，已使用 /usr/local/bin/aimd 作为稳定入口".to_string());
+            messages
+                .push("aimd 不在 App PATH 中，已使用 /usr/local/bin/aimd 作为稳定入口".to_string());
         }
     } else {
         messages.push(
@@ -199,7 +221,17 @@ pub fn git_integration_doctor(repo_path: Option<String>) -> Result<GitDoctorResu
         messages.push("尚未配置 AIMD Git driver".to_string());
         suggestions.push("点击启用全局 Git 集成或启用当前仓库 Git 集成".to_string());
     }
-    log_event(&request_id, "doctor", "doctor", repo_path.as_deref(), None, None, None, "ok", "doctor checked");
+    log_event(
+        &request_id,
+        "doctor",
+        "doctor",
+        repo_path.as_deref(),
+        None,
+        None,
+        None,
+        "ok",
+        "doctor checked",
+    );
     Ok(GitDoctorResult {
         request_id,
         ok: messages.is_empty(),
@@ -207,18 +239,6 @@ pub fn git_integration_doctor(repo_path: Option<String>) -> Result<GitDoctorResu
         suggestions,
         status,
     })
-}
-
-#[derive(Debug, Clone)]
-struct DriverCommands {
-    source: String,
-    textconv: String,
-    merge_driver: String,
-}
-
-#[derive(Debug)]
-struct WriteConfigReport {
-    details: Vec<String>,
 }
 
 fn status_impl(repo_path: Option<&str>, request_id: String) -> GitIntegrationStatus {
@@ -289,156 +309,18 @@ fn status_impl(repo_path: Option<&str>, request_id: String) -> GitIntegrationSta
         global_cache_textconv: config_value(None, "diff.aimd.cachetextconv"),
         global_merge_name: config_value(None, "merge.aimd.name"),
         global_merge_driver: config_value(None, "merge.aimd.driver"),
-        repo_textconv: repo.as_ref().and_then(|r| config_value(Some(r), "diff.aimd.textconv")),
-        repo_cache_textconv: repo.as_ref().and_then(|r| config_value(Some(r), "diff.aimd.cachetextconv")),
-        repo_merge_name: repo.as_ref().and_then(|r| config_value(Some(r), "merge.aimd.name")),
-        repo_merge_driver: repo.as_ref().and_then(|r| config_value(Some(r), "merge.aimd.driver")),
-    }
-}
-
-fn write_global_config(enable: bool, request_id: &str) -> Result<WriteConfigReport, String> {
-    write_config(None, "--global", enable, request_id)
-}
-
-fn write_repo_config(repo: &Path, enable: bool, request_id: &str) -> Result<WriteConfigReport, String> {
-    write_config(Some(repo), "--local", enable, request_id)
-}
-
-fn write_config(repo: Option<&Path>, scope: &str, enable: bool, request_id: &str) -> Result<WriteConfigReport, String> {
-    let cli_path = find_in_path("aimd");
-    let stable_cli_executable = is_executable(Path::new(STABLE_CLI_PATH));
-    let commands = driver_commands(cli_path.is_some(), stable_cli_executable);
-    let writes = [
-        ("diff.aimd.textconv", Some(commands.textconv.as_str())),
-        ("diff.aimd.cachetextconv", Some("false")),
-        ("merge.aimd.name", Some(MERGE_NAME)),
-        ("merge.aimd.driver", Some(commands.merge_driver.as_str())),
-    ];
-    let mut details = Vec::new();
-    for (key, value) in writes {
-        let args: Vec<&str> = if enable {
-            vec!["config", scope, key, value.unwrap()]
-        } else {
-            vec!["config", scope, "--unset-all", key]
-        };
-        let out = run_git_logged(request_id, if repo.is_some() { "repo" } else { "global" }, repo, &args)?;
-        if enable && !out.status.success() {
-            return Err(format!("git config {key} 失败: {}", stderr_or_stdout(&out)));
-        }
-        if enable {
-            details.push(format!("{key} = {}", value.unwrap()));
-        } else if out.status.success() {
-            details.push(format!("{key} 已删除"));
-        } else {
-            details.push(format!("{key} 原本不存在"));
-        }
-    }
-    verify_config(repo, enable, &commands)?;
-    Ok(WriteConfigReport { details })
-}
-
-fn write_gitattributes_line(repo: &Path) -> Result<Vec<String>, String> {
-    let path = repo.join(".gitattributes");
-    let existing = fs::read_to_string(&path).unwrap_or_default();
-    if existing
-        .lines()
-        .any(|line| line.trim() == GITATTRIBUTES_LINE)
-    {
-        return Ok(vec![".gitattributes 已包含 *.aimd diff=aimd merge=aimd".to_string()]);
-    }
-    let mut next = existing;
-    if !next.is_empty() && !next.ends_with('\n') {
-        next.push('\n');
-    }
-    next.push_str(GITATTRIBUTES_LINE);
-    next.push('\n');
-    fs::write(&path, next).map_err(|e| format!("写入 .gitattributes 失败: {e}"))?;
-    Ok(vec![".gitattributes 已追加 *.aimd diff=aimd merge=aimd".to_string()])
-}
-
-fn ensure_repo(path: &str) -> Result<PathBuf, String> {
-    canonical_repo_root(Path::new(path)).map_err(|_| "当前路径不是 Git 仓库".to_string())
-}
-
-fn canonical_repo_root(path: &Path) -> Result<PathBuf, String> {
-    let root = fs::canonicalize(path).map_err(|e| e.to_string())?;
-    let out = run_git(Some(&root), &["rev-parse", "--show-toplevel"])?;
-    if !out.status.success() {
-        return Err(stderr_or_stdout(&out));
-    }
-    let s = String::from_utf8_lossy(&out.stdout).trim().to_string();
-    if s.is_empty() {
-        Err("empty git root".to_string())
-    } else {
-        Ok(PathBuf::from(s))
-    }
-}
-
-fn driver_configured(repo: Option<&Path>, commands: &DriverCommands) -> bool {
-    config_value(repo, "diff.aimd.textconv").as_deref() == Some(commands.textconv.as_str())
-        && config_value(repo, "diff.aimd.cachetextconv").as_deref() != Some("true")
-        && config_value(repo, "merge.aimd.name").as_deref() == Some(MERGE_NAME)
-        && config_value(repo, "merge.aimd.driver").as_deref() == Some(commands.merge_driver.as_str())
-}
-
-fn config_value(repo: Option<&Path>, key: &str) -> Option<String> {
-    let scope = if repo.is_some() {
-        "--local"
-    } else {
-        "--global"
-    };
-    let out = run_git(repo, &["config", scope, "--get", key]).ok()?;
-    if !out.status.success() {
-        return None;
-    }
-    Some(String::from_utf8_lossy(&out.stdout).trim().to_string())
-}
-
-fn verify_config(repo: Option<&Path>, enable: bool, commands: &DriverCommands) -> Result<(), String> {
-    if enable {
-        if driver_configured(repo, commands) {
-            Ok(())
-        } else {
-            Err("git config 写入后验证失败".to_string())
-        }
-    } else {
-        let keys = [
-            "diff.aimd.textconv",
-            "diff.aimd.cachetextconv",
-            "merge.aimd.name",
-            "merge.aimd.driver",
-        ];
-        let remaining: Vec<_> = keys
-            .into_iter()
-            .filter(|key| config_value(repo, key).is_some())
-            .collect();
-        if remaining.is_empty() {
-            Ok(())
-        } else {
-            Err(format!("git config 禁用后仍存在: {}", remaining.join(", ")))
-        }
-    }
-}
-
-fn driver_commands(cli_in_path: bool, stable_cli_executable: bool) -> DriverCommands {
-    if cli_in_path {
-        DriverCommands {
-            source: "path".to_string(),
-            textconv: BARE_DIFF_TEXTCONV.to_string(),
-            merge_driver: BARE_MERGE_DRIVER.to_string(),
-        }
-    } else if stable_cli_executable {
-        DriverCommands {
-            source: "stable".to_string(),
-            textconv: STABLE_DIFF_TEXTCONV.to_string(),
-            merge_driver: STABLE_MERGE_DRIVER.to_string(),
-        }
-    } else {
-        DriverCommands {
-            source: "path".to_string(),
-            textconv: BARE_DIFF_TEXTCONV.to_string(),
-            merge_driver: BARE_MERGE_DRIVER.to_string(),
-        }
+        repo_textconv: repo
+            .as_ref()
+            .and_then(|r| config_value(Some(r), "diff.aimd.textconv")),
+        repo_cache_textconv: repo
+            .as_ref()
+            .and_then(|r| config_value(Some(r), "diff.aimd.cachetextconv")),
+        repo_merge_name: repo
+            .as_ref()
+            .and_then(|r| config_value(Some(r), "merge.aimd.name")),
+        repo_merge_driver: repo
+            .as_ref()
+            .and_then(|r| config_value(Some(r), "merge.aimd.driver")),
     }
 }
 
@@ -454,7 +336,17 @@ fn action_result(
     match result {
         Ok(report) => {
             let status = status_impl(status_repo_path, request_id.clone());
-            log_event(&request_id, "action", scope, repo_path, None, None, None, "ok", success_title);
+            log_event(
+                &request_id,
+                "action",
+                scope,
+                repo_path,
+                None,
+                None,
+                None,
+                "ok",
+                success_title,
+            );
             Ok(GitIntegrationActionResult {
                 request_id,
                 ok: true,
@@ -465,34 +357,20 @@ fn action_result(
             })
         }
         Err(err) => {
-            log_event(&request_id, "action", scope, repo_path, None, None, None, "failed", &err);
+            log_event(
+                &request_id,
+                "action",
+                scope,
+                repo_path,
+                None,
+                None,
+                None,
+                "failed",
+                &err,
+            );
             Err(format!("{failure_title}: {err}（requestId: {request_id}）"))
         }
     }
-}
-
-fn find_in_path(name: &str) -> Option<PathBuf> {
-    let path = std::env::var_os("PATH")?;
-    for dir in std::env::split_paths(&path) {
-        let candidate = dir.join(name);
-        if is_executable(&candidate) {
-            return Some(candidate);
-        }
-    }
-    None
-}
-
-#[cfg(unix)]
-fn is_executable(path: &Path) -> bool {
-    use std::os::unix::fs::PermissionsExt;
-    fs::metadata(path)
-        .map(|m| m.is_file() && (m.permissions().mode() & 0o111 != 0))
-        .unwrap_or(false)
-}
-
-#[cfg(not(unix))]
-fn is_executable(path: &Path) -> bool {
-    path.is_file()
 }
 
 #[cfg(test)]

@@ -2,8 +2,11 @@
 set -euo pipefail
 
 PKG_IDENTIFIER="org.aimd.desktop.pkg"
-APP_PATH="/Applications/AIMD.app"
+APP_PATH="/Applications/AIMD Desktop.app"
+LEGACY_APP_PATH="/Applications/AIMD.app"
 CLI_PATH="/usr/local/bin/aimd"
+SHARE_PATH="/usr/local/share/aimd"
+USER_BIN_NAME=".local/bin/aimd"
 
 usage() {
   cat <<'USAGE'
@@ -11,8 +14,9 @@ Usage:
   ./scripts/uninstall-macos-pkg.sh
 
 Uninstalls the system-level AIMD macOS PKG install:
-  /Applications/AIMD.app
+  /Applications/AIMD Desktop.app
   /usr/local/bin/aimd
+  /usr/local/share/aimd
 
 The script also removes global AIMD Git driver config and forgets the macOS
 PKG receipt. User documents and AIMD app data are not removed.
@@ -40,8 +44,18 @@ elif command -v git >/dev/null 2>&1; then
   git config --global --unset-all merge.aimd.driver 2>/dev/null || true
 fi
 
-echo "==> removing $APP_PATH and $CLI_PATH"
-sudo rm -rf "$APP_PATH" "$CLI_PATH"
+console_user="$(stat -f '%Su' /dev/console 2>/dev/null || true)"
+if [[ -n "$console_user" && "$console_user" != "root" && "$console_user" != "loginwindow" ]]; then
+  home_dir="$(dscl . -read "/Users/$console_user" NFSHomeDirectory 2>/dev/null | awk '{print $2}' || true)"
+  user_cli="${home_dir:-}/$USER_BIN_NAME"
+  if [[ -n "${home_dir:-}" && -f "$user_cli" && -f "$CLI_PATH" ]] && cmp -s "$user_cli" "$CLI_PATH"; then
+    echo "==> removing user CLI shim $user_cli"
+    sudo rm -f "$user_cli"
+  fi
+fi
+
+echo "==> removing $APP_PATH, $LEGACY_APP_PATH, $CLI_PATH, and $SHARE_PATH"
+sudo rm -rf "$APP_PATH" "$LEGACY_APP_PATH" "$CLI_PATH" "$SHARE_PATH"
 
 echo "==> forgetting pkg receipt $PKG_IDENTIFIER"
 sudo pkgutil --forget "$PKG_IDENTIFIER" >/dev/null 2>&1 || true

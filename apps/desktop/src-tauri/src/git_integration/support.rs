@@ -112,20 +112,22 @@ pub(super) fn log_event(
     let stderr_tail = output
         .map(|out| tail(&String::from_utf8_lossy(&out.stderr)))
         .unwrap_or_default();
-    dev_log::git_integration(action, || json!({
-        "requestId": request_id,
-        "action": action,
-        "scope": scope,
-        "repoPath": repo_path,
-        "command": command,
-        "startedAt": Utc::now().to_rfc3339(),
-        "elapsedMs": elapsed_ms,
-        "exitCode": exit_code,
-        "stdoutTail": stdout_tail,
-        "stderrTail": stderr_tail,
-        "result": result,
-        "message": message,
-    }));
+    dev_log::git_integration(action, || {
+        json!({
+            "requestId": request_id,
+            "action": action,
+            "scope": scope,
+            "repoPath": repo_path,
+            "command": command,
+            "startedAt": Utc::now().to_rfc3339(),
+            "elapsedMs": elapsed_ms,
+            "exitCode": exit_code,
+            "stdoutTail": stdout_tail,
+            "stderrTail": stderr_tail,
+            "result": result,
+            "message": message,
+        })
+    });
 }
 
 fn tail(value: &str) -> String {

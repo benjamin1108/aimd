@@ -137,6 +137,8 @@ pub fn bundle_local_images(
             filename,
             data,
             role: ROLE_CONTENT_IMAGE.to_string(),
+            mime: None,
+            extra: Default::default(),
         });
     }
 

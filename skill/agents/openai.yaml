@@ -1,0 +1,4 @@
+interface:
+  display_name: "AIMD"
+  short_description: "Read and edit .aimd Markdown packages"
+  default_prompt: "Use $aimd to inspect, edit, or create an AIMD .aimd document safely."

@@ -105,7 +105,10 @@ fn disabling_missing_repo_keys_is_successful() {
     }
 
     let report = write_repo_config(tmp.path(), false, "test-disable-missing").unwrap();
-    assert!(report.details.iter().any(|line| line.contains("原本不存在")));
+    assert!(report
+        .details
+        .iter()
+        .any(|line| line.contains("原本不存在")));
 }
 
 #[cfg(unix)]

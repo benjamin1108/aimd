@@ -21,12 +21,12 @@ use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Mutex;
 use tauri::{AppHandle, State};
 
+#[path = "documents/path_utils.rs"]
+mod path_utils;
 #[path = "documents/pdf.rs"]
 mod pdf;
 #[path = "documents/pdf_diagnostics.rs"]
 mod pdf_diagnostics;
-#[path = "documents/path_utils.rs"]
-mod path_utils;
 #[path = "documents/remote_images.rs"]
 mod remote_images;
 pub(crate) use path_utils::file_url_for_path;
@@ -122,6 +122,7 @@ pub fn save_aimd(path: String, markdown: String) -> Result<Value, String> {
         file,
         RewriteOptions {
             markdown: markdown.as_bytes().to_vec(),
+            title: None,
             delete_assets: None,
             add_assets: Vec::new(),
             add_files: Vec::new(),
@@ -262,6 +263,7 @@ pub fn package_local_images(path: String, markdown: String) -> Result<Value, Str
         file,
         RewriteOptions {
             markdown: bundled.markdown,
+            title: None,
             delete_assets: None,
             add_assets: bundled.assets,
             add_files: Vec::new(),

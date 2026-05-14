@@ -10,3 +10,9 @@ path = "src/main.rs"
 
 [dependencies]
 aimd-core = { path = "../aimd-core" }
+clap = { version = "4", features = ["derive"] }
+serde = { workspace = true }
+serde_json = { workspace = true }
+
+[dev-dependencies]
+tempfile = { workspace = true }

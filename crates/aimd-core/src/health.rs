@@ -231,6 +231,7 @@ mod tests {
             sha256: "hash".to_string(),
             size: 1024,
             role: ROLE_CONTENT_IMAGE.to_string(),
+            extra: Default::default(),
         });
         mf.assets.push(Asset {
             id: "unused-001".to_string(),
@@ -239,6 +240,7 @@ mod tests {
             sha256: "hash".to_string(),
             size: 10 * 1024 * 1024,
             role: ROLE_CONTENT_IMAGE.to_string(),
+            extra: Default::default(),
         });
         mf
     }

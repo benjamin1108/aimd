@@ -1,0 +1,75 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+CLI="/usr/local/bin/aimd"
+SKILL_SOURCE="/usr/local/share/aimd/skill/aimd"
+
+console_user="$(stat -f '%Su' /dev/console 2>/dev/null || true)"
+if [[ -z "$console_user" || "$console_user" == "root" || "$console_user" == "loginwindow" ]]; then
+  exit 0
+fi
+
+home_dir="$(dscl . -read "/Users/$console_user" NFSHomeDirectory 2>/dev/null | awk '{print $2}' || true)"
+if [[ -z "$home_dir" || ! -d "$home_dir" ]]; then
+  exit 0
+fi
+
+if [[ ! -x "$CLI" || ! -f "$SKILL_SOURCE/SKILL.md" ]]; then
+  exit 0
+fi
+
+install -d -o "$console_user" -g staff "$home_dir/.local/bin"
+if [[ -e "$home_dir/.local/bin/aimd" ]] && ! cmp -s "$CLI" "$home_dir/.local/bin/aimd"; then
+  backup="$home_dir/.local/bin/aimd.pre-aimd-pkg.$(date +%Y%m%d%H%M%S)"
+  mv "$home_dir/.local/bin/aimd" "$backup"
+  chown "$console_user":staff "$backup" 2>/dev/null || true
+fi
+install -m 0755 -o "$console_user" -g staff "$CLI" "$home_dir/.local/bin/aimd"
+
+agents=(
+  claude-code
+  github-copilot
+  codex
+  gemini
+  cursor
+  amp
+  goose
+  opencode
+  windsurf
+  antigravity
+  cline
+  warp
+  continue
+  roo
+  kiro
+  qwen
+  openhands
+  qoderwork
+)
+
+for agent in "${agents[@]}"; do
+  HOME="$home_dir" "$CLI" skill install --agent "$agent" --scope user --force >/dev/null 2>&1 || true
+done
+
+for dir in \
+  "$home_dir/.claude/skills/aimd" \
+  "$home_dir/.copilot/skills/aimd" \
+  "$home_dir/.agents/skills/aimd" \
+  "$home_dir/.gemini/skills/aimd" \
+  "$home_dir/.cursor/skills/aimd" \
+  "$home_dir/.config/agents/skills/aimd" \
+  "$home_dir/.config/opencode/skills/aimd" \
+  "$home_dir/.codeium/windsurf/skills/aimd" \
+  "$home_dir/.gemini/antigravity/skills/aimd" \
+  "$home_dir/.continue/skills/aimd" \
+  "$home_dir/.roo/skills/aimd" \
+  "$home_dir/.kiro/skills/aimd" \
+  "$home_dir/.qwen/skills/aimd" \
+  "$home_dir/.openhands/skills/aimd" \
+  "$home_dir/.qoderwork/skills/aimd"; do
+  if [[ -d "$dir" ]]; then
+    chown -R "$console_user":staff "$dir" 2>/dev/null || true
+  fi
+done
+
+exit 0

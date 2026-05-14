@@ -165,6 +165,7 @@ fn canonical_bytes_include_manifest_asset_sha_and_size() {
         sha256: "".into(),
         size: 0,
         role: ROLE_CONTENT_IMAGE.into(),
+        extra: Default::default(),
     });
     let mut assets = std::collections::BTreeMap::new();
     assets.insert(

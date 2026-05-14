@@ -39,8 +39,14 @@ Usage:
   ./scripts/build-macos-pkg.sh --skip-build
 
 Builds AIMD Desktop, builds the aimd CLI, and creates a system-level PKG that installs:
-  /Applications/AIMD.app
+  /Applications/AIMD Desktop.app
   /usr/local/bin/aimd
+  /usr/local/share/aimd/skill/aimd
+
+The package postinstall also installs the AIMD skill into supported user-level
+Agent skill directories for the active console user and refreshes
+~/.local/bin/aimd when that user-local path shadows /usr/local/bin/aimd.
+The package preinstall quits a running AIMD Desktop before replacing the app.
 
 The final package is written to dist/. Cargo/Tauri caches stay under target/.
 After a successful package build, distributable byproducts such as .app/.dmg
@@ -202,20 +208,28 @@ if [[ ! -x "$CLI_PATH" ]]; then
   exit 1
 fi
 
+SKILL_SOURCE="$ROOT/skill"
+if [[ ! -f "$SKILL_SOURCE/SKILL.md" ]]; then
+  echo "error: missing AIMD skill source: $SKILL_SOURCE/SKILL.md" >&2
+  exit 1
+fi
+
 PKGROOT="$(mktemp -d "${TMPDIR:-/tmp}/aimd-pkgroot.XXXXXX")"
 trap '[[ -n "${PKGROOT:-}" ]] && rm -rf "$PKGROOT"' EXIT
 prepare_output_dir
-mkdir -p "$PKGROOT/Applications" "$PKGROOT/usr/local/bin"
+mkdir -p "$PKGROOT/Applications" "$PKGROOT/usr/local/bin" "$PKGROOT/usr/local/share/aimd/skill/aimd"
 xattr -cr "$APP_PATH" 2>/dev/null || true
-mkdir -p "$PKGROOT/Applications/AIMD.app"
-cp -R "$APP_PATH"/. "$PKGROOT/Applications/AIMD.app/"
+mkdir -p "$PKGROOT/Applications/AIMD Desktop.app"
+cp -R "$APP_PATH"/. "$PKGROOT/Applications/AIMD Desktop.app/"
 install -m 0755 "$CLI_PATH" "$PKGROOT/usr/local/bin/aimd"
+cp -R "$SKILL_SOURCE"/. "$PKGROOT/usr/local/share/aimd/skill/aimd/"
 find "$PKGROOT" -name '._*' -delete
 xattr -cr "$PKGROOT" 2>/dev/null || true
 chmod -R u+rwX,go+rX "$PKGROOT"
 
 pkgbuild \
   --root "$PKGROOT" \
+  --scripts "$ROOT/scripts/pkg" \
   --filter '(^|/)\._[^/]*$' \
   --filter '.*\.DS_Store$' \
   --identifier "$IDENTIFIER" \

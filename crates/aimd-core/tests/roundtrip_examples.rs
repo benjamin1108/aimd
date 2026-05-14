@@ -128,6 +128,7 @@ fn rewrite_gc_preserves_referenced_assets_and_advances_updated_at() {
         &aimd_path,
         RewriteOptions {
             markdown: md_before.clone(),
+            title: None,
             delete_assets: None,
             add_assets: vec![],
             add_files: vec![],
@@ -177,6 +178,7 @@ fn rewrite_produces_no_leftover_tmp_files() {
         &aimd_path,
         RewriteOptions {
             markdown: md,
+            title: None,
             delete_assets: None,
             add_assets: vec![],
             add_files: vec![],

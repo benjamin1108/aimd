@@ -86,12 +86,15 @@ pub fn add_image(path: String, image_path: String) -> Result<Value, String> {
         file,
         RewriteOptions {
             markdown: md_bytes,
+            title: None,
             delete_assets: None,
             add_assets: vec![NewAsset {
                 id: id.clone(),
                 filename: filename.clone(),
                 data,
                 role: ROLE_CONTENT_IMAGE.to_string(),
+                mime: None,
+                extra: Default::default(),
             }],
             add_files: Vec::new(),
             delete_files: std::collections::HashSet::new(),
@@ -196,6 +199,12 @@ pub fn replace_aimd_asset(
                 filename: new_filename.clone(),
                 data: bytes.clone(),
                 role: asset.role.clone(),
+                mime: if asset.mime.is_empty() {
+                    None
+                } else {
+                    Some(asset.mime.clone())
+                },
+                extra: asset.extra.clone(),
             });
             break;
         }
@@ -209,6 +218,7 @@ pub fn replace_aimd_asset(
 
     let opt = RewriteOptions {
         markdown,
+        title: None,
         delete_assets: Some(delete_ids),
         add_assets,
         add_files: Vec::new(),

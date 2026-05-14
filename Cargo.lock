@@ -22,6 +22,10 @@ name = "aimd-cli"
 version = "1.0.0"
 dependencies = [
  "aimd-core",
+ "clap",
+ "serde",
+ "serde_json",
+ "tempfile",
 ]
 
 [[package]]

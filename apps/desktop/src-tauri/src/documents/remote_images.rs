@@ -66,6 +66,7 @@ pub(super) async fn package_remote_images(path: String, markdown: String) -> Res
                     sha256: hash.clone(),
                     size: data.len() as i64,
                     role: ROLE_CONTENT_IMAGE.to_string(),
+                    extra: Default::default(),
                 });
                 hash_to_id.insert(hash, id.clone());
                 url_to_id.insert(url, id.clone());
@@ -74,6 +75,8 @@ pub(super) async fn package_remote_images(path: String, markdown: String) -> Res
                     filename,
                     data,
                     role: ROLE_CONTENT_IMAGE.to_string(),
+                    mime: content_type,
+                    extra: Default::default(),
                 });
             }
             Err(err) => failures.push(format!("{url}: {err}")),
@@ -102,6 +105,7 @@ pub(super) async fn package_remote_images(path: String, markdown: String) -> Res
         file,
         RewriteOptions {
             markdown: rewritten,
+            title: None,
             delete_assets: None,
             add_assets,
             add_files: Vec::new(),

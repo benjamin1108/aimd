@@ -24,6 +24,7 @@ pub use pack::{
 };
 pub use reader::Reader;
 pub use rewrite::{
-    referenced_asset_ids, rewrite_file, unique_asset_name, NewAsset, PackageFile, RewriteOptions,
+    referenced_asset_ids, rewrite_file, set_title_file, unique_asset_name, NewAsset, PackageFile,
+    RewriteOptions,
 };
 pub use writer::Writer;
