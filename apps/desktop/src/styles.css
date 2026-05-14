@@ -5,6 +5,7 @@
    so each concern owns its own selectors. */
 
 @import "./styles/tokens.css";
+@import "./styles/selection.css";
 @import "./styles/frame.css";
 @import "./styles/sidebar.css";
 @import "./styles/sidebar-layout.css";

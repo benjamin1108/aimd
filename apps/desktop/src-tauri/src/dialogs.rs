@@ -136,6 +136,17 @@ pub fn confirm_upgrade_to_aimd(message: String) -> bool {
 }
 
 #[tauri::command]
+pub fn confirm_git_config_change(message: String) -> bool {
+    let result = rfd::MessageDialog::new()
+        .set_title("AIMD Git 集成")
+        .set_description(&message)
+        .set_level(rfd::MessageLevel::Warning)
+        .set_buttons(rfd::MessageButtons::YesNo)
+        .show();
+    matches!(result, rfd::MessageDialogResult::Yes)
+}
+
+#[tauri::command]
 pub fn confirm_keep_online_images(message: String) -> bool {
     let result = rfd::MessageDialog::new()
         .set_title("AIMD Desktop")

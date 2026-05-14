@@ -12,6 +12,22 @@ export const turndown = new TurndownService({
 
 turndown.use(gfm);
 
+const UI_ONLY_LINK_TITLES = new Set(["打开链接", "按住 Ctrl/⌘ 点击打开链接"]);
+
+turndown.addRule("linkWithoutUiTitle", {
+  filter: "a",
+  replacement(content, node) {
+    const anchor = node as Element;
+    const href = anchor.getAttribute("href");
+    if (!href) return content;
+    const title = anchor.getAttribute("title") || "";
+    const titleSuffix = title && !UI_ONLY_LINK_TITLES.has(title)
+      ? ` "${title.replace(/"/g, '\\"')}"`
+      : "";
+    return `[${content}](${href}${titleSuffix})`;
+  },
+});
+
 turndown.addRule("aimdImage", {
   filter: "img",
   replacement(_content, node) {

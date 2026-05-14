@@ -36,7 +36,12 @@ export function normalizeDocument(doc: AimdDocument): AimdDocument {
     hasExternalImageReferences: externalImages,
     requiresAimdSave,
     needsAimdSave: requiresAimdSave,
+    hasGitConflicts: hasGitConflictMarkers(doc.markdown) || hasGitConflictMarkers(doc.html || ""),
   };
+}
+
+export function hasGitConflictMarkers(markdown: string): boolean {
+  return markdown.includes("<<<<<<<") && markdown.includes("=======") && markdown.includes(">>>>>>>");
 }
 
 export function inferFormat(doc: AimdDocument): "aimd" | "markdown" {

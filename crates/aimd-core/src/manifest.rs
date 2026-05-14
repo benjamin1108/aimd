@@ -100,10 +100,26 @@ impl Manifest {
     }
 
     pub fn encode<W: Write>(&self, w: &mut W) -> io::Result<()> {
-        let json = serde_json::to_string_pretty(self)
+        let json = serde_json::to_string_pretty(&self.canonicalized())
             .map_err(|e| io::Error::new(io::ErrorKind::InvalidData, e))?;
         w.write_all(json.as_bytes())?;
         w.write_all(b"\n")
+    }
+
+    pub fn canonicalized(&self) -> Self {
+        let mut out = self.clone();
+        out.entry = FILE_MAIN_MD.to_string();
+        out.assets.sort_by(|a, b| {
+            a.id.cmp(&b.id)
+                .then_with(|| a.path.cmp(&b.path))
+                .then_with(|| a.sha256.cmp(&b.sha256))
+        });
+        out.authors.sort_by(|a, b| {
+            a.name
+                .cmp(&b.name)
+                .then_with(|| a.author_type.cmp(&b.author_type))
+        });
+        out
     }
 
     pub fn decode<R: Read>(r: R) -> io::Result<Self> {

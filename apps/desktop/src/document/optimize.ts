@@ -18,10 +18,12 @@ export function formatBytes(bytes: number): string {
 
 export async function triggerOptimizeOnOpen(docPath: string) {
   if ((window as any).__aimd_e2e_disable_auto_optimize) return;
+  if (state.doc?.hasGitConflicts) return;
   try {
     setStatus("正在检查图片优化空间", "loading");
     const startedDocPath = docPath;
     const result = await optimizeDocumentAssets(docPath, startedDocPath);
+    if (state.doc?.hasGitConflicts) return;
     if (result.optimized === 0) {
       setStatus("就绪", "idle");
       return;

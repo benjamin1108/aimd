@@ -70,7 +70,6 @@ function enableExternalLinks(root: HTMLElement, mode: LinkOpenMode) {
     const url = resolveExternalUrl(anchor);
     if (!url) return;
     anchor.dataset.externalLink = "true";
-    anchor.title = mode === "modifier" ? "按住 Ctrl/⌘ 点击打开链接" : "打开链接";
   });
   if (root.dataset.externalLinkBound) return;
   root.dataset.externalLinkBound = "true";

@@ -2,6 +2,7 @@
 resolver = "2"
 members = [
     "crates/aimd-core",
+    "crates/aimd-cli",
     "crates/aimd-mdx",
     "crates/aimd-render",
     "apps/desktop/src-tauri",

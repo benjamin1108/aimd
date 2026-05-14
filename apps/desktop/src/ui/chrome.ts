@@ -62,7 +62,11 @@ export function setStatus(text: string, tone: "idle" | "loading" | "success" | "
     state.statusTimer = window.setTimeout(() => {
       state.statusTimer = null;
       const doc = state.doc;
-      if (doc?.dirty) {
+      if (doc && (doc.hasGitConflicts || hasGitConflictMarkers(doc.markdown) || hasGitConflictMarkers(doc.html))) {
+        doc.hasGitConflicts = true;
+        statusEl().textContent = "文档包含 Git 冲突，请解决后保存";
+        statusPillEl().dataset.tone = "warn";
+      } else if (doc?.dirty) {
         statusEl().textContent = "未保存的修改";
         statusPillEl().dataset.tone = "warn";
       } else {
@@ -156,7 +160,11 @@ export function updateChrome() {
   // 已保存 / 失败）窗口期内 statusTimer 非 null，这里不抢；timer 回调结束后
   // 会自己根据 dirty 回退到稳定态。
   if (state.statusTimer == null) {
-    if (doc.requiresAimdSave) {
+    if (doc.hasGitConflicts || hasGitConflictMarkers(doc.markdown) || hasGitConflictMarkers(doc.html)) {
+      doc.hasGitConflicts = true;
+      statusEl().textContent = "文档包含 Git 冲突，请解决后保存";
+      statusPillEl().dataset.tone = "warn";
+    } else if (doc.requiresAimdSave) {
       statusEl().textContent = "保存时需选择格式";
       statusPillEl().dataset.tone = "info";
     } else if (doc.isDraft && !doc.dirty) {
@@ -170,4 +178,8 @@ export function updateChrome() {
     }
   }
   persistSessionSnapshot();
+}
+
+function hasGitConflictMarkers(markdown: string): boolean {
+  return markdown.includes("<<<<<<<") && markdown.includes("=======") && markdown.includes(">>>>>>>");
 }

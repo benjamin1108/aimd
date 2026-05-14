@@ -7,6 +7,7 @@ import { renderPreview } from "../ui/outline";
 import { loadAppSettings } from "../core/settings";
 import { hasAimdImageReferences } from "./assets";
 import { splitFrontmatter } from "../markdown/frontmatter";
+import { hasGitConflictMarkers } from "./apply";
 
 let formatting = false;
 let pendingMarkdown = "";
@@ -98,6 +99,12 @@ export async function formatCurrentDocument() {
   if (!state.doc || formatting) return;
   if (!state.doc.markdown.trim()) {
     setStatus("当前文档为空，无法格式化", "info");
+    return;
+  }
+  if (state.doc.hasGitConflicts || hasGitConflictMarkers(state.doc.markdown)) {
+    state.doc.hasGitConflicts = true;
+    updateChrome();
+    setStatus("文档包含 Git 冲突，请解决后再格式化", "warn");
     return;
   }
   if (state.mode === "edit") flushInline();

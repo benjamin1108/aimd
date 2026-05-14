@@ -51,7 +51,7 @@ https://github.com/benjamin1108/aimd/releases
 
 | 平台 | 安装包 |
 |---|---|
-| macOS Apple Silicon | `AIMD.Desktop_0.1.0_aarch64.dmg` |
+| macOS Apple Silicon | `AIMD-0.1.0.pkg` |
 | Windows x64 | `AIMD.Desktop_0.1.0_x64-setup.exe` |
 | Windows x64 MSI | `AIMD.Desktop_0.1.0_x64_en-US.msi` |
 
@@ -115,7 +115,8 @@ npm run test:e2e
 
 ```bash
 # macOS
-./build-dmg.sh
+./scripts/build-macos-pkg.sh
+# output: dist/AIMD-<version>.pkg
 
 # Windows
 build-windows.bat

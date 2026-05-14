@@ -18,6 +18,13 @@ dependencies = [
 ]
 
 [[package]]
+name = "aimd-cli"
+version = "1.0.0"
+dependencies = [
+ "aimd-core",
+]
+
+[[package]]
 name = "aimd-core"
 version = "1.0.0"
 dependencies = [

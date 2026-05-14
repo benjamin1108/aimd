@@ -11,6 +11,7 @@ mod dto;
 mod external;
 mod formatter;
 mod git;
+mod git_integration;
 mod importer;
 mod llm;
 mod macos_assoc;
@@ -97,6 +98,7 @@ pub fn run() {
             dialogs::choose_export_pdf_file,
             dialogs::confirm_discard_changes,
             dialogs::confirm_upgrade_to_aimd,
+            dialogs::confirm_git_config_change,
             dialogs::confirm_keep_online_images,
             dialogs::reveal_in_finder,
             git::get_git_repo_status,
@@ -108,6 +110,13 @@ pub fn run() {
             git::git_commit,
             git::git_pull,
             git::git_push,
+            git_integration::git_integration_status,
+            git_integration::git_integration_enable_global,
+            git_integration::git_integration_disable_global,
+            git_integration::git_integration_enable_repo,
+            git_integration::git_integration_disable_repo,
+            git_integration::git_integration_write_gitattributes,
+            git_integration::git_integration_doctor,
             workspace::open_workspace_dir,
             workspace::read_workspace_tree,
             workspace::create_workspace_file,

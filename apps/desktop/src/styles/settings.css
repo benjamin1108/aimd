@@ -303,6 +303,45 @@
   color: var(--tone-danger);
 }
 
+.git-integration-status {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 10px;
+  border: 1px solid var(--hairline);
+  border-radius: 8px;
+  background: var(--bg-soft);
+}
+
+.git-status-line {
+  display: grid;
+  grid-template-columns: 136px minmax(0, 1fr);
+  gap: 10px;
+  align-items: baseline;
+  color: var(--ink-muted);
+  font-size: 12px;
+  line-height: 1.4;
+}
+
+.git-status-line strong {
+  color: var(--ink-strong);
+  font-weight: 600;
+}
+
+.git-status-line[data-ok="true"] span {
+  color: var(--tone-success);
+}
+
+.git-status-line[data-ok="false"] span {
+  color: var(--tone-warn);
+}
+
+.git-integration-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
 .settings-actions {
   display: flex;
   align-items: center;

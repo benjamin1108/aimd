@@ -37,6 +37,10 @@ export async function saveDocument() {
     return;
   }
   if (!state.doc.dirty) return;
+  if (state.doc.hasGitConflicts && !window.confirm("文档仍包含 Git 冲突标记。确认保存？")) {
+    setStatus("已取消保存，请先解决 Git 冲突", "warn");
+    return;
+  }
 
   if (state.doc.format === "markdown") {
     if (state.doc.requiresAimdSave) {
@@ -187,6 +191,10 @@ async function saveDocumentAsAimd(sourcePath: string | null, wasDraft: boolean, 
 export async function saveDocumentAs() {
   if (!state.doc) return;
   if (state.mode === "edit") flushInline();
+  if (state.doc.hasGitConflicts && !window.confirm("文档仍包含 Git 冲突标记。确认另存？")) {
+    setStatus("已取消保存，请先解决 Git 冲突", "warn");
+    return;
+  }
   const wasDraft = Boolean(state.doc.isDraft || !state.doc.path);
   const draftSourcePath = state.doc.draftSourcePath || "";
   const sourcePath = state.doc.format === "markdown"

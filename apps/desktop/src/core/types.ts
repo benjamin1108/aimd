@@ -21,6 +21,7 @@ export type AimdDocument = {
   needsAimdSave?: boolean;
   hasExternalImageReferences?: boolean;
   requiresAimdSave?: boolean;
+  hasGitConflicts?: boolean;
   format: "aimd" | "markdown";
 };
 
@@ -40,6 +41,7 @@ export type SessionSnapshot = {
   needsAimdSave?: boolean;
   hasExternalImageReferences?: boolean;
   requiresAimdSave?: boolean;
+  hasGitConflicts?: boolean;
   format: "aimd" | "markdown";
   mode: Mode;
 };

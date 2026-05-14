@@ -30,8 +30,23 @@ where
     write_json_line("llm", event, payload());
 }
 
+#[cfg(debug_assertions)]
+pub fn git_integration<F>(event: &str, payload: F)
+where
+    F: FnOnce() -> Value,
+{
+    write_json_line("git-integration", event, payload());
+}
+
 #[cfg(not(debug_assertions))]
 pub fn llm<F>(_event: &str, _payload: F)
+where
+    F: FnOnce() -> serde_json::Value,
+{
+}
+
+#[cfg(not(debug_assertions))]
+pub fn git_integration<F>(_event: &str, _payload: F)
 where
     F: FnOnce() -> serde_json::Value,
 {

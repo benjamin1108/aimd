@@ -17,6 +17,12 @@ export function refreshSourceBanner() {
     banner.hidden = true;
     return;
   }
+  if (state.doc.hasGitConflicts) {
+    sourceBannerTextEl().innerHTML =
+      "<strong>Git 冲突</strong>：文档包含 conflict markers，请在源码中搜索 <<<<<<< 并解决后保存。";
+    banner.hidden = false;
+    return;
+  }
   const { frontmatter } = splitFrontmatter(state.doc.markdown);
   if (!frontmatter) {
     banner.hidden = true;

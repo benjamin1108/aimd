@@ -1,4 +1,7 @@
+pub mod canonical;
 pub mod export;
+pub mod git_diff;
+pub mod git_merge;
 pub mod health;
 pub mod manifest;
 pub mod pack;

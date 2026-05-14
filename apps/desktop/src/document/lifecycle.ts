@@ -164,7 +164,11 @@ export async function openDocument(path: string, options: { skipConfirm?: boolea
     const doc = await invoke<AimdDocument>("open_aimd", { path });
     applyDocument({ ...doc, isDraft: false, format: "aimd", dirty: false }, "read");
     rememberOpenedPath(doc.path);
-    setStatus("已打开", "success");
+    if (state.doc?.hasGitConflicts) {
+      setStatus("文档包含 Git 冲突，请解决后保存", "warn");
+    } else {
+      setStatus("已打开", "success");
+    }
     try {
       await invoke("register_window_path", { path: doc.path });
     } catch { /* 命令不存在（旧版 / e2e mock）时静默忽略 */ }

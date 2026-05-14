@@ -80,7 +80,7 @@ export function renderGitDiffView() {
       <button id="git-diff-back" class="secondary-btn sm" type="button" ${canReturn ? "" : "disabled"}>返回文档</button>
       <div class="git-diff-title" title="${escapeAttr(title)}">${escapeHTML(title)}</div>
     </header>
-    <div class="git-diff-scroll">${body}</div>
+    <div id="git-diff-scroll" class="git-diff-scroll" data-select-all-scope>${body}</div>
   `;
   document.querySelector<HTMLButtonElement>("#git-diff-back")?.addEventListener("click", showDocumentView);
 }

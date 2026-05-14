@@ -46,14 +46,17 @@ import {
 } from "./drag/window-drop";
 import { persistSessionSnapshot, restoreSession } from "./session/snapshot";
 import { applyDocument } from "./document/apply";
+import { hasGitConflictMarkers } from "./document/apply";
 import { debugLog, installDebugConsole, openDebugConsole, onDebugChange, setDebugMode } from "./debug/console";
 import { bindWorkspacePanel, openWorkspacePicker } from "./ui/workspace";
 import { bindDocPanelTabs } from "./ui/doc-panel";
 import { bindGitPanel, refreshGitStatus } from "./ui/git";
 import { bindGitDiffView } from "./ui/git-diff";
+import { bindSelectionBoundary } from "./ui/selection";
 import { loadAppSettings, type AppSettings } from "./core/settings";
 
 installDebugConsole();
+bindSelectionBoundary("main");
 if (isTauri()) {
   void listen<{ level?: string; traceId?: string; elapsedMs?: number; message?: string }>("aimd-pdf-log", (event) => {
     const payload = event.payload || {};
@@ -160,6 +163,7 @@ markdownEl().addEventListener("input", () => {
   if (!state.doc) return;
   state.doc.markdown = markdownEl().value;
   state.doc.dirty = true;
+  state.doc.hasGitConflicts = hasGitConflictMarkers(state.doc.markdown);
   state.doc.hasExternalImageReferences = hasExternalImageReferences(state.doc.markdown);
   if (state.doc.format === "markdown") {
     state.doc.requiresAimdSave = hasAimdImageReferences(state.doc.markdown) || state.doc.assets.length > 0;
@@ -203,6 +207,8 @@ bindSidebarResizers();
 bindSidebarHrResizer();
 
 document.addEventListener("keydown", (event) => {
+  if (event.defaultPrevented) return;
+
   const mod = event.metaKey || event.ctrlKey;
   const key = event.key.toLowerCase();
 
