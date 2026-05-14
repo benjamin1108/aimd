@@ -141,6 +141,8 @@ test.describe("B. ensureCanDiscardChanges 走 Rust 对话框", () => {
     });
 
     await clickClose(page);
+    await expect(page.locator("#save-format-panel")).toBeVisible();
+    await page.locator("#save-format-aimd").click();
 
     await expect.poll(() => page.evaluate(() => (window as any).__savedAs)).toBe(1);
     // 落盘后 isDraft=false / dirty=false，关闭照常进行

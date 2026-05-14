@@ -1,5 +1,5 @@
 use crate::llm::{generate_text, GenerateTextRequest, ModelConfig};
-use crate::settings::load_settings;
+use crate::settings::{default_model_for_provider, load_settings};
 use crate::web_clip_image_proxy::{
     clear_session as clear_image_proxy_session, ensure_session as ensure_image_proxy_session,
     WebClipImageProxyState,
@@ -299,6 +299,7 @@ pub async fn refine_markdown(
     app: AppHandle,
     markdown: String,
     provider: String,
+    model: Option<String>,
     guard_reason: Option<String>,
     output_language: Option<String>,
 ) -> Result<String, String> {
@@ -312,10 +313,32 @@ pub async fn refine_markdown(
         "gemini" => settings.ai.providers.gemini,
         _ => settings.ai.providers.dashscope,
     };
+    let selected_model = model
+        .as_deref()
+        .map(str::trim)
+        .filter(|s| !s.is_empty())
+        .map(str::to_string)
+        .or_else(|| {
+            let configured = settings.web_clip.model.trim();
+            if configured.is_empty() {
+                None
+            } else {
+                Some(configured.to_string())
+            }
+        })
+        .or_else(|| {
+            let configured = cred.model.trim();
+            if configured.is_empty() {
+                None
+            } else {
+                Some(configured.to_string())
+            }
+        })
+        .unwrap_or_else(|| default_model_for_provider(&provider));
 
     let config = ModelConfig {
         provider: provider.clone(),
-        model: cred.model,
+        model: selected_model,
         api_key: cred.api_key,
         api_base: Some(cred.api_base).filter(|s| !s.is_empty()),
     };

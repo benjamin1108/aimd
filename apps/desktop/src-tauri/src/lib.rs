@@ -9,6 +9,7 @@ mod documents;
 mod drafts;
 mod dto;
 mod external;
+mod formatter;
 mod git;
 mod importer;
 mod llm;
@@ -70,6 +71,10 @@ pub fn run() {
                 main.set_menu(menu)?;
             }
 
+            if let Ok(settings) = settings::load_settings(app.handle().clone()) {
+                menu::set_debug_menu_enabled(app.handle(), settings.ui.debug_mode);
+            }
+
             macos_assoc::register_default_handlers();
             Ok(())
         })
@@ -86,6 +91,7 @@ pub fn run() {
             dialogs::choose_doc_file,
             dialogs::choose_image_file,
             dialogs::choose_save_aimd_file,
+            dialogs::choose_save_markdown_file,
             dialogs::choose_export_markdown_dir,
             dialogs::choose_export_html_file,
             dialogs::choose_export_pdf_file,
@@ -127,6 +133,7 @@ pub fn run() {
             external::open_external_url,
             documents::convert_md_to_draft,
             documents::save_markdown,
+            documents::save_markdown_as,
             drafts::create_aimd_draft,
             drafts::delete_draft_file,
             drafts::cleanup_old_drafts,
@@ -143,6 +150,7 @@ pub fn run() {
             importer::localize_web_clip_images,
             importer::save_web_clip,
             importer::refine_markdown,
+            formatter::format_markdown,
             assets::add_image,
             assets::add_image_bytes,
             assets::read_image_bytes,

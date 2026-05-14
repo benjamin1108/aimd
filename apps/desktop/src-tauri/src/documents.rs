@@ -11,6 +11,7 @@ use aimd_core::manifest::{Manifest, ROLE_CONTENT_IMAGE};
 use aimd_core::reader::Reader;
 use aimd_core::rewrite::{referenced_asset_ids, rewrite_file, RewriteOptions};
 use aimd_core::writer;
+use aimd_core::{rewrite_asset_uris_to_relative, ExportMarkdownResult};
 use aimd_render::render;
 use chrono::Utc;
 use serde_json::Value;
@@ -422,4 +423,91 @@ pub fn save_markdown(path: String, markdown: String) -> Result<(), String> {
     })?;
     let _: DocumentDTO; // 让 import 不被剪掉（DTO 仅在 open_aimd 路径里用），保持 use 语句的清晰编译反馈
     Ok(())
+}
+
+#[tauri::command]
+pub fn save_markdown_as(
+    source_path: Option<String>,
+    save_path: String,
+    markdown: String,
+) -> Result<Value, String> {
+    let dest = Path::new(&save_path);
+    let has_asset_refs = !referenced_asset_ids(markdown.as_bytes()).is_empty();
+    if !has_asset_refs {
+        write_markdown_atomic(dest, markdown.as_bytes())?;
+        return serde_json::to_value(serde_json::json!({
+            "path": save_path,
+            "markdown": markdown,
+            "assetsDir": serde_json::Value::Null,
+            "exportedAssets": []
+        }))
+        .map_err(|e| e.to_string());
+    }
+
+    let Some(source_path) = source_path else {
+        return Err(
+            "保存为 Markdown 时发现 asset:// 资源，但当前文档没有可导出的 AIMD 来源".to_string(),
+        );
+    };
+    let source = Path::new(&source_path);
+    if !is_aimd_extension(source) {
+        return Err(
+            "保存为 Markdown 时发现 asset:// 资源，请先保存为 AIMD 或选择 AIMD 格式".to_string(),
+        );
+    }
+    let reader = Reader::open(source).map_err(|e| e.to_string())?;
+    let stem = dest
+        .file_stem()
+        .and_then(|s| s.to_str())
+        .filter(|s| !s.trim().is_empty())
+        .unwrap_or("assets");
+    let assets_dir_name = format!("{}_assets", stem);
+    let assets_dir = dest
+        .parent()
+        .unwrap_or_else(|| Path::new("."))
+        .join(&assets_dir_name);
+    let (rewritten, exported) =
+        rewrite_asset_uris_to_relative(markdown.as_bytes(), &reader.manifest, &assets_dir_name);
+    fs::create_dir_all(&assets_dir).map_err(|e| e.to_string())?;
+    for asset in &exported {
+        let manifest_asset = reader
+            .manifest
+            .assets
+            .iter()
+            .find(|candidate| candidate.id == asset.id)
+            .ok_or_else(|| format!("AIMD 资源不存在: {}", asset.id))?;
+        let data = reader
+            .read_file(&manifest_asset.path)
+            .map_err(|e| e.to_string())?;
+        fs::write(assets_dir.join(&asset.filename), data).map_err(|e| e.to_string())?;
+    }
+    write_markdown_atomic(dest, &rewritten)?;
+    let result = ExportMarkdownResult {
+        markdown_path: save_path.clone(),
+        assets_dir: assets_dir.to_string_lossy().to_string(),
+        exported_assets: exported,
+    };
+    serde_json::to_value(serde_json::json!({
+        "path": save_path,
+        "markdown": String::from_utf8_lossy(&rewritten).to_string(),
+        "assetsDir": result.assets_dir,
+        "exportedAssets": result.exported_assets
+    }))
+    .map_err(|e| e.to_string())
+}
+
+fn write_markdown_atomic(path_ref: &Path, markdown: &[u8]) -> Result<(), String> {
+    let tmp_name = format!(
+        ".{}.tmp",
+        path_ref
+            .file_name()
+            .and_then(|s| s.to_str())
+            .unwrap_or("md")
+    );
+    let tmp = path_ref.with_file_name(tmp_name);
+    fs::write(&tmp, markdown).map_err(|e| format!("save_markdown write tmp: {e}"))?;
+    fs::rename(&tmp, path_ref).map_err(|e| {
+        let _ = fs::remove_file(&tmp);
+        format!("save_markdown rename: {e}")
+    })
 }

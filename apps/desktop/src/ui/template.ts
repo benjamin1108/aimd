@@ -83,7 +83,7 @@ export const APP_HTML = `
         <header class="workspace-head">
           <div class="doc-meta">
             <h1 id="doc-title" class="doc-title">AIMD Desktop</h1>
-            <div id="doc-path" class="doc-path">正文、图片和元信息始终在一起</div>
+            <div id="doc-path" class="doc-path">面向 AI 与人类协作的 Markdown 文档格式，方便保存与分享。</div>
           </div>
 
           <div class="starter-actions" id="starter-actions">
@@ -108,6 +108,10 @@ export const APP_HTML = `
                 <button id="save-as" class="action-menu-item" type="button" disabled>
                   <span class="action-menu-icon">${ICONS.folder}</span>
                   <span>另存为...</span>
+                </button>
+                <button id="format-document" class="action-menu-item" type="button" disabled>
+                  <span class="action-menu-icon">${ICONS.sparkle}</span>
+                  <span>一键格式化</span>
                 </button>
                 <button id="package-local-images" class="action-menu-item" type="button" disabled>
                   <span class="action-menu-icon">${ICONS.image}</span>
@@ -265,6 +269,41 @@ export const APP_HTML = `
           <div class="health-actions">
             <button id="health-clean-unused" class="secondary-btn sm" type="button">清理未引用资源</button>
             <button id="health-package-local" class="secondary-btn sm" type="button">嵌入本地图片</button>
+          </div>
+        </div>
+
+        <div id="format-preview-panel" class="format-preview-panel" hidden>
+          <div class="format-preview-head">
+            <div>
+              <div class="format-preview-title">一键格式化</div>
+              <div class="format-preview-sub">确认后替换当前文档内容</div>
+            </div>
+            <button id="format-preview-cancel-x" class="ft-btn" type="button" title="关闭">${ICONS.close}</button>
+          </div>
+          <pre id="format-preview-text" class="format-preview-text"></pre>
+          <div class="format-preview-actions">
+            <button id="format-cancel" class="secondary-btn sm" type="button">取消</button>
+            <button id="format-apply" class="primary-btn sm" type="button">应用</button>
+          </div>
+        </div>
+
+        <div id="save-format-panel" class="format-preview-panel save-format-panel" hidden>
+          <div class="format-preview-head">
+            <div>
+              <div class="format-preview-title">选择保存格式</div>
+              <div class="format-preview-sub">保存为 Markdown 或 AIMD</div>
+            </div>
+            <button id="save-format-cancel-x" class="ft-btn" type="button" title="关闭">${ICONS.close}</button>
+          </div>
+          <div class="save-format-options">
+            <button id="save-format-markdown" class="save-format-option" type="button">
+              <strong>Markdown (.md)</strong>
+              <span>写出 YAML frontmatter 和正文；有内嵌资源时导出 assets 目录并改写相对路径。</span>
+            </button>
+            <button id="save-format-aimd" class="save-format-option" type="button">
+              <strong>AIMD (.aimd)</strong>
+              <span>保留 Markdown、YAML 元信息和内嵌资源，适合长期归档。</span>
+            </button>
           </div>
         </div>
 

@@ -136,6 +136,8 @@ test.describe("Launchpad and document lifecycle", () => {
     await expect(page.locator("#doc-path")).toContainText("未保存草稿");
 
     await page.locator("#save").click();
+    await expect(page.locator("#save-format-panel")).toBeVisible();
+    await page.locator("#save-format-aimd").click();
 
     await expect(page.locator("#doc-path")).toContainText("/mock/未命名文档.aimd");
     await expect(page.locator("#save-label")).toHaveText("保存");

@@ -15,6 +15,7 @@ let listEl: HTMLElement | null = null;
 let panelEl: HTMLElement | null = null;
 let levelFilterEl: HTMLSelectElement | null = null;
 let levelFilter: DebugLevelFilter = "all";
+let debugMode = false;
 
 type ChangeListener = (errorCount: number) => void;
 const listeners = new Set<ChangeListener>();
@@ -55,6 +56,16 @@ export function onDebugChange(listener: ChangeListener): () => void {
 function emitChange() {
   const n = errorEntryCount();
   for (const listener of listeners) listener(n);
+}
+
+export function setDebugMode(enabled: boolean) {
+  debugMode = enabled;
+  if (!debugMode) closeDebugConsole();
+  emitChange();
+}
+
+export function isDebugModeEnabled() {
+  return debugMode;
 }
 
 export function debugLog(level: DebugLevel, ...args: unknown[]) {
@@ -159,7 +170,8 @@ async function copyVisibleEntries() {
   }
 }
 
-export function openDebugConsole() {
+export function openDebugConsole(): boolean {
+  if (!debugMode) return false;
   if (!modal) {
     modal = document.createElement("div");
     modal.className = "debug-modal";
@@ -214,6 +226,7 @@ export function openDebugConsole() {
   }
   modal.hidden = false;
   renderEntries();
+  return true;
 }
 
 export function closeDebugConsole() {

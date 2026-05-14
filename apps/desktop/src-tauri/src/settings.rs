@@ -1,5 +1,6 @@
 // 应用级设置持久化。
 
+use crate::menu;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use std::fs;
@@ -16,12 +17,24 @@ fn default_web_clip_output_language() -> String {
     "zh-CN".to_string()
 }
 
+fn default_format_output_language() -> String {
+    "zh-CN".to_string()
+}
+
 fn default_dashscope_model() -> String {
     "qwen3.6-plus".to_string()
 }
 
 fn default_gemini_model() -> String {
     "gemini-3.1-flash-lite-preview".to_string()
+}
+
+pub fn default_model_for_provider(provider: &str) -> String {
+    if provider == "gemini" {
+        default_gemini_model()
+    } else {
+        default_dashscope_model()
+    }
 }
 
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
@@ -94,6 +107,8 @@ pub struct WebClipSettings {
     pub llm_enabled: bool,
     #[serde(default = "default_provider")]
     pub provider: String,
+    #[serde(default)]
+    pub model: String,
     #[serde(default = "default_web_clip_output_language")]
     pub output_language: String,
 }
@@ -103,9 +118,35 @@ impl Default for WebClipSettings {
         Self {
             llm_enabled: false,
             provider: default_provider(),
+            model: default_dashscope_model(),
             output_language: default_web_clip_output_language(),
         }
     }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct FormatSettings {
+    #[serde(default = "default_provider")]
+    pub provider: String,
+    #[serde(default = "default_dashscope_model")]
+    pub model: String,
+    #[serde(default = "default_format_output_language")]
+    pub output_language: String,
+}
+
+impl Default for FormatSettings {
+    fn default() -> Self {
+        Self {
+            provider: default_provider(),
+            model: default_dashscope_model(),
+            output_language: default_format_output_language(),
+        }
+    }
+}
+
+fn default_false() -> bool {
+    false
 }
 
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
@@ -113,6 +154,8 @@ impl Default for WebClipSettings {
 pub struct UiSettings {
     #[serde(default)]
     pub show_asset_panel: bool,
+    #[serde(default = "default_false")]
+    pub debug_mode: bool,
 }
 
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
@@ -123,7 +166,52 @@ pub struct AppSettings {
     #[serde(default)]
     pub web_clip: WebClipSettings,
     #[serde(default)]
+    pub format: FormatSettings,
+    #[serde(default)]
     pub ui: UiSettings,
+}
+
+fn provider_cred_model(settings: &AppSettings, provider: &str) -> String {
+    let model = if provider == "gemini" {
+        settings.ai.providers.gemini.model.trim()
+    } else {
+        settings.ai.providers.dashscope.model.trim()
+    };
+    if model.is_empty() {
+        default_model_for_provider(provider)
+    } else {
+        model.to_string()
+    }
+}
+
+fn normalize_app_settings(settings: &mut AppSettings) {
+    if settings.ai.active_provider != "dashscope" && settings.ai.active_provider != "gemini" {
+        settings.ai.active_provider = default_provider();
+    }
+    if settings.ai.providers.dashscope.model.trim().is_empty() {
+        settings.ai.providers.dashscope.model = default_dashscope_model();
+    }
+    if settings.ai.providers.gemini.model.trim().is_empty() {
+        settings.ai.providers.gemini.model = default_gemini_model();
+    }
+    if settings.web_clip.provider != "dashscope" && settings.web_clip.provider != "gemini" {
+        settings.web_clip.provider = default_provider();
+    }
+    if settings.web_clip.model.trim().is_empty() {
+        settings.web_clip.model = provider_cred_model(settings, &settings.web_clip.provider);
+    }
+    if settings.web_clip.output_language != "en" {
+        settings.web_clip.output_language = default_web_clip_output_language();
+    }
+    if settings.format.provider != "dashscope" && settings.format.provider != "gemini" {
+        settings.format.provider = default_provider();
+    }
+    if settings.format.model.trim().is_empty() {
+        settings.format.model = default_model_for_provider(&settings.format.provider);
+    }
+    if settings.format.output_language != "en" {
+        settings.format.output_language = default_format_output_language();
+    }
 }
 
 fn settings_path(app: &AppHandle) -> Result<PathBuf, String> {
@@ -257,7 +345,8 @@ pub fn load_settings(app: AppHandle) -> Result<AppSettings, String> {
         value = Value::Object(Default::default());
     }
     migrate_legacy_inplace(&mut value);
-    let settings: AppSettings = serde_json::from_value(value).unwrap_or_default();
+    let mut settings: AppSettings = serde_json::from_value(value).unwrap_or_default();
+    normalize_app_settings(&mut settings);
     Ok(settings)
 }
 
@@ -265,15 +354,7 @@ pub fn load_settings(app: AppHandle) -> Result<AppSettings, String> {
 pub fn save_settings(app: AppHandle, settings: AppSettings) -> Result<(), String> {
     let path = settings_path(&app)?;
     let mut normalized = settings;
-    if normalized.ai.active_provider != "dashscope" && normalized.ai.active_provider != "gemini" {
-        normalized.ai.active_provider = "dashscope".to_string();
-    }
-    if normalized.web_clip.provider != "dashscope" && normalized.web_clip.provider != "gemini" {
-        normalized.web_clip.provider = default_provider();
-    }
-    if normalized.web_clip.output_language != "en" {
-        normalized.web_clip.output_language = default_web_clip_output_language();
-    }
+    normalize_app_settings(&mut normalized);
     let body =
         serde_json::to_vec_pretty(&normalized).map_err(|err| format!("序列化设置失败: {err}"))?;
     let tmp = path.with_extension("json.tmp");
@@ -282,6 +363,7 @@ pub fn save_settings(app: AppHandle, settings: AppSettings) -> Result<(), String
         let _ = fs::remove_file(&tmp);
         format!("保存设置失败: {err}")
     })?;
+    menu::set_debug_menu_enabled(&app, normalized.ui.debug_mode);
     let _ = app.emit("aimd-settings-updated", &normalized);
     Ok(())
 }
@@ -318,8 +400,8 @@ mod tests {
     }
 
     #[test]
-    fn missing_ui_defaults_asset_panel_to_hidden() {
-        let settings: AppSettings = serde_json::from_value(serde_json::json!({
+    fn missing_ui_defaults_to_quiet_ui() {
+        let mut settings: AppSettings = serde_json::from_value(serde_json::json!({
             "ai": {
                 "activeProvider": "dashscope",
                 "providers": {}
@@ -327,6 +409,72 @@ mod tests {
             "webClip": {}
         }))
         .unwrap();
+        normalize_app_settings(&mut settings);
         assert!(!settings.ui.show_asset_panel);
+        assert!(!settings.ui.debug_mode);
+        assert_eq!(settings.web_clip.model, default_dashscope_model());
+        assert_eq!(settings.format.provider, "dashscope");
+        assert_eq!(settings.format.model, default_dashscope_model());
+        assert_eq!(settings.format.output_language, "zh-CN");
+    }
+
+    #[test]
+    fn missing_web_clip_model_defaults_to_provider_global_model() {
+        let mut settings: AppSettings = serde_json::from_value(serde_json::json!({
+            "ai": {
+                "activeProvider": "dashscope",
+                "providers": {
+                    "dashscope": {
+                        "model": "qwen-global-custom",
+                        "apiKey": "sk",
+                        "apiBase": ""
+                    }
+                }
+            },
+            "webClip": {
+                "llmEnabled": true,
+                "provider": "dashscope",
+                "outputLanguage": "zh-CN"
+            }
+        }))
+        .unwrap();
+        normalize_app_settings(&mut settings);
+
+        assert_eq!(settings.web_clip.model, "qwen-global-custom");
+    }
+
+    #[test]
+    fn web_clip_model_deserializes_and_round_trips() {
+        let mut settings: AppSettings = serde_json::from_value(serde_json::json!({
+            "webClip": {
+                "llmEnabled": true,
+                "provider": "gemini",
+                "model": "gemini-webclip-custom",
+                "outputLanguage": "en"
+            }
+        }))
+        .unwrap();
+        normalize_app_settings(&mut settings);
+
+        assert!(settings.web_clip.llm_enabled);
+        assert_eq!(settings.web_clip.provider, "gemini");
+        assert_eq!(settings.web_clip.model, "gemini-webclip-custom");
+        assert_eq!(settings.web_clip.output_language, "en");
+
+        let value = serde_json::to_value(&settings).unwrap();
+        assert_eq!(value["webClip"]["model"], "gemini-webclip-custom");
+    }
+
+    #[test]
+    fn ui_debug_mode_round_trips() {
+        let settings: AppSettings = serde_json::from_value(serde_json::json!({
+            "ui": {
+                "showAssetPanel": true,
+                "debugMode": true
+            }
+        }))
+        .unwrap();
+        assert!(settings.ui.show_asset_panel);
+        assert!(settings.ui.debug_mode);
     }
 }

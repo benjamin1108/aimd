@@ -8,11 +8,14 @@ import type {
   ModelProvider,
   ProviderCredential,
   WebClipOutputLanguage,
+  FormatSettings,
+  FormatOutputLanguage,
 } from "./types";
 
 export type AppSettings = {
   ai: AiSettings;
   webClip: WebClipSettings;
+  format: FormatSettings;
   ui: UiSettings;
 };
 
@@ -35,11 +38,19 @@ export const DEFAULT_AI_SETTINGS: AiSettings = {
 export const DEFAULT_WEB_CLIP_SETTINGS: WebClipSettings = {
   llmEnabled: false,
   provider: "dashscope",
+  model: defaultModelForProvider("dashscope"),
+  outputLanguage: "zh-CN",
+};
+
+export const DEFAULT_FORMAT_SETTINGS: FormatSettings = {
+  provider: "dashscope",
+  model: defaultModelForProvider("dashscope"),
   outputLanguage: "zh-CN",
 };
 
 export const DEFAULT_UI_SETTINGS: UiSettings = {
   showAssetPanel: false,
+  debugMode: false,
 };
 
 function normalizeProvider(value: unknown): ModelProvider {
@@ -47,6 +58,10 @@ function normalizeProvider(value: unknown): ModelProvider {
 }
 
 function normalizeWebClipOutputLanguage(value: unknown): WebClipOutputLanguage {
+  return value === "en" ? "en" : "zh-CN";
+}
+
+function normalizeFormatOutputLanguage(value: unknown): FormatOutputLanguage {
   return value === "en" ? "en" : "zh-CN";
 }
 
@@ -58,6 +73,11 @@ function coerceProviderCred(raw: unknown, provider: ModelProvider): ProviderCred
   const apiKey = typeof obj.apiKey === "string" ? obj.apiKey.trim() : "";
   const apiBase = typeof obj.apiBase === "string" ? obj.apiBase.trim() : "";
   return { model, apiKey, apiBase };
+}
+
+export function defaultWebClipModelForProvider(ai: AiSettings | null | undefined, provider: ModelProvider) {
+  const configured = ai?.providers?.[provider]?.model?.trim();
+  return configured || defaultModelForProvider(provider);
 }
 
 export function coerceSettings(raw: unknown): AiSettings {
@@ -84,10 +104,31 @@ export function coerceWebClipSettings(raw: unknown): WebClipSettings {
     return { ...DEFAULT_WEB_CLIP_SETTINGS };
   }
   const obj = raw as Record<string, unknown>;
+  const provider = normalizeProvider(obj.provider);
+  const model = typeof obj.model === "string" && obj.model.trim()
+    ? obj.model.trim()
+    : defaultModelForProvider(provider);
   return {
     llmEnabled: Boolean(obj.llmEnabled),
-    provider: normalizeProvider(obj.provider),
+    provider,
+    model,
     outputLanguage: normalizeWebClipOutputLanguage(obj.outputLanguage),
+  };
+}
+
+export function coerceFormatSettings(raw: unknown): FormatSettings {
+  if (!raw || typeof raw !== "object") {
+    return { ...DEFAULT_FORMAT_SETTINGS };
+  }
+  const obj = raw as Record<string, unknown>;
+  const provider = normalizeProvider(obj.provider);
+  const model = typeof obj.model === "string" && obj.model.trim()
+    ? obj.model.trim()
+    : defaultModelForProvider(provider);
+  return {
+    provider,
+    model,
+    outputLanguage: normalizeFormatOutputLanguage(obj.outputLanguage),
   };
 }
 
@@ -98,6 +139,7 @@ export function coerceUiSettings(raw: unknown): UiSettings {
   const obj = raw as Record<string, unknown>;
   return {
     showAssetPanel: obj.showAssetPanel === true,
+    debugMode: obj.debugMode === true,
   };
 }
 
@@ -113,10 +155,19 @@ export function cloneSettings(s: AiSettings): AiSettings {
 
 export async function loadAppSettings(): Promise<AppSettings> {
   try {
-    const raw = await invoke<{ ai?: unknown, webClip?: unknown, ui?: unknown } | null>("load_settings");
+    const raw = await invoke<{ ai?: unknown, webClip?: unknown, format?: unknown, ui?: unknown } | null>("load_settings");
+    const ai = coerceSettings(raw?.ai ?? null);
+    const webClip = coerceWebClipSettings(raw?.webClip ?? null);
+    const rawWebClip = (raw?.webClip && typeof raw.webClip === "object")
+      ? raw.webClip as Record<string, unknown>
+      : {};
+    if (typeof rawWebClip.model !== "string" || !rawWebClip.model.trim()) {
+      webClip.model = defaultWebClipModelForProvider(ai, webClip.provider);
+    }
     return { 
-      ai: coerceSettings(raw?.ai ?? null),
-      webClip: coerceWebClipSettings(raw?.webClip ?? null),
+      ai,
+      webClip,
+      format: coerceFormatSettings(raw?.format ?? null),
       ui: coerceUiSettings(raw?.ui ?? null),
     };
   } catch (err) {
@@ -124,6 +175,7 @@ export async function loadAppSettings(): Promise<AppSettings> {
     return { 
       ai: cloneSettings(DEFAULT_AI_SETTINGS),
       webClip: { ...DEFAULT_WEB_CLIP_SETTINGS },
+      format: { ...DEFAULT_FORMAT_SETTINGS },
       ui: { ...DEFAULT_UI_SETTINGS },
     };
   }
@@ -133,6 +185,7 @@ export async function saveAppSettings(settings: AppSettings): Promise<void> {
   const normalized: AppSettings = { 
     ai: coerceSettings(settings.ai),
     webClip: coerceWebClipSettings(settings.webClip),
+    format: coerceFormatSettings(settings.format),
     ui: coerceUiSettings(settings.ui),
   };
   await invoke("save_settings", { settings: normalized });

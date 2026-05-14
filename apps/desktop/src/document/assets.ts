@@ -134,23 +134,45 @@ export function rewriteMarkdownLocalImageURLs(html: string, markdownPath: string
 }
 
 const localImageObjectURLs = new Map<string, string>();
+const pendingLocalImageObjectURLs = new Map<string, Promise<string | null>>();
+const failedLocalImagePaths = new Set<string>();
+
+async function loadLocalImageObjectURL(imagePath: string): Promise<string | null> {
+  const cached = localImageObjectURLs.get(imagePath);
+  if (cached) return cached;
+  if (failedLocalImagePaths.has(imagePath)) return null;
+
+  let pending = pendingLocalImageObjectURLs.get(imagePath);
+  if (!pending) {
+    pending = (async () => {
+      try {
+        const bytes = await invoke<number[]>("read_image_bytes", { imagePath });
+        const blob = new Blob([new Uint8Array(bytes)], { type: imageMimeByPath(imagePath) });
+        const objectURL = URL.createObjectURL(blob);
+        localImageObjectURLs.set(imagePath, objectURL);
+        return objectURL;
+      } catch (err) {
+        failedLocalImagePaths.add(imagePath);
+        console.warn("hydrate markdown image failed", imagePath, err);
+        return null;
+      } finally {
+        pendingLocalImageObjectURLs.delete(imagePath);
+      }
+    })();
+    pendingLocalImageObjectURLs.set(imagePath, pending);
+  }
+
+  return pending;
+}
 
 export async function hydrateMarkdownLocalImages(container: HTMLElement) {
   const images = Array.from(container.querySelectorAll<HTMLImageElement>("img[data-aimd-local-image-path]"));
   await Promise.all(images.map(async (img) => {
     const imagePath = img.dataset.aimdLocalImagePath || "";
     if (!imagePath) return;
-    try {
-      let objectURL = localImageObjectURLs.get(imagePath);
-      if (!objectURL) {
-        const bytes = await invoke<number[]>("read_image_bytes", { imagePath });
-        const blob = new Blob([new Uint8Array(bytes)], { type: imageMimeByPath(imagePath) });
-        objectURL = URL.createObjectURL(blob);
-        localImageObjectURLs.set(imagePath, objectURL);
-      }
+    const objectURL = await loadLocalImageObjectURL(imagePath);
+    if (objectURL) {
       img.src = objectURL + (img.dataset.aimdLocalImageSuffix || "");
-    } catch (err) {
-      console.warn("hydrate markdown image failed", imagePath, err);
     }
   }));
 }

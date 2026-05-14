@@ -7,6 +7,7 @@ import {
 import { persistSessionSnapshot } from "../session/snapshot";
 import { htmlToMarkdown } from "./markdown";
 import { hasAimdImageReferences, hasExternalImageReferences } from "../document/assets";
+import { joinFrontmatter, splitFrontmatter } from "../markdown/frontmatter";
 
 export function lightNormalize(root: HTMLElement) {
   root.querySelectorAll<HTMLElement>("h1[style], h2[style], h3[style], h4[style], h5[style], h6[style], p[style]").forEach((el) => el.removeAttribute("style"));
@@ -108,7 +109,8 @@ export function flushInline() {
   normalizeInlineDOM();
   state.inlineDirty = false;
   const html = inlineEditorEl().innerHTML;
-  const md = htmlToMarkdown(html);
+  const existing = splitFrontmatter(state.doc.markdown);
+  const md = joinFrontmatter(existing.frontmatter, htmlToMarkdown(html));
   if (md !== state.doc.markdown) {
     state.doc.markdown = md;
     markdownEl().value = md;

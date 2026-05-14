@@ -103,6 +103,8 @@ test.describe("A. sidebar-foot 在 dirty draft 下用 '保存' 替换 '新建'",
     });
 
     await page.locator("#sidebar-save").click();
+    await expect(page.locator("#save-format-panel")).toBeVisible();
+    await page.locator("#save-format-aimd").click();
     await expect.poll(() => askedSavePath).toBe(true);
   });
 
@@ -133,6 +135,8 @@ test.describe("A. sidebar-foot 在 dirty draft 下用 '保存' 替换 '新建'",
     });
 
     await page.locator("#sidebar-save").click();
+    await expect(page.locator("#save-format-panel")).toBeVisible();
+    await page.locator("#save-format-aimd").click();
 
     await expect(page.locator("#sidebar-save")).toBeHidden();
     await expect(page.locator("#sidebar-new")).toBeVisible();

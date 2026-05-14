@@ -31,7 +31,8 @@ async function installMainMock(page: Page, showAssetPanel?: boolean) {
               gemini: { model: "gemini-3.1-flash-lite-preview", apiKey: "", apiBase: "" },
             },
           },
-          webClip: { llmEnabled: false, provider: "dashscope", outputLanguage: "zh-CN" },
+          webClip: { llmEnabled: false, provider: "dashscope", model: "qwen3.6-plus", outputLanguage: "zh-CN" },
+          ui: { showAssetPanel: false, debugMode: false },
         }
       : {
           ai: {
@@ -41,8 +42,8 @@ async function installMainMock(page: Page, showAssetPanel?: boolean) {
               gemini: { model: "gemini-3.1-flash-lite-preview", apiKey: "", apiBase: "" },
             },
           },
-          webClip: { llmEnabled: false, provider: "dashscope", outputLanguage: "zh-CN" },
-          ui: { showAssetPanel },
+          webClip: { llmEnabled: false, provider: "dashscope", model: "qwen3.6-plus", outputLanguage: "zh-CN" },
+          ui: { showAssetPanel, debugMode: false },
         };
     const handlers: Record<string, (a: Args) => unknown> = {
       load_settings: () => settings,
@@ -84,7 +85,8 @@ async function installSettingsMock(page: Page, opts?: { onSave?: (settings: any)
           gemini: { model: "gemini-3.1-flash-lite-preview", apiKey: "", apiBase: "" },
         },
       },
-      webClip: { llmEnabled: false, provider: "dashscope", outputLanguage: "zh-CN" },
+      webClip: { llmEnabled: false, provider: "dashscope", model: "qwen3.6-plus", outputLanguage: "zh-CN" },
+      ui: { showAssetPanel: false, debugMode: false },
     };
     const handlers: Record<string, (a: Args) => unknown> = {
       load_settings: () => stored,
@@ -151,12 +153,15 @@ test.describe("asset panel visibility preference", () => {
     await page.goto("/settings.html");
 
     await expect(page.locator(".settings-head h1")).toHaveText("AIMD 设置");
-    await expect(page.locator(".settings-nav-item")).toHaveText(["常规", "AI / 模型", "网页导入"]);
+    await expect(page.locator(".settings-nav-item")).toHaveText(["常规", "AI / 模型", "网页导入", "格式化"]);
     await expect(page.locator("#ui-show-asset-panel")).not.toBeChecked();
+    await expect(page.locator("#ui-debug-mode")).not.toBeChecked();
 
     await page.locator("#ui-show-asset-panel").check();
+    await page.locator("#ui-debug-mode").check();
     await page.locator("#save-settings").click();
 
     await expect.poll(() => saved?.ui?.showAssetPanel).toBe(true);
+    await expect.poll(() => saved?.ui?.debugMode).toBe(true);
   });
 });

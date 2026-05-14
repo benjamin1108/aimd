@@ -37,7 +37,7 @@ async function installWebClipMock(page: Page) {
             gemini: { model: "gemini", apiKey: "", apiBase: "" },
           },
         },
-        webClip: { llmEnabled: false, provider: "dashscope", outputLanguage: "zh-CN" },
+        webClip: { llmEnabled: false, provider: "dashscope", model: "qwen-webclip", outputLanguage: "zh-CN" },
       },
       refineResponses: [] as string[],
       refineHangs: false,
@@ -201,6 +201,13 @@ async function installWebClipMock(page: Page) {
       },
       setOutputLanguage: (value: "zh-CN" | "en") => {
         runtime.settings.webClip.outputLanguage = value;
+      },
+      setWebClipModel: (provider: "dashscope" | "gemini", model: string) => {
+        runtime.settings.webClip.provider = provider;
+        runtime.settings.webClip.model = model;
+      },
+      removeWebClipModel: () => {
+        delete (runtime.settings.webClip as any).model;
       },
       stats: () => runtime,
     };
@@ -408,6 +415,8 @@ test.describe("Web Clip background import", () => {
     await expect.poll(() => page.evaluate(() => (window as any).__aimdWebClipMock.stats().openDraftCalls.length)).toBe(1);
     const stats = await page.evaluate(() => (window as any).__aimdWebClipMock.stats());
     expect(stats.refineCalls).toHaveLength(1);
+    expect(stats.refineCalls[0].provider).toBe("dashscope");
+    expect(stats.refineCalls[0].model).toBe("qwen-webclip");
     expect(stats.refineCalls[0].outputLanguage).toBe("zh-CN");
     expect(stats.saveCalls[0].markdown).toContain("> **摘要**");
     expect(stats.saveCalls[0].markdown).toContain("短新闻正文第二段");
@@ -488,6 +497,42 @@ test.describe("Web Clip background import", () => {
     const stats = await page.evaluate(() => (window as any).__aimdWebClipMock.stats());
     expect(stats.refineCalls).toHaveLength(1);
     expect(stats.refineCalls[0].outputLanguage).toBe("en");
+  });
+
+  test("LLM refinement uses the web clip model instead of the global provider model", async ({ page }) => {
+    await installWebClipMock(page);
+    await page.goto("/");
+    await page.evaluate(() => {
+      (window as any).__aimdWebClipMock.setWebClipModel("dashscope", "qwen-webclip-custom");
+      (window as any).__aimdWebClipMock.enableLlm(["# Web Clip\n\nBody."]);
+    });
+
+    await submitWebImport(page, "https://example.com/webclip-model");
+    await expect.poll(() => page.evaluate(() => (window as any).__aimdWebClipMock.stats().saveCalls.length)).toBe(1);
+
+    const stats = await page.evaluate(() => (window as any).__aimdWebClipMock.stats());
+    expect(stats.settings.ai.providers.dashscope.model).toBe("qwen");
+    expect(stats.refineCalls[0]).toMatchObject({
+      provider: "dashscope",
+      model: "qwen-webclip-custom",
+      outputLanguage: "zh-CN",
+    });
+  });
+
+  test("old settings without webClip.model still import without crashing", async ({ page }) => {
+    await installWebClipMock(page);
+    await page.goto("/");
+    await page.evaluate(() => {
+      (window as any).__aimdWebClipMock.removeWebClipModel();
+      (window as any).__aimdWebClipMock.enableLlm(["# Web Clip\n\nBody."]);
+    });
+
+    await submitWebImport(page, "https://example.com/old-settings-no-model");
+    await expect.poll(() => page.evaluate(() => (window as any).__aimdWebClipMock.stats().saveCalls.length)).toBe(1);
+
+    const stats = await page.evaluate(() => (window as any).__aimdWebClipMock.stats());
+    expect(stats.refineCalls[0].provider).toBe("dashscope");
+    expect(stats.refineCalls[0].model).toBe("qwen");
   });
 
   test("failure stays in the panel and fallback opens the extractor window", async ({ page }) => {

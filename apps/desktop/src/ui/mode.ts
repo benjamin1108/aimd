@@ -9,6 +9,7 @@ import type { Mode } from "../core/types";
 import { paintPaneIfStale } from "./outline";
 import { updateChrome } from "./chrome";
 import { flushInline } from "../editor/inline";
+import { splitFrontmatter } from "../markdown/frontmatter";
 
 export function refreshSourceBanner() {
   const banner = sourceBannerEl();
@@ -16,18 +17,14 @@ export function refreshSourceBanner() {
     banner.hidden = true;
     return;
   }
-  const lines = state.doc.markdown.split("\n");
-  if (lines[0] !== "---") {
+  const { frontmatter } = splitFrontmatter(state.doc.markdown);
+  if (!frontmatter) {
     banner.hidden = true;
     return;
   }
-  const endIndex = lines.indexOf("---", 1);
-  if (endIndex === -1) {
-    banner.hidden = true;
-    return;
-  }
+  const lineCount = frontmatter.split("\n").length;
   sourceBannerTextEl().innerHTML =
-    `<strong>源码视图</strong>：开头 ${endIndex + 1} 行是 Front-matter。这些通常由阅读 / 编辑模式自动维护，可手改但建议从顶部菜单操作。`;
+    `<strong>源码视图</strong>：开头 ${lineCount} 行是 YAML 元信息。阅读 / 编辑模式会保护这些内容；源码模式可直接修改。`;
   banner.hidden = false;
 }
 

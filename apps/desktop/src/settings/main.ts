@@ -7,9 +7,11 @@ import {
   DEFAULT_AI_SETTINGS,
   DEFAULT_UI_SETTINGS,
   DEFAULT_WEB_CLIP_SETTINGS,
+  DEFAULT_FORMAT_SETTINGS,
   loadAppSettings,
   saveAppSettings,
   defaultModelForProvider,
+  defaultWebClipModelForProvider,
   type AppSettings,
 } from "../core/settings";
 import type {
@@ -18,6 +20,8 @@ import type {
   ProviderCredential,
   WebClipOutputLanguage,
   UiSettings,
+  FormatSettings,
+  FormatOutputLanguage,
 } from "../core/types";
 import { MODEL_OPTIONS } from "./model-options";
 
@@ -48,6 +52,7 @@ root.innerHTML = `
           <button type="button" class="settings-nav-item is-active" data-section="general" role="tab" aria-selected="true">常规</button>
           <button type="button" class="settings-nav-item" data-section="model" role="tab" aria-selected="false">AI / 模型</button>
           <button type="button" class="settings-nav-item" data-section="webclip" role="tab" aria-selected="false">网页导入</button>
+          <button type="button" class="settings-nav-item" data-section="format" role="tab" aria-selected="false">格式化</button>
         </aside>
 
         <div class="settings-content">
@@ -62,6 +67,14 @@ root.innerHTML = `
               <span class="toggle-field-text">
                 <span class="field-label">显示资源面板</span>
                 <span class="field-hint">在左侧栏显示当前文档内嵌资源列表。关闭后不影响图片保存、资源检查和导出。</span>
+              </span>
+            </label>
+
+            <label class="toggle-field">
+              <input type="checkbox" id="ui-debug-mode" />
+              <span class="toggle-field-text">
+                <span class="field-label">启用调试模式</span>
+                <span class="field-hint">显示调试控制台入口和运行时诊断。关闭后，后台日志仍会保留，但不会主动打扰。</span>
               </span>
             </label>
           </section>
@@ -125,11 +138,18 @@ root.innerHTML = `
             <p style="font-size: 13px; color: var(--text-muted); margin-bottom: 16px;">启用后，会把提取到的网页正文发送给所选模型，并生成摘要、核心观点和层级化分章正文。这可能会增加一些等待时间。</p>
 
             <label class="field">
-              <span class="field-label">使用已配置的模型 (Provider)</span>
+              <span class="field-label">Provider</span>
               <select id="webclip-provider">
                 <option value="dashscope">DashScope（通义千问）</option>
                 <option value="gemini">Gemini（Google）</option>
               </select>
+              <span class="field-hint">API Key 和 API Base 复用 AI / 模型 中该 Provider 的配置。</span>
+            </label>
+
+            <label class="field">
+              <span class="field-label">网页导入模型</span>
+              <select id="webclip-model-select"></select>
+              <input id="webclip-model" type="text" autocomplete="off" spellcheck="false" hidden />
             </label>
 
             <label class="field">
@@ -140,6 +160,36 @@ root.innerHTML = `
               </select>
             </label>
             <p style="font-size: 13px; color: var(--text-muted); margin-bottom: 16px;">如果网页原文不是所选语言，智能排版会在保留链接、图片和术语的前提下翻译正文。</p>
+          </section>
+
+          <section class="settings-section" data-section="format" role="tabpanel" aria-labelledby="settings-tab-format" hidden>
+            <header class="settings-section-head">
+              <h2>一键格式化</h2>
+              <p>配置当前文档一键整理时使用的模型和输出语言。</p>
+            </header>
+
+            <label class="field">
+              <span class="field-label">Provider</span>
+              <select id="format-provider">
+                <option value="dashscope">DashScope（通义千问）</option>
+                <option value="gemini">Gemini（Google）</option>
+              </select>
+              <span class="field-hint">API Key 和 API Base 复用 AI / 模型 中该 Provider 的配置。</span>
+            </label>
+
+            <label class="field">
+              <span class="field-label">格式化模型</span>
+              <select id="format-model-select"></select>
+              <input id="format-model" type="text" autocomplete="off" spellcheck="false" hidden />
+            </label>
+
+            <label class="field">
+              <span class="field-label">输出语言</span>
+              <select id="format-output-language">
+                <option value="zh-CN">中文</option>
+                <option value="en">英文</option>
+              </select>
+            </label>
           </section>
         </div>
       </div>
@@ -167,9 +217,16 @@ const apiKeyRevealEl = $<HTMLButtonElement>("#api-key-reveal");
 const apiKeyErrorEl = $<HTMLElement>("#api-key-error");
 const apiBaseEl = $<HTMLInputElement>("#api-base");
 const uiShowAssetPanelEl = $<HTMLInputElement>("#ui-show-asset-panel");
+const uiDebugModeEl = $<HTMLInputElement>("#ui-debug-mode");
 const webClipLlmEnabledEl = $<HTMLInputElement>("#webclip-llm-enabled");
 const webClipProviderEl = $<HTMLSelectElement>("#webclip-provider");
+const webClipModelSelectEl = $<HTMLSelectElement>("#webclip-model-select");
+const webClipModelEl = $<HTMLInputElement>("#webclip-model");
 const webClipOutputLanguageEl = $<HTMLSelectElement>("#webclip-output-language");
+const formatProviderEl = $<HTMLSelectElement>("#format-provider");
+const formatModelSelectEl = $<HTMLSelectElement>("#format-model-select");
+const formatModelEl = $<HTMLInputElement>("#format-model");
+const formatOutputLanguageEl = $<HTMLSelectElement>("#format-output-language");
 const saveStateEl = $<HTMLElement>("#save-state");
 const saveButtonEl = $<HTMLButtonElement>("#save-settings");
 const cancelButtonEl = $<HTMLButtonElement>("#cancel");
@@ -192,6 +249,11 @@ let draft: Record<ModelProvider, ProviderCredential> = {
   gemini: { ...DEFAULT_AI_SETTINGS.providers.gemini },
 };
 let webClipConfig = { ...DEFAULT_WEB_CLIP_SETTINGS };
+let webClipModelDraft: Record<ModelProvider, string> = {
+  dashscope: defaultModelForProvider("dashscope"),
+  gemini: defaultModelForProvider("gemini"),
+};
+let formatConfig: FormatSettings = { ...DEFAULT_FORMAT_SETTINGS };
 let uiConfig: UiSettings = { ...DEFAULT_UI_SETTINGS };
 
 function switchTab(sectionId: string) {
@@ -229,6 +291,20 @@ function renderModelOptions(provider: ModelProvider, selectedModel: string) {
   modelEl.value = selectedModel;
 }
 
+function renderModelOptionsFor(selectEl: HTMLSelectElement, inputEl: HTMLInputElement, provider: ModelProvider, selectedModel: string) {
+  const customValue = customModelValue();
+  const known = isKnownModel(provider, selectedModel);
+  selectEl.innerHTML = [
+    ...modelOptionsForProvider(provider).map((option) =>
+      `<option value="${option.value}">${option.label}</option>`
+    ),
+    `<option value="${customValue}">自定义模型...</option>`,
+  ].join("");
+  selectEl.value = known ? selectedModel : customValue;
+  inputEl.hidden = known;
+  inputEl.value = selectedModel;
+}
+
 function readCredFromForm(): ProviderCredential {
   const model = modelSelectEl.value === customModelValue()
     ? modelEl.value.trim()
@@ -243,9 +319,24 @@ function readCredFromForm(): ProviderCredential {
 function captureFormToDraft() {
   draft[activeProvider] = readCredFromForm();
   uiConfig.showAssetPanel = uiShowAssetPanelEl.checked;
+  uiConfig.debugMode = uiDebugModeEl.checked;
+  const webClipProvider = webClipProviderEl.value as ModelProvider;
+  const webClipModel = webClipModelSelectEl.value === customModelValue()
+    ? (webClipModelEl.value.trim() || defaultWebClipModelForProvider({ activeProvider, providers: draft }, webClipProvider))
+    : webClipModelSelectEl.value;
+  webClipModelDraft[webClipProvider] = webClipModel;
   webClipConfig.llmEnabled = webClipLlmEnabledEl.checked;
-  webClipConfig.provider = webClipProviderEl.value as ModelProvider;
+  webClipConfig.provider = webClipProvider;
+  webClipConfig.model = webClipModel;
   webClipConfig.outputLanguage = webClipOutputLanguageEl.value as WebClipOutputLanguage;
+  const formatProvider = formatProviderEl.value as ModelProvider;
+  formatConfig = {
+    provider: formatProvider,
+    model: formatModelSelectEl.value === customModelValue()
+      ? (formatModelEl.value.trim() || defaultModelForProvider(formatProvider))
+      : formatModelSelectEl.value,
+    outputLanguage: formatOutputLanguageEl.value as FormatOutputLanguage,
+  };
 }
 
 function clearConnectionTestState() {
@@ -275,15 +366,35 @@ function fill(settings: AppSettings) {
   webClipConfig = {
     llmEnabled: settings.webClip?.llmEnabled ?? false,
     provider: settings.webClip?.provider ?? "dashscope",
+    model: settings.webClip?.model ?? defaultWebClipModelForProvider(settings.ai, settings.webClip?.provider ?? "dashscope"),
     outputLanguage: settings.webClip?.outputLanguage ?? "zh-CN",
+  };
+  webClipModelDraft = {
+    dashscope: webClipConfig.provider === "dashscope"
+      ? webClipConfig.model
+      : defaultWebClipModelForProvider(settings.ai, "dashscope"),
+    gemini: webClipConfig.provider === "gemini"
+      ? webClipConfig.model
+      : defaultWebClipModelForProvider(settings.ai, "gemini"),
+  };
+  formatConfig = {
+    provider: settings.format?.provider ?? "dashscope",
+    model: settings.format?.model ?? defaultModelForProvider(settings.format?.provider ?? "dashscope"),
+    outputLanguage: settings.format?.outputLanguage ?? "zh-CN",
   };
   uiConfig = {
     showAssetPanel: settings.ui?.showAssetPanel ?? false,
+    debugMode: settings.ui?.debugMode ?? false,
   };
   uiShowAssetPanelEl.checked = uiConfig.showAssetPanel;
+  uiDebugModeEl.checked = uiConfig.debugMode;
   webClipLlmEnabledEl.checked = webClipConfig.llmEnabled;
   webClipProviderEl.value = webClipConfig.provider;
+  renderModelOptionsFor(webClipModelSelectEl, webClipModelEl, webClipConfig.provider, webClipConfig.model);
   webClipOutputLanguageEl.value = webClipConfig.outputLanguage;
+  formatProviderEl.value = formatConfig.provider;
+  formatOutputLanguageEl.value = formatConfig.outputLanguage;
+  renderModelOptionsFor(formatModelSelectEl, formatModelEl, formatConfig.provider, formatConfig.model);
 
   loadProviderToForm(activeProvider);
   saveStateEl.textContent = "";
@@ -305,10 +416,17 @@ function readSettings(): AppSettings {
     webClip: {
       llmEnabled: webClipConfig.llmEnabled,
       provider: webClipConfig.provider,
+      model: webClipConfig.model,
       outputLanguage: webClipConfig.outputLanguage,
+    },
+    format: {
+      provider: formatConfig.provider,
+      model: formatConfig.model,
+      outputLanguage: formatConfig.outputLanguage,
     },
     ui: {
       showAssetPanel: uiConfig.showAssetPanel,
+      debugMode: uiConfig.debugMode,
     },
   };
 }
@@ -368,7 +486,7 @@ apiKeyRevealEl.addEventListener("click", () => {
   refreshApiKeyMask();
 });
 
-[apiBaseEl, modelEl, uiShowAssetPanelEl, webClipLlmEnabledEl, webClipProviderEl, webClipOutputLanguageEl].forEach((el) => {
+[apiBaseEl, modelEl, uiShowAssetPanelEl, uiDebugModeEl, webClipLlmEnabledEl, webClipModelEl, webClipOutputLanguageEl, formatProviderEl, formatModelEl, formatOutputLanguageEl].forEach((el) => {
   el.addEventListener("input", () => {
     clearConnectionTestState();
     syncSaveButton();
@@ -388,6 +506,7 @@ async function bootstrap() {
     initial = {
       ai: cloneSettings(DEFAULT_AI_SETTINGS),
       webClip: { ...DEFAULT_WEB_CLIP_SETTINGS },
+      format: { ...DEFAULT_FORMAT_SETTINGS },
       ui: { ...DEFAULT_UI_SETTINGS },
     };
   }
@@ -416,6 +535,58 @@ modelSelectEl.addEventListener("change", () => {
     modelEl.focus();
   }
   clearConnectionTestState();
+  syncSaveButton();
+});
+
+formatProviderEl.addEventListener("change", () => {
+  const provider = formatProviderEl.value as ModelProvider;
+  const model = formatConfig.provider === provider ? formatConfig.model : defaultModelForProvider(provider);
+  renderModelOptionsFor(formatModelSelectEl, formatModelEl, provider, model);
+  syncSaveButton();
+});
+
+webClipProviderEl.addEventListener("change", () => {
+  const previousProvider = webClipConfig.provider;
+  const previousModel = webClipModelSelectEl.value === customModelValue()
+    ? (webClipModelEl.value.trim() || defaultWebClipModelForProvider({ activeProvider, providers: draft }, previousProvider))
+    : webClipModelSelectEl.value;
+  webClipModelDraft[previousProvider] = previousModel;
+  draft[activeProvider] = readCredFromForm();
+  uiConfig.showAssetPanel = uiShowAssetPanelEl.checked;
+  uiConfig.debugMode = uiDebugModeEl.checked;
+  const provider = webClipProviderEl.value as ModelProvider;
+  const model = webClipModelDraft[provider] || defaultWebClipModelForProvider({ activeProvider, providers: draft }, provider);
+  webClipConfig = {
+    llmEnabled: webClipLlmEnabledEl.checked,
+    provider,
+    model,
+    outputLanguage: webClipOutputLanguageEl.value as WebClipOutputLanguage,
+  };
+  renderModelOptionsFor(webClipModelSelectEl, webClipModelEl, provider, model);
+  syncSaveButton();
+});
+
+webClipModelSelectEl.addEventListener("change", () => {
+  const provider = webClipProviderEl.value as ModelProvider;
+  const isCustom = webClipModelSelectEl.value === customModelValue();
+  webClipModelEl.hidden = !isCustom;
+  webClipModelEl.value = isCustom ? "" : webClipModelSelectEl.value;
+  if (isCustom) {
+    webClipModelEl.placeholder = defaultWebClipModelForProvider({ activeProvider, providers: draft }, provider);
+    webClipModelEl.focus();
+  }
+  syncSaveButton();
+});
+
+formatModelSelectEl.addEventListener("change", () => {
+  const provider = formatProviderEl.value as ModelProvider;
+  const isCustom = formatModelSelectEl.value === customModelValue();
+  formatModelEl.hidden = !isCustom;
+  formatModelEl.value = isCustom ? "" : formatModelSelectEl.value;
+  if (isCustom) {
+    formatModelEl.placeholder = defaultModelForProvider(provider);
+    formatModelEl.focus();
+  }
   syncSaveButton();
 });
 

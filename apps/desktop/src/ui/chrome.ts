@@ -6,6 +6,7 @@ import {
   starterActionsEl, docActionsEl, sidebarFootEl,
   sidebarNewEl, sidebarSaveEl, saveEl, saveLabelEl, saveAsEl, closeEl,
   packageLocalImagesEl, healthCheckEl, webImportEl, exportMarkdownEl, exportHtmlEl, exportPdfEl,
+  formatDocumentEl,
   newWindowEl, findToggleEl,
   modeReadEl, modeEditEl, modeSourceEl, docToolbarEl,
 } from "../core/dom";
@@ -92,14 +93,15 @@ export function updateChrome() {
   titleEl().textContent = doc ? displayDocTitle(doc) : "AIMD Desktop";
   pathEl().textContent = doc
     ? (doc.requiresAimdSave
-      ? `${doc.path ? formatPathHint(doc.path) : "Markdown 草稿"} · 保存时需转换为 AIMD`
-      : (doc.path || "未保存草稿 · 先另存为 .aimd"))
-    : "正文、图片和元信息始终在一起";
+      ? `${doc.path ? formatPathHint(doc.path) : "Markdown 草稿"} · 保存时需选择格式`
+      : (doc.path || "未保存草稿 · 保存时选择 .md / .aimd"))
+    : "面向 AI 与人类协作的 Markdown 文档格式，方便保存与分享。";
   // 保存按钮在文档没有变化时禁用：用户的"按钮亮着但其实没活做"会变成第二种困惑。
   // 草稿状态(isDraft)即使 dirty=false 也要保留可点（点击会触发 saveDocumentAs 创建文件）。
   const canSave = Boolean(doc && (doc.dirty || doc.isDraft));
   saveEl().disabled = !canSave;
   saveAsEl().disabled = !doc;
+  formatDocumentEl().disabled = !doc || !doc.markdown.trim();
   packageLocalImagesEl().disabled = doc?.format !== "markdown";
   healthCheckEl().disabled = !doc;
   webImportEl().disabled = !doc;
@@ -155,7 +157,7 @@ export function updateChrome() {
   // 会自己根据 dirty 回退到稳定态。
   if (state.statusTimer == null) {
     if (doc.requiresAimdSave) {
-      statusEl().textContent = "保存时需转换为 AIMD";
+      statusEl().textContent = "保存时需选择格式";
       statusPillEl().dataset.tone = "info";
     } else if (doc.isDraft && !doc.dirty) {
       setStatus("这是未保存草稿，保存后才会生成 .aimd 文件", "info");

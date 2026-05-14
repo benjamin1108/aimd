@@ -12,7 +12,7 @@ import type { AimdDocument } from "./core/types";
 import {
   markdownEl, inlineEditorEl, modeReadEl, modeEditEl, modeSourceEl,
   saveEl, saveAsEl, closeEl,
-  moreMenuToggleEl, moreMenuEl, webImportEl,
+  moreMenuToggleEl, moreMenuEl, webImportEl, formatDocumentEl,
   debugIndicatorEl, debugIndicatorCountEl,
 } from "./core/dom";
 import { setMode, refreshSourceBanner } from "./ui/mode";
@@ -36,6 +36,7 @@ import {
 import { saveDocument, saveDocumentAs } from "./document/persist";
 import { hasAimdImageReferences, hasExternalImageReferences } from "./document/assets";
 import { importWebClip } from "./document/web-clip";
+import { bindFormatDocumentPanel, formatCurrentDocument } from "./document/format";
 import { cleanupOldDrafts } from "./document/drafts";
 import { optimizeDocumentAssets } from "./document/optimize";
 import { exportMarkdownAssets, exportHTML, exportPDF } from "./document/export";
@@ -45,7 +46,7 @@ import {
 } from "./drag/window-drop";
 import { persistSessionSnapshot, restoreSession } from "./session/snapshot";
 import { applyDocument } from "./document/apply";
-import { debugLog, installDebugConsole, openDebugConsole, onDebugChange } from "./debug/console";
+import { debugLog, installDebugConsole, openDebugConsole, onDebugChange, setDebugMode } from "./debug/console";
 import { bindWorkspacePanel, openWorkspacePicker } from "./ui/workspace";
 import { bindDocPanelTabs } from "./ui/doc-panel";
 import { bindGitPanel, refreshGitStatus } from "./ui/git";
@@ -72,6 +73,7 @@ if (isTauri()) {
 
 function applyAppSettings(settings: AppSettings) {
   state.uiSettings = { ...settings.ui };
+  setDebugMode(state.uiSettings.debugMode);
   updateChrome();
 }
 
@@ -79,7 +81,7 @@ function applyAppSettings(settings: AppSettings) {
 // 文案 "调试 · N"，点击就开 Debug 窗口；不再用最小化 / 最小化条。
 onDebugChange((errorCount) => {
   const indicator = debugIndicatorEl();
-  if (errorCount > 0) {
+  if (state.uiSettings.debugMode && errorCount > 0) {
     indicator.hidden = false;
     debugIndicatorCountEl().textContent = String(errorCount);
   } else {
@@ -87,7 +89,9 @@ onDebugChange((errorCount) => {
     debugIndicatorCountEl().textContent = "0";
   }
 });
-debugIndicatorEl().addEventListener("click", () => { openDebugConsole(); });
+debugIndicatorEl().addEventListener("click", () => {
+  if (state.uiSettings.debugMode) openDebugConsole();
+});
 
 const $ = <T extends HTMLElement>(selector: string) => document.querySelector<T>(selector)!;
 
@@ -135,6 +139,7 @@ modeEditEl().addEventListener("click", () => setMode("edit"));
 modeSourceEl().addEventListener("click", () => setMode("source"));
 saveEl().addEventListener("click", saveDocument);
 saveAsEl().addEventListener("click", () => { closeActionMenus(); void saveDocumentAs(); });
+formatDocumentEl().addEventListener("click", () => { closeActionMenus(); void formatCurrentDocument(); });
 $("#package-local-images").addEventListener("click", () => { closeActionMenus(); void packageLocalImages(); });
 webImportEl().addEventListener("click", () => { closeActionMenus(); void importWebClip(); });
 $("#health-check").addEventListener("click", () => { closeActionMenus(); void runHealthCheck(); });
@@ -187,6 +192,7 @@ bindFormatToolbar();
 bindSearch();
 bindSourceHighlight();
 bindHealthPanel();
+bindFormatDocumentPanel();
 bindWorkspacePanel();
 bindDocPanelTabs(() => { void refreshGitStatus(); });
 bindGitPanel();
@@ -281,7 +287,7 @@ window.addEventListener("DOMContentLoaded", async () => {
     });
     const menuHandlers: Record<string, () => void> = {
       "settings":          () => { void invoke("open_settings_window"); },
-      "debug-console":     () => { openDebugConsole(); },
+      "debug-console":     () => { if (state.uiSettings.debugMode) openDebugConsole(); },
       "new-document":      () => { void newDocument(); },
       "open-document":     () => { void chooseAndOpen(); },
       "save-document":     () => { void saveDocument(); },

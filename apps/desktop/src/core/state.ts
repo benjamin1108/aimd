@@ -126,7 +126,7 @@ export const state: {
     error: "",
     selectedPath: "",
   },
-  uiSettings: { showAssetPanel: false },
+  uiSettings: { showAssetPanel: false, debugMode: false },
   // Tracks whether the inline editor's DOM has been mutated by user input since
   // the last flush / paint. flushInline skips its (expensive) turndown call when
   // false — this is what keeps mode hops snappy on long documents.

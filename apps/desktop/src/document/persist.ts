@@ -1,6 +1,9 @@
 import { invoke } from "@tauri-apps/api/core";
 import { state } from "../core/state";
-import { saveEl, saveAsEl } from "../core/dom";
+import {
+  saveEl, saveAsEl,
+  saveFormatPanelEl, saveFormatMarkdownEl, saveFormatAimdEl, saveFormatCancelXEl,
+} from "../core/dom";
 import type { AimdDocument } from "../core/types";
 import { setStatus, displayDocTitle, updateChrome } from "../ui/chrome";
 import { rememberOpenedPath } from "../ui/recents";
@@ -8,6 +11,17 @@ import { fileStem, suggestAimdFilename } from "../util/path";
 import { applyDocument } from "./apply";
 import { flushInline } from "../editor/inline";
 import { deleteDraftFile } from "./drafts";
+import { hasAimdImageReferences } from "./assets";
+import { renderPreview } from "../ui/outline";
+
+type SaveFormat = "markdown" | "aimd";
+
+type MarkdownSaveResult = {
+  path: string;
+  markdown: string;
+  assetsDir?: string | null;
+  exportedAssets?: unknown[];
+};
 
 function messageFromError(err: unknown, fallback: string): string {
   if (err instanceof Error && err.message) return `${fallback}: ${err.message}`;
@@ -26,7 +40,7 @@ export async function saveDocument() {
 
   if (state.doc.format === "markdown") {
     if (state.doc.requiresAimdSave) {
-      setStatus("当前 Markdown 包含内嵌图片，请保存为 AIMD", "info");
+      setStatus("当前 Markdown 包含内嵌资源，请选择保存格式", "info");
       await saveDocumentAs();
       return;
     }
@@ -67,19 +81,81 @@ export async function saveDocument() {
   }
 }
 
-export async function saveDocumentAs() {
+function chooseSaveFormat(): Promise<SaveFormat | null> {
+  return new Promise((resolve) => {
+    const panel = saveFormatPanelEl();
+    const cleanup = (value: SaveFormat | null) => {
+      panel.hidden = true;
+      saveFormatMarkdownEl().removeEventListener("click", onMarkdown);
+      saveFormatAimdEl().removeEventListener("click", onAimd);
+      saveFormatCancelXEl().removeEventListener("click", onCancel);
+      resolve(value);
+    };
+    const onMarkdown = () => cleanup("markdown");
+    const onAimd = () => cleanup("aimd");
+    const onCancel = () => cleanup(null);
+    saveFormatMarkdownEl().addEventListener("click", onMarkdown);
+    saveFormatAimdEl().addEventListener("click", onAimd);
+    saveFormatCancelXEl().addEventListener("click", onCancel);
+    panel.hidden = false;
+    saveFormatMarkdownEl().focus();
+  });
+}
+
+function markdownSuggestedName(doc: AimdDocument): string {
+  const stem = fileStem(doc.path || doc.draftSourcePath || displayDocTitle(doc)) || "untitled";
+  return `${stem}.md`;
+}
+
+function aimdSuggestedName(doc: AimdDocument): string {
+  if (doc.format === "markdown" && doc.path) return `${fileStem(doc.path)}.aimd`;
+  return suggestAimdFilename(doc.path || `${displayDocTitle(doc)}.aimd`);
+}
+
+async function saveDocumentAsMarkdown(sourcePath: string | null, wasDraft: boolean, draftSourcePath: string) {
   if (!state.doc) return;
-  if (state.mode === "edit") flushInline();
-  const isMarkdownDoc = state.doc.format === "markdown" && Boolean(state.doc.path);
-  const wasDraft = Boolean(state.doc.isDraft || !state.doc.path);
-  const draftSourcePath = state.doc.draftSourcePath || "";
-  const sourcePath = state.doc.format === "markdown"
-    ? (draftSourcePath || state.doc.path || null)
-    : (state.doc.path || draftSourcePath || null);
-  const suggestedName = isMarkdownDoc
-    ? `${fileStem(state.doc.path)}.aimd`
-    : suggestAimdFilename(state.doc.path || `${displayDocTitle(state.doc)}.aimd`);
-  const savePath = await invoke<string | null>("choose_save_aimd_file", { suggestedName });
+  const savePath = await invoke<string | null>("choose_save_markdown_file", {
+    suggestedName: markdownSuggestedName(state.doc),
+  });
+  if (!savePath) return;
+  setStatus(wasDraft ? "正在创建 Markdown" : "正在另存为 Markdown", "loading");
+  saveAsEl().disabled = true;
+  try {
+    const result = await invoke<MarkdownSaveResult>("save_markdown_as", {
+      sourcePath,
+      savePath,
+      markdown: state.doc.markdown,
+    });
+    state.doc.path = result.path;
+    state.doc.markdown = result.markdown;
+    state.doc.format = "markdown";
+    state.doc.assets = [];
+    state.doc.isDraft = false;
+    state.doc.draftSourcePath = undefined;
+    state.doc.dirty = false;
+    state.doc.requiresAimdSave = hasAimdImageReferences(result.markdown);
+    state.doc.needsAimdSave = state.doc.requiresAimdSave;
+    await renderPreview();
+    rememberOpenedPath(result.path);
+    window.dispatchEvent(new CustomEvent("aimd-doc-saved"));
+    if (draftSourcePath && draftSourcePath !== result.path) void deleteDraftFile(draftSourcePath);
+    try {
+      await invoke("update_window_path", { newPath: result.path });
+    } catch {}
+    setStatus(result.assetsDir ? "已保存 Markdown 和资源目录" : "已保存（Markdown）", "success");
+  } catch (err) {
+    console.error(err);
+    setStatus(messageFromError(err, "另存为 Markdown 失败"), "warn");
+  } finally {
+    updateChrome();
+  }
+}
+
+async function saveDocumentAsAimd(sourcePath: string | null, wasDraft: boolean, draftSourcePath: string) {
+  if (!state.doc) return;
+  const savePath = await invoke<string | null>("choose_save_aimd_file", {
+    suggestedName: aimdSuggestedName(state.doc),
+  });
   if (!savePath) return;
   setStatus(wasDraft ? "正在创建文件" : "正在另存为", "loading");
   saveAsEl().disabled = true;
@@ -90,15 +166,9 @@ export async function saveDocumentAs() {
       markdown: state.doc.markdown,
       title: displayDocTitle(state.doc),
     });
-    if (isMarkdownDoc) {
-      applyDocument({ ...doc, isDraft: false, format: "aimd", dirty: false, needsAimdSave: false }, state.mode);
-      rememberOpenedPath(doc.path);
-      setStatus("已转换为 .aimd", "success");
-    } else {
-      applyDocument({ ...doc, isDraft: false, format: "aimd", dirty: false, needsAimdSave: false }, state.mode);
-      rememberOpenedPath(doc.path);
-      setStatus(wasDraft ? "文件已创建" : "已另存为", "success");
-    }
+    applyDocument({ ...doc, isDraft: false, format: "aimd", dirty: false, needsAimdSave: false }, state.mode);
+    rememberOpenedPath(doc.path);
+    setStatus(wasDraft ? "文件已创建" : "已另存为 AIMD", "success");
     window.dispatchEvent(new CustomEvent("aimd-doc-saved"));
     if (draftSourcePath && draftSourcePath !== doc.path) {
       void deleteDraftFile(draftSourcePath);
@@ -111,6 +181,23 @@ export async function saveDocumentAs() {
     setStatus(messageFromError(err, "另存为失败"), "warn");
   } finally {
     updateChrome();
+  }
+}
+
+export async function saveDocumentAs() {
+  if (!state.doc) return;
+  if (state.mode === "edit") flushInline();
+  const wasDraft = Boolean(state.doc.isDraft || !state.doc.path);
+  const draftSourcePath = state.doc.draftSourcePath || "";
+  const sourcePath = state.doc.format === "markdown"
+    ? (draftSourcePath || state.doc.path || null)
+    : (state.doc.path || draftSourcePath || null);
+  const format = await chooseSaveFormat();
+  if (!format) return;
+  if (format === "markdown") {
+    await saveDocumentAsMarkdown(sourcePath, wasDraft, draftSourcePath);
+  } else {
+    await saveDocumentAsAimd(sourcePath, wasDraft, draftSourcePath);
   }
 }
 

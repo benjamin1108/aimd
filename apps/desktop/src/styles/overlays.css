@@ -306,3 +306,105 @@
   border-top: 1px solid var(--hairline);
   background: var(--bg-soft);
 }
+
+.format-preview-panel {
+  position: fixed;
+  top: 84px;
+  right: 22px;
+  z-index: 9000;
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr) auto;
+  width: min(620px, calc(100vw - 44px));
+  max-height: min(720px, calc(100vh - 120px));
+  border: 1px solid var(--hairline-strong);
+  border-radius: 10px;
+  background: var(--bg-panel);
+  box-shadow: var(--shadow-panel);
+  overflow: hidden;
+}
+
+.format-preview-panel[hidden] {
+  display: none !important;
+}
+
+.format-preview-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 14px 14px 12px;
+  border-bottom: 1px solid var(--hairline);
+  background: var(--bg-soft);
+}
+
+.format-preview-title {
+  color: var(--ink-strong);
+  font: 600 14px/1.2 var(--font-display);
+}
+
+.format-preview-sub {
+  margin-top: 4px;
+  color: var(--ink-muted);
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+.format-preview-text {
+  min-height: 220px;
+  margin: 0;
+  overflow: auto;
+  padding: 14px;
+  background: #fff;
+  color: var(--ink);
+  font: 12px/1.55 var(--font-mono);
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.format-preview-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  padding: 10px 12px;
+  border-top: 1px solid var(--hairline);
+  background: var(--bg-soft);
+}
+
+.save-format-panel {
+  grid-template-rows: auto auto;
+  width: min(460px, calc(100vw - 44px));
+}
+
+.save-format-options {
+  display: grid;
+  gap: 8px;
+  padding: 12px;
+}
+
+.save-format-option {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  width: 100%;
+  border: 1px solid var(--hairline);
+  border-radius: 8px;
+  background: #fff;
+  padding: 11px 12px;
+  text-align: left;
+}
+
+.save-format-option:hover {
+  border-color: var(--hairline-strong);
+  background: var(--bg-soft);
+}
+
+.save-format-option strong {
+  color: var(--ink-strong);
+  font-size: 13px;
+}
+
+.save-format-option span {
+  color: var(--ink-muted);
+  font-size: 12px;
+  line-height: 1.45;
+}

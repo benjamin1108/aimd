@@ -1,5 +1,7 @@
-use tauri::menu::{MenuBuilder, PredefinedMenuItem, SubmenuBuilder};
-use tauri::Manager;
+use tauri::menu::{
+    Menu, MenuBuilder, MenuItem, MenuItemKind, PredefinedMenuItem, Submenu, SubmenuBuilder,
+};
+use tauri::{AppHandle, Manager, Wry};
 
 pub const MENU_EVENT_IDS: &[&str] = &[
     "settings",
@@ -24,9 +26,11 @@ pub fn build_app_menu<M: Manager<tauri::Wry>>(
     // Tauri 默认 .quit() 在 macOS 下渲染成 "Quit AIMD Desktop"（英文）。
     // 用 PredefinedMenuItem::quit + Some("退出 AIMD Desktop") 强制中文。
     let quit_item = PredefinedMenuItem::quit(manager, Some("退出 AIMD Desktop"))?;
-    let app_menu = SubmenuBuilder::new(manager, "AIMD")
+    let debug_item =
+        MenuItem::with_id(manager, "debug-console", "调试控制台", false, None::<&str>)?;
+    let app_menu = SubmenuBuilder::with_id(manager, "app-menu", "AIMD")
         .text("settings", "设置...")
-        .text("debug-console", "调试控制台")
+        .item(&debug_item)
         .separator()
         .item(&quit_item)
         .build()?;
@@ -73,4 +77,27 @@ pub fn build_app_menu<M: Manager<tauri::Wry>>(
     MenuBuilder::new(manager)
         .items(&[&app_menu, &file_menu, &edit_menu, &view_menu])
         .build()
+}
+
+fn set_debug_item_enabled_in_submenu(menu: &Submenu<Wry>, enabled: bool) {
+    if let Some(MenuItemKind::MenuItem(item)) = menu.get("debug-console") {
+        let _ = item.set_enabled(enabled);
+    }
+}
+
+fn set_debug_item_enabled_in_menu(menu: &Menu<Wry>, enabled: bool) {
+    if let Some(MenuItemKind::Submenu(app_menu)) = menu.get("app-menu") {
+        set_debug_item_enabled_in_submenu(&app_menu, enabled);
+    }
+}
+
+pub fn set_debug_menu_enabled(app: &AppHandle, enabled: bool) {
+    if let Some(menu) = app.menu() {
+        set_debug_item_enabled_in_menu(&menu, enabled);
+    }
+    if let Some(main) = app.get_webview_window("main") {
+        if let Some(menu) = main.menu() {
+            set_debug_item_enabled_in_menu(&menu, enabled);
+        }
+    }
 }

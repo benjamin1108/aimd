@@ -380,6 +380,7 @@ async function handleExtracted(payload: ExtractPayload) {
           {
             markdown: rawMarkdown,
             provider: webClipConfig.provider,
+            model: webClipConfig.model,
             guardReason: null,
             outputLanguage: webClipConfig.outputLanguage,
           },

@@ -328,9 +328,11 @@ test.describe("31. MD 按需升级方案", () => {
     expect(log.some((e) => e.cmd === "confirm_upgrade_to_aimd")).toBe(false);
 
     await expect(page.locator("#doc-path")).toContainText("/mock/report.md");
-    await expect(page.locator("#doc-path")).toContainText("保存时需转换为 AIMD");
+    await expect(page.locator("#doc-path")).toContainText("保存时需选择格式");
 
     await page.keyboard.press("Meta+s");
+    await expect(page.locator("#save-format-panel")).toBeVisible();
+    await page.locator("#save-format-aimd").click();
     await page.waitForFunction(() => {
       const log = (window as any).__aimd_call_log as Array<{ cmd: string }>;
       return log && log.some((e) => e.cmd === "save_aimd_as");
@@ -369,6 +371,8 @@ test.describe("31. MD 按需升级方案", () => {
     }, { timeout: 5000 });
 
     await page.keyboard.press("Meta+s");
+    await expect(page.locator("#save-format-panel")).toBeVisible();
+    await page.locator("#save-format-aimd").click();
 
     const log = await page.evaluate(() => (window as any).__aimd_call_log as Array<{ cmd: string }>);
     const addCalls = log.filter((e) => e.cmd === "add_image_bytes");
@@ -377,7 +381,7 @@ test.describe("31. MD 按需升级方案", () => {
     expect(log.some((e) => e.cmd === "confirm_upgrade_to_aimd")).toBe(false);
 
     await expect(page.locator("#doc-path")).toContainText("/mock/report.md");
-    await expect(page.locator("#doc-path")).toContainText("保存时需转换为 AIMD");
+    await expect(page.locator("#doc-path")).toContainText("保存时需选择格式");
   });
 
   test("手动插入图片后保存 .md 会转换为 AIMD", async ({ page }) => {
@@ -393,9 +397,11 @@ test.describe("31. MD 按需升级方案", () => {
       const log = (window as any).__aimd_call_log as Array<{ cmd: string }>;
       return log && log.some((e) => e.cmd === "add_image_bytes");
     }, { timeout: 5000 });
-    await expect(page.locator("#doc-path")).toContainText("保存时需转换为 AIMD");
+    await expect(page.locator("#doc-path")).toContainText("保存时需选择格式");
 
     await page.locator("#save").click();
+    await expect(page.locator("#save-format-panel")).toBeVisible();
+    await page.locator("#save-format-aimd").click();
     await page.waitForFunction(() => {
       const log = (window as any).__aimd_call_log as Array<{ cmd: string }>;
       return log && log.some((e) => e.cmd === "save_aimd_as");
@@ -427,6 +433,8 @@ test.describe("31. MD 按需升级方案", () => {
 
     await page.locator("#more-menu-toggle").click();
     await page.locator("#close").click();
+    await expect(page.locator("#save-format-panel")).toBeVisible();
+    await page.locator("#save-format-aimd").click();
     await page.waitForFunction(() => {
       const log = (window as any).__aimd_call_log as Array<{ cmd: string }>;
       return log && log.some((e) => e.cmd === "save_aimd_as");
@@ -448,6 +456,8 @@ test.describe("31. MD 按需升级方案", () => {
     await page.goto("/");
     await page.locator("#more-menu-toggle").click();
     await page.locator("#package-local-images").click();
+    await expect(page.locator("#save-format-panel")).toBeVisible();
+    await page.locator("#save-format-aimd").click();
 
     await page.waitForFunction(() => {
       const log = (window as any).__aimd_call_log as Array<{ cmd: string }>;

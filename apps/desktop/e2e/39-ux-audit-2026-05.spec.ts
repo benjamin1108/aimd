@@ -122,9 +122,14 @@ test.describe("P1 — 主 UI 信息架构", () => {
 });
 
 test.describe("P0-1 — 设置取消按钮 + 后端持久化", () => {
+  async function openModelSettings(page: Page) {
+    await page.locator(".settings-nav-item[data-section='model']").click();
+  }
+
   test("打开设置页，loadAppSettings 拿到的是后端 stored 值", async ({ page }) => {
     await installMock(page);
     await page.goto("/settings.html");
+    await openModelSettings(page);
     await expect(page.locator("#api-key")).toHaveValue("existing-key");
     await expect(page.locator("#provider")).toHaveValue("dashscope");
   });
@@ -133,6 +138,7 @@ test.describe("P0-1 — 设置取消按钮 + 后端持久化", () => {
     let savedCount = 0;
     await installMock(page, { onSaveSettings: () => { savedCount += 1; } });
     await page.goto("/settings.html");
+    await openModelSettings(page);
     await page.locator("#api-key").fill("changed-but-cancelled");
     let closed = false;
     await page.exposeFunction("__settingsClosed", () => { closed = true; });
@@ -152,6 +158,7 @@ test.describe("P0-1 — 设置取消按钮 + 后端持久化", () => {
     let received: any = null;
     await installMock(page, { onSaveSettings: (v) => { received = v; } });
     await page.goto("/settings.html");
+    await openModelSettings(page);
     await page.locator("#api-key").fill("new-key-123");
     await page.locator("#save-settings").click();
     // 新格式：apiKey 落在 providers[activeProvider] 下。
@@ -163,6 +170,7 @@ test.describe("P0-1 — 设置取消按钮 + 后端持久化", () => {
     let savedCount = 0;
     await installMock(page, { onSaveSettings: () => { savedCount += 1; } });
     await page.goto("/settings.html");
+    await openModelSettings(page);
     await page.locator("#api-key").fill("typed-then-escaped");
     await page.keyboard.press("Escape");
     // 给前端一帧让 keydown handler 跑完。
@@ -176,6 +184,7 @@ test.describe("P0-1 — 设置取消按钮 + 后端持久化", () => {
     // 直到用户再次编辑才能再点。关窗交给 取消 / Esc / 窗口关闭按钮。
     await installMock(page);
     await page.goto("/settings.html");
+    await openModelSettings(page);
     await page.locator("#api-key").fill("first-save-key");
     await page.locator("#save-settings").click();
 
@@ -194,6 +203,7 @@ test.describe("P0-1 — 设置取消按钮 + 后端持久化", () => {
     let tested: any = null;
     await installMock(page, { onTestConnection: (v) => { tested = v; } });
     await page.goto("/settings.html");
+    await openModelSettings(page);
     await page.locator("#api-base").fill("https://example.test/v1");
     await page.locator("#test-connection").click();
 

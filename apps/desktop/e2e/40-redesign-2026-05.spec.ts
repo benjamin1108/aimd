@@ -14,13 +14,17 @@ import { test, expect, Page } from "@playwright/test";
 type SetupOpts = {
   withTour?: boolean;
   dirty?: boolean;
+  debugMode?: boolean;
 };
 
 async function installMock(page: Page, opts: SetupOpts = {}) {
   const tour = opts.withTour ?? false;
   const dirty = opts.dirty ?? false;
-  await page.addInitScript(({ withTour, isDirty }) => {
+  const debugMode = opts.debugMode ?? false;
+  await page.addInitScript(({ withTour, isDirty, debugMode }) => {
     type Args = Record<string, unknown> | undefined;
+    const listeners = new Map<number, { event: string; handler: Function }>();
+    let nextListenerId = 1;
     const tourPayload = JSON.stringify({
       version: 1,
       title: "演示导览",
@@ -50,8 +54,15 @@ async function installMock(page: Page, opts: SetupOpts = {}) {
           dashscope: { model: "qwen3.6-plus", apiKey: "sk-test-1234567890abcdef", apiBase: "" },
         },
       },
+      webClip: { llmEnabled: false, provider: "dashscope", model: "qwen3.6-plus", outputLanguage: "zh-CN" },
+      ui: { showAssetPanel: false, debugMode },
     };
     const handlers: Record<string, (a: Args) => unknown> = {
+      "plugin:event|listen": (a) => {
+        const id = nextListenerId++;
+        listeners.set(id, { event: String((a as any)?.event ?? ""), handler: (a as any)?.handler });
+        return id;
+      },
       initial_open_path: () => null,
       choose_doc_file: () => doc.path,
       choose_aimd_file: () => doc.path,
@@ -70,7 +81,12 @@ async function installMock(page: Page, opts: SetupOpts = {}) {
       transformCallback: (cb: Function) => cb,
     };
     (window as any).__TAURI_EVENT_PLUGIN_INTERNALS__ = { unregisterListener: () => {} };
-  }, { withTour: tour, isDirty: dirty });
+    (window as any).__aimdEmitTauriEvent = (event: string, payload: unknown) => {
+      for (const item of listeners.values()) {
+        if (item.event === event) item.handler({ event, payload });
+      }
+    };
+  }, { withTour: tour, isDirty: dirty, debugMode });
 }
 
 test.describe("工具栏：旧导览入口已移除", () => {
@@ -143,9 +159,14 @@ test.describe("保存按钮：干净时灰，脏时亮", () => {
 });
 
 test.describe("设置：双栏 IA + API Key 半遮罩", () => {
+  async function openModelSettings(page: Page) {
+    await page.locator(".settings-nav-item[data-section='model']").click();
+  }
+
   test("API Key 默认半遮罩：mask 文本含 prefix4 + ••• + suffix4", async ({ page }) => {
     await installMock(page);
     await page.goto("/settings.html");
+    await openModelSettings(page);
     const wrap = page.locator(".api-key-wrap");
     await expect(wrap).toHaveAttribute("data-state", "masked");
     const mask = page.locator(".api-key-mask");
@@ -158,6 +179,7 @@ test.describe("设置：双栏 IA + API Key 半遮罩", () => {
   test("聚焦 input 不会暴露明文：仍是 type=password；只有点眼睛才切 type=text", async ({ page }) => {
     await installMock(page);
     await page.goto("/settings.html");
+    await openModelSettings(page);
     const input = page.locator("#api-key");
 
     // 默认 password
@@ -204,6 +226,7 @@ test.describe("设置：双栏 IA + API Key 半遮罩", () => {
       (window as any).__TAURI_EVENT_PLUGIN_INTERNALS__ = { unregisterListener: () => {} };
     });
     await page.goto("/settings.html");
+    await openModelSettings(page);
     // coerceConfig 把 "   " trim 成空，UI 表现为真实空，不出现"看着像空但 caret 卡中间"。
     await expect(page.locator("#api-key")).toHaveValue("");
     await expect(page.locator(".api-key-wrap")).toHaveAttribute("data-state", "visible");
@@ -213,6 +236,7 @@ test.describe("设置：双栏 IA + API Key 半遮罩", () => {
   test("无修改时保存按钮 disabled；编辑后 enabled", async ({ page }) => {
     await installMock(page);
     await page.goto("/settings.html");
+    await openModelSettings(page);
     await expect(page.locator("#save-settings")).toBeDisabled();
     await page.locator("#api-key").fill("sk-different-value");
     await expect(page.locator("#save-settings")).toBeEnabled();
@@ -242,8 +266,17 @@ test.describe("调试：状态栏隐式指示器", () => {
     await expect(page.locator("#debug-indicator")).toBeHidden();
   });
 
-  test("出现 console.error 后指示器浮现，点击直接打开调试控制台", async ({ page }) => {
+  test("调试模式关闭时 console.error 不显示指示器，菜单事件也不打开控制台", async ({ page }) => {
     await installMock(page);
+    await page.goto("/");
+    await page.evaluate(() => { console.error("e2e: 模拟错误"); });
+    await expect(page.locator("#debug-indicator")).toBeHidden();
+    await page.evaluate(() => (window as any).__aimdEmitTauriEvent("aimd-menu", "debug-console"));
+    await expect(page.locator(".debug-panel")).toHaveCount(0);
+  });
+
+  test("调试模式开启后出现 console.error 才显示指示器，点击打开调试控制台", async ({ page }) => {
+    await installMock(page, { debugMode: true });
     await page.goto("/");
     await page.evaluate(() => { console.error("e2e: 模拟错误"); });
     await expect(page.locator("#debug-indicator")).toBeVisible();
@@ -256,12 +289,36 @@ test.describe("调试：状态栏隐式指示器", () => {
   });
 
   test('点"清空"后指示器归零并隐藏', async ({ page }) => {
-    await installMock(page);
+    await installMock(page, { debugMode: true });
     await page.goto("/");
     await page.evaluate(() => { console.error("err1"); console.warn("warn1"); });
     await expect(page.locator("#debug-indicator-count")).toHaveText("2");
     await page.locator("#debug-indicator").click();
     await page.locator("[data-debug-clear]").click();
     await expect(page.locator("#debug-indicator")).toBeHidden();
+  });
+
+  test("关闭调试模式后立即隐藏指示器和已打开的调试控制台", async ({ page }) => {
+    await installMock(page, { debugMode: true });
+    await page.goto("/");
+    await page.evaluate(() => { console.warn("warn-before-disable"); });
+    await expect(page.locator("#debug-indicator")).toBeVisible();
+    await page.locator("#debug-indicator").click();
+    await expect(page.locator(".debug-panel")).toBeVisible();
+
+    await page.evaluate(() => (window as any).__aimdEmitTauriEvent("aimd-settings-updated", {
+      ai: {
+        activeProvider: "dashscope",
+        providers: {
+          dashscope: { model: "qwen3.6-plus", apiKey: "", apiBase: "" },
+          gemini: { model: "gemini-3.1-flash-lite-preview", apiKey: "", apiBase: "" },
+        },
+      },
+      webClip: { llmEnabled: false, provider: "dashscope", model: "qwen3.6-plus", outputLanguage: "zh-CN" },
+      ui: { showAssetPanel: false, debugMode: false },
+    }));
+
+    await expect(page.locator("#debug-indicator")).toBeHidden();
+    await expect(page.locator(".debug-panel")).toBeHidden();
   });
 });

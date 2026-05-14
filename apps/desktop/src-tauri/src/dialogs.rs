@@ -55,6 +55,17 @@ pub fn choose_save_aimd_file(suggested_name: Option<String>) -> Option<String> {
 }
 
 #[tauri::command]
+pub fn choose_save_markdown_file(suggested_name: Option<String>) -> Option<String> {
+    let mut dialog = rfd::FileDialog::new().add_filter("Markdown", &["md"]);
+    if let Some(name) = suggested_name {
+        dialog = dialog.set_file_name(&name);
+    }
+    dialog
+        .save_file()
+        .map(|path| path.to_string_lossy().to_string())
+}
+
+#[tauri::command]
 pub fn choose_export_markdown_dir() -> Option<String> {
     rfd::FileDialog::new()
         .set_title("选择 Markdown 导出文件夹")
