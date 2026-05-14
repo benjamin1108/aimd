@@ -543,4 +543,26 @@ test.describe("31. MD 按需升级方案", () => {
     await expect(page.locator("#empty")).toBeVisible();
     await expect(page.locator("#status")).toContainText("不支持的文件类型");
   });
+
+  test("Windows .md 中的 file URL 图片会解析成本地文件路径并完成 hydrate", async ({ page }) => {
+    await installMock(page, {
+      initialPath: "C:\\Users\\benjamin\\Documents\\report.md",
+      md: {
+        markdown: "# Windows Markdown\n\n![fileurl](file:///C:/Users/benjamin/Pictures/pic%20one.png)\n",
+        title: "Windows Markdown",
+        html: '<h1>Windows Markdown</h1><p><img src="file:///C:/Users/benjamin/Pictures/pic%20one.png" alt="fileurl"></p>',
+      },
+    });
+    await page.goto("/");
+
+    await expect.poll(async () => page.locator("#reader img[alt='fileurl']").evaluate((img: HTMLImageElement) => ({
+      src: img.getAttribute("src") || "",
+      localPath: img.dataset.aimdLocalImagePath || "",
+      naturalWidth: img.naturalWidth,
+    }))).toMatchObject({
+      src: expect.stringContaining("blob:"),
+      localPath: "C:/Users/benjamin/Pictures/pic one.png",
+      naturalWidth: 1,
+    });
+  });
 });

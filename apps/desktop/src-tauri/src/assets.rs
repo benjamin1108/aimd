@@ -8,10 +8,11 @@ use aimd_core::rewrite::{
     find_asset_by_hash, is_image_filename, rewrite_file, sha256_hex, unique_asset_name, NewAsset,
     RewriteOptions,
 };
+use aimd_core::{is_path_like_image_url, resolve_image_path};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use std::fs;
-use std::path::Path;
+use std::path::{Path, PathBuf};
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct AssetEntry {
@@ -121,7 +122,16 @@ pub fn add_image(path: String, image_path: String) -> Result<Value, String> {
 
 #[tauri::command]
 pub fn read_image_bytes(image_path: String) -> Result<Vec<u8>, String> {
-    fs::read(&image_path).map_err(|err| format!("read_image_bytes: {err}"))
+    let path = image_path_to_fs_path(&image_path);
+    fs::read(&path).map_err(|err| format!("read_image_bytes: {err}"))
+}
+
+fn image_path_to_fs_path(value: &str) -> PathBuf {
+    if is_path_like_image_url(value) {
+        resolve_image_path(Path::new("."), value)
+    } else {
+        PathBuf::from(value)
+    }
 }
 
 #[tauri::command]
@@ -234,4 +244,18 @@ pub fn replace_aimd_asset(
         size: bytes.len() as u64,
         mime: mime_by_ext(&new_name).to_string(),
     })
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn image_path_accepts_windows_file_url() {
+        let path = image_path_to_fs_path("file:///C:/Users/benjamin/Pictures/pic%20one.png");
+        assert_eq!(
+            path.to_string_lossy().replace('\\', "/"),
+            "C:/Users/benjamin/Pictures/pic one.png"
+        );
+    }
 }

@@ -15,6 +15,7 @@ export function sanitizeDisplayURL(value?: string): string {
 
 export function looksLikeLocalPath(value: string): boolean {
   if (!value || value.startsWith("data:")) return false;
+  if (/^file:\/\//i.test(value)) return true;
   if (value.startsWith("/") || value.startsWith("\\\\")) return true;
   return /^[A-Za-z]:[\\/]/.test(value);
 }
@@ -25,8 +26,8 @@ export function hasRemoteImageReferences(markdown: string): boolean {
 }
 
 export function hasLocalImageReferences(markdown: string): boolean {
-  return /!\[[^\]]*]\(\s*(?!https?:\/\/|data:|asset:\/\/)[^)]+/i.test(markdown)
-    || /<img\b[^>]*\bsrc\s*=\s*["'](?!https?:\/\/|data:|asset:\/\/)[^"']+/i.test(markdown);
+  return /!\[[^\]]*]\(\s*(?!https?:\/\/|\/\/|data:|blob:|asset:\/\/)[^)]+/i.test(markdown)
+    || /<img\b[^>]*\bsrc\s*=\s*["'](?!https?:\/\/|\/\/|data:|blob:|asset:\/\/)[^"']+/i.test(markdown);
 }
 
 export function hasExternalImageReferences(markdown: string): boolean {
@@ -52,6 +53,29 @@ function splitURLSuffix(value: string): { path: string; suffix: string } {
   return { path: value.slice(0, index), suffix: value.slice(index) };
 }
 
+function safeDecodeURIComponent(value: string): string {
+  try {
+    return decodeURIComponent(value);
+  } catch {
+    return value;
+  }
+}
+
+function fileURLToLocalPath(value: string): string | null {
+  if (!/^file:\/\//i.test(value)) return null;
+  try {
+    const url = new URL(value);
+    const decodedPath = safeDecodeURIComponent(url.pathname);
+    const localPath = /^\/[A-Za-z]:\//.test(decodedPath) ? decodedPath.slice(1) : decodedPath;
+    return url.hostname ? `//${url.hostname}${localPath}` : localPath;
+  } catch {
+    const raw = value.replace(/^file:\/+/i, "");
+    const decoded = safeDecodeURIComponent(raw);
+    if (/^\/[A-Za-z]:\//.test(decoded)) return decoded.slice(1);
+    return decoded;
+  }
+}
+
 function parentDir(path: string): string {
   const normalized = path.replace(/\\/g, "/");
   const index = normalized.lastIndexOf("/");
@@ -59,9 +83,11 @@ function parentDir(path: string): string {
 }
 
 function normalizeLocalPath(path: string): string {
-  const isWindows = /^[A-Za-z]:\//.test(path);
-  const prefix = isWindows ? path.slice(0, 2) : (path.startsWith("/") ? "/" : "");
-  const body = isWindows ? path.slice(2) : path;
+  const normalized = path.replace(/\\/g, "/");
+  if (normalized.startsWith("//")) return normalized;
+  const isWindows = /^[A-Za-z]:\//.test(normalized);
+  const prefix = isWindows ? normalized.slice(0, 2) : (normalized.startsWith("/") ? "/" : "");
+  const body = isWindows ? normalized.slice(2) : normalized;
   const parts: string[] = [];
   body.split("/").forEach((part) => {
     if (!part || part === ".") return;
@@ -77,9 +103,11 @@ function resolveMarkdownImagePath(basePath: string, src: string): string {
 }
 
 function resolveMarkdownImageFilePath(basePath: string, src: string): string {
-  const decoded = decodeURIComponent(src);
+  const fileURLPath = fileURLToLocalPath(src);
+  if (fileURLPath) return normalizeLocalPath(fileURLPath);
+  const decoded = safeDecodeURIComponent(src);
   return looksLikeLocalPath(decoded)
-    ? decoded
+    ? normalizeLocalPath(decoded)
     : normalizeLocalPath(`${parentDir(basePath)}/${decoded}`);
 }
 
@@ -123,7 +151,14 @@ export function rewriteMarkdownLocalImageURLs(html: string, markdownPath: string
   tpl.innerHTML = html;
   tpl.content.querySelectorAll<HTMLImageElement>("img").forEach((img) => {
     const src = img.getAttribute("src") || "";
-    if (!src || src.startsWith(ASSET_URI_PREFIX) || src.startsWith("data:") || /^https?:\/\//i.test(src)) return;
+    if (
+      !src
+      || src.startsWith(ASSET_URI_PREFIX)
+      || src.startsWith("data:")
+      || src.startsWith("blob:")
+      || /^https?:\/\//i.test(src)
+      || src.startsWith("//")
+    ) return;
     const { suffix } = splitURLSuffix(src);
     const localPath = resolveMarkdownImagePath(markdownPath, src);
     img.dataset.aimdMarkdownSrc = src;

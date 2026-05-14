@@ -8,6 +8,7 @@ use aimd_mdx::{extract_title, is_asset_uri, is_remote, rewrite, scan, ASSET_URI_
 use crate::manifest::{Manifest, ROLE_CONTENT_IMAGE};
 use crate::rewrite::NewAsset;
 use crate::writer::Writer;
+use crate::{is_path_like_image_url, resolve_image_path};
 
 #[derive(Debug)]
 pub struct BundleLocalImagesResult {
@@ -103,17 +104,16 @@ pub fn bundle_local_images(
     let mut id_counter = 0u32;
 
     for image_ref in scan(markdown) {
-        if is_remote(&image_ref.url) || is_asset_uri(&image_ref.url) {
+        if is_remote(&image_ref.url)
+            || is_asset_uri(&image_ref.url)
+            || !is_path_like_image_url(&image_ref.url)
+        {
             continue;
         }
         if url_to_id.contains_key(&image_ref.url) {
             continue;
         }
-        let full: PathBuf = if Path::new(&image_ref.url).is_absolute() {
-            PathBuf::from(&image_ref.url)
-        } else {
-            base_dir.join(&image_ref.url)
-        };
+        let full: PathBuf = resolve_image_path(base_dir, &image_ref.url);
         if !full.exists() {
             missing.push(image_ref.url.clone());
             continue;
@@ -464,15 +464,36 @@ mod tests {
     }
 
     #[test]
+    fn pack_file_url_local_image_gets_bundled() {
+        let tmp = tempfile::tempdir().unwrap();
+        let md_path = tmp.path().join("input.md");
+        let png_path = tmp.path().join("pic one.png");
+        let out_path = tmp.path().join("output.aimd");
+        std::fs::write(&md_path, "# Old\n").unwrap();
+        std::fs::write(&png_path, MIN_PNG).unwrap();
+        let url_path = png_path
+            .to_string_lossy()
+            .replace('\\', "/")
+            .replace(' ', "%20");
+        let file_url = match url_path.as_bytes().get(1) {
+            Some(b':') => format!("file:///{url_path}"),
+            _ => format!("file://{url_path}"),
+        };
+        let markdown = format!("# New\n\n![x]({file_url})\n");
+        run_with_markdown(&md_path, markdown.as_bytes(), &out_path, None).unwrap();
+        let r = Reader::open(&out_path).unwrap();
+        assert_eq!(r.manifest.assets.len(), 1);
+        let md_got = String::from_utf8(r.main_markdown().unwrap()).unwrap();
+        assert!(md_got.contains("asset://"));
+        assert!(!md_got.contains("file://"));
+    }
+    #[test]
     fn pack_title_falls_back_to_filename_when_no_h1() {
         let tmp = tempfile::tempdir().unwrap();
         let md_path = tmp.path().join("my-document.md");
         let out_path = tmp.path().join("output.aimd");
-
         std::fs::write(&md_path, "No heading here.\n").unwrap();
-
         run(&md_path, &out_path, None).unwrap();
-
         let r = Reader::open(&out_path).unwrap();
         assert_eq!(r.manifest.title, "my-document");
     }

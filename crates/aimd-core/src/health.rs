@@ -4,6 +4,8 @@ use aimd_mdx::{asset_uri_id, is_asset_uri, is_remote, scan};
 use std::collections::HashSet;
 use std::path::Path;
 
+use crate::{is_path_like_image_url, resolve_image_path};
+
 pub const DEFAULT_LARGE_ASSET_THRESHOLD: i64 = 2 * 1024 * 1024;
 
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize, PartialEq, Eq)]
@@ -130,7 +132,7 @@ pub fn check_document_health_with_threshold(
     }
 
     for image_ref in scan(markdown) {
-        if is_remote(&image_ref.url) {
+        if is_remote(&image_ref.url) || image_ref.url.starts_with("//") {
             issues.push(HealthIssue {
                 kind: "remote_image".to_string(),
                 severity: HealthSeverity::Warning,
@@ -150,15 +152,11 @@ pub fn check_document_health_with_threshold(
             }
             continue;
         }
+        if !is_path_like_image_url(&image_ref.url) {
+            continue;
+        }
         let exists = base_dir
-            .map(|dir| {
-                let p = if Path::new(&image_ref.url).is_absolute() {
-                    Path::new(&image_ref.url).to_path_buf()
-                } else {
-                    dir.join(&image_ref.url)
-                };
-                p.exists()
-            })
+            .map(|dir| resolve_image_path(dir, &image_ref.url).exists())
             .unwrap_or(false);
         issues.push(HealthIssue {
             kind: "local_image".to_string(),
@@ -288,5 +286,27 @@ mod tests {
         let report = check_document_health(&clean, b"![ok](asset://img-001)\n", None);
         assert_eq!(report.status, HealthStatus::OfflineReady);
         assert!(report.issues.is_empty());
+    }
+
+    #[test]
+    fn health_resolves_file_url_local_image() {
+        let tmp = tempfile::tempdir().unwrap();
+        let png_path = tmp.path().join("pic one.png");
+        std::fs::write(&png_path, b"png").unwrap();
+        let url_path = png_path
+            .to_string_lossy()
+            .replace('\\', "/")
+            .replace(' ', "%20");
+        let file_url = if url_path.as_bytes().get(1) == Some(&b':') {
+            format!("file:///{url_path}")
+        } else {
+            format!("file://{url_path}")
+        };
+        let markdown = format!("![local]({file_url})\n");
+        let report =
+            check_document_health(&Manifest::new("Doc"), markdown.as_bytes(), Some(tmp.path()));
+        assert!(report.issues.iter().any(|issue| {
+            issue.kind == "local_image" && issue.url.as_deref() == Some(file_url.as_str())
+        }));
     }
 }

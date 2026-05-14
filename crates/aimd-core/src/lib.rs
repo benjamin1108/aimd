@@ -3,6 +3,7 @@ pub mod export;
 pub mod git_diff;
 pub mod git_merge;
 pub mod health;
+mod local_paths;
 pub mod manifest;
 pub mod pack;
 pub mod reader;
@@ -17,6 +18,7 @@ pub use health::{
     check_document_health, check_document_health_with_threshold, DocumentHealthReport, HealthIssue,
     HealthSeverity, HealthStatus,
 };
+pub use local_paths::{is_path_like_image_url, resolve_image_path};
 pub use manifest::Manifest;
 pub use pack::{
     bundle_local_images, run as pack_run, run_with_markdown as pack_run_with_markdown,
