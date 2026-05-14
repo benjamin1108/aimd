@@ -160,7 +160,11 @@ pub fn check_document_health_with_threshold(
             .unwrap_or(false);
         issues.push(HealthIssue {
             kind: "local_image".to_string(),
-            severity: HealthSeverity::Warning,
+            severity: if exists {
+                HealthSeverity::Warning
+            } else {
+                HealthSeverity::Error
+            },
             message: if exists {
                 format!("本地图片尚未嵌入文档: {}", image_ref.url)
             } else {
@@ -308,5 +312,19 @@ mod tests {
         assert!(report.issues.iter().any(|issue| {
             issue.kind == "local_image" && issue.url.as_deref() == Some(file_url.as_str())
         }));
+    }
+
+    #[test]
+    fn health_treats_missing_local_image_as_missing() {
+        let report = check_document_health(
+            &Manifest::new("Doc"),
+            b"![missing](missing.png)\n",
+            Some(Path::new(".")),
+        );
+        assert_eq!(report.status, HealthStatus::Missing);
+        assert!(report
+            .issues
+            .iter()
+            .any(|issue| issue.kind == "local_image" && issue.severity == HealthSeverity::Error));
     }
 }

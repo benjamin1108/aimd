@@ -21,6 +21,8 @@ use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Mutex;
 use tauri::{AppHandle, State};
 
+#[path = "documents/local_images.rs"]
+mod local_images;
 #[path = "documents/path_utils.rs"]
 mod path_utils;
 #[path = "documents/pdf.rs"]
@@ -29,6 +31,7 @@ mod pdf;
 mod pdf_diagnostics;
 #[path = "documents/remote_images.rs"]
 mod remote_images;
+use local_images::{embed_local_markdown_images, filter_existing_markdown_local_images};
 pub(crate) use path_utils::file_url_for_path;
 use path_utils::{is_aimd_extension, is_markdown_extension, markdown_base_href};
 
@@ -54,13 +57,24 @@ fn export_html_for_document(file: &Path, markdown: &str) -> Result<Vec<u8>, Stri
     }
 
     let title = resolve_title(None, markdown, file);
+    let export_markdown = markdown_base_dir(file)
+        .map(|base_dir| embed_local_markdown_images(markdown, base_dir))
+        .unwrap_or_else(|| markdown.to_string());
     let base_href = markdown_base_href(file);
     Ok(aimd_core::export_html_document_bytes(
         &title,
-        markdown,
+        &export_markdown,
         None,
         base_href.as_deref(),
     ))
+}
+
+fn markdown_base_dir(file: &Path) -> Option<&Path> {
+    if is_markdown_extension(file) {
+        file.parent()
+    } else {
+        None
+    }
 }
 
 #[tauri::command]
@@ -293,7 +307,10 @@ pub fn check_document_health(path: Option<String>, markdown: String) -> Result<V
                 .unwrap_or_else(|| resolve_title(None, &markdown, Path::new("document.md"))),
         )
     };
-    let report = aimd_core::check_document_health(&manifest, markdown.as_bytes(), base_dir);
+    let mut report = aimd_core::check_document_health(&manifest, markdown.as_bytes(), base_dir);
+    if path_ref.is_some_and(is_markdown_extension) {
+        filter_existing_markdown_local_images(&mut report, base_dir);
+    }
     serde_json::to_value(report).map_err(|e| e.to_string())
 }
 
