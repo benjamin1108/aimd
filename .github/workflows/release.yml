@@ -43,11 +43,6 @@ jobs:
       - name: Setup Rust
         uses: dtolnay/rust-toolchain@stable
 
-      - name: Rust cache
-        uses: Swatinem/rust-cache@v2
-        with:
-          cache-bin: false
-
       - name: Install frontend dependencies
         working-directory: apps/desktop
         run: npm ci
