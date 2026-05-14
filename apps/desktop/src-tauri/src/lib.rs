@@ -12,6 +12,7 @@ mod external;
 mod formatter;
 mod git;
 mod git_integration;
+mod git_process;
 mod importer;
 mod llm;
 mod macos_assoc;

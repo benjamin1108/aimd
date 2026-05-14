@@ -7,10 +7,12 @@ mod support;
 #[cfg(test)]
 use config::stable_cli_path;
 use config::{
-    canonical_repo_root, config_value, driver_commands, driver_configured, ensure_repo,
+    canonical_repo_root, config_snapshot, driver_commands, driver_configured_snapshot, ensure_repo,
     find_in_path, is_executable, write_gitattributes_line, write_global_config, write_repo_config,
     WriteConfigReport,
 };
+#[cfg(test)]
+use config::{config_value, driver_configured};
 use support::{log_event, new_request_id, run_git, stderr_or_stdout};
 const BARE_DIFF_TEXTCONV: &str = "aimd git-diff";
 const BARE_MERGE_DRIVER: &str = "aimd git-merge %O %A %B %P";
@@ -274,6 +276,7 @@ fn status_impl(repo_path: Option<&str>, request_id: String) -> GitIntegrationSta
         cli_path_buf.as_deref(),
         stable_cli_executable.then_some(stable.as_path()),
     );
+    let global_config = config_snapshot(None);
     let stable_cli_error = if stable_cli_exists && !stable_cli_executable {
         Some(format!("{} 存在但不可执行", stable.display()))
     } else if !stable_cli_exists {
@@ -298,6 +301,7 @@ fn status_impl(repo_path: Option<&str>, request_id: String) -> GitIntegrationSta
         .and_then(|p| fs::read_to_string(p).ok())
         .map(|s| s.lines().any(|line| line.trim() == GITATTRIBUTES_LINE))
         .unwrap_or(false);
+    let repo_config = repo.as_ref().map(|r| config_snapshot(Some(r)));
 
     GitIntegrationStatus {
         request_id,
@@ -317,28 +321,29 @@ fn status_impl(repo_path: Option<&str>, request_id: String) -> GitIntegrationSta
         gitattributes_configured,
         repo_driver_configured: repo
             .as_ref()
-            .map(|r| driver_configured(Some(r), &commands))
+            .and_then(|_| repo_config.as_ref())
+            .map(|repo_config| driver_configured_snapshot(repo_config, &commands))
             .unwrap_or(false),
-        global_driver_configured: driver_configured(None, &commands),
+        global_driver_configured: driver_configured_snapshot(&global_config, &commands),
         driver_command_source: commands.source,
         expected_textconv: commands.textconv,
         expected_merge_driver: commands.merge_driver,
-        global_textconv: config_value(None, "diff.aimd.textconv"),
-        global_cache_textconv: config_value(None, "diff.aimd.cachetextconv"),
-        global_merge_name: config_value(None, "merge.aimd.name"),
-        global_merge_driver: config_value(None, "merge.aimd.driver"),
-        repo_textconv: repo
+        global_textconv: global_config.get("diff.aimd.textconv"),
+        global_cache_textconv: global_config.get("diff.aimd.cachetextconv"),
+        global_merge_name: global_config.get("merge.aimd.name"),
+        global_merge_driver: global_config.get("merge.aimd.driver"),
+        repo_textconv: repo_config
             .as_ref()
-            .and_then(|r| config_value(Some(r), "diff.aimd.textconv")),
-        repo_cache_textconv: repo
+            .and_then(|config| config.get("diff.aimd.textconv")),
+        repo_cache_textconv: repo_config
             .as_ref()
-            .and_then(|r| config_value(Some(r), "diff.aimd.cachetextconv")),
-        repo_merge_name: repo
+            .and_then(|config| config.get("diff.aimd.cachetextconv")),
+        repo_merge_name: repo_config
             .as_ref()
-            .and_then(|r| config_value(Some(r), "merge.aimd.name")),
-        repo_merge_driver: repo
+            .and_then(|config| config.get("merge.aimd.name")),
+        repo_merge_driver: repo_config
             .as_ref()
-            .and_then(|r| config_value(Some(r), "merge.aimd.driver")),
+            .and_then(|config| config.get("merge.aimd.driver")),
     }
 }
 

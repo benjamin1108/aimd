@@ -1,4 +1,5 @@
 use std::{
+    collections::HashMap,
     fs,
     path::{Path, PathBuf},
 };
@@ -18,6 +19,17 @@ pub(super) struct DriverCommands {
 #[derive(Debug)]
 pub(super) struct WriteConfigReport {
     pub details: Vec<String>,
+}
+
+#[derive(Debug, Default, Clone)]
+pub(super) struct GitConfigSnapshot {
+    values: HashMap<String, String>,
+}
+
+impl GitConfigSnapshot {
+    pub(super) fn get(&self, key: &str) -> Option<String> {
+        self.values.get(key).cloned()
+    }
 }
 
 pub(super) fn write_global_config(
@@ -123,25 +135,48 @@ pub(super) fn canonical_repo_root(path: &Path) -> Result<PathBuf, String> {
     }
 }
 
+#[cfg(test)]
 pub(super) fn driver_configured(repo: Option<&Path>, commands: &DriverCommands) -> bool {
-    config_value(repo, "diff.aimd.textconv").as_deref() == Some(commands.textconv.as_str())
-        && config_value(repo, "diff.aimd.cachetextconv").as_deref() != Some("true")
-        && config_value(repo, "merge.aimd.name").as_deref() == Some(MERGE_NAME)
-        && config_value(repo, "merge.aimd.driver").as_deref()
-            == Some(commands.merge_driver.as_str())
+    let config = config_snapshot(repo);
+    driver_configured_snapshot(&config, commands)
 }
 
-pub(super) fn config_value(repo: Option<&Path>, key: &str) -> Option<String> {
+pub(super) fn driver_configured_snapshot(
+    config: &GitConfigSnapshot,
+    commands: &DriverCommands,
+) -> bool {
+    config.get("diff.aimd.textconv").as_deref() == Some(commands.textconv.as_str())
+        && config.get("diff.aimd.cachetextconv").as_deref() != Some("true")
+        && config.get("merge.aimd.name").as_deref() == Some(MERGE_NAME)
+        && config.get("merge.aimd.driver").as_deref() == Some(commands.merge_driver.as_str())
+}
+
+pub(super) fn config_snapshot(repo: Option<&Path>) -> GitConfigSnapshot {
     let scope = if repo.is_some() {
         "--local"
     } else {
         "--global"
     };
-    let out = run_git(repo, &["config", scope, "--get", key]).ok()?;
+    let out = match run_git(repo, &["config", scope, "--list"]) {
+        Ok(out) => out,
+        Err(_) => return GitConfigSnapshot::default(),
+    };
     if !out.status.success() {
-        return None;
+        return GitConfigSnapshot::default();
     }
-    Some(String::from_utf8_lossy(&out.stdout).trim().to_string())
+    let mut values = HashMap::new();
+    for line in String::from_utf8_lossy(&out.stdout).lines() {
+        let Some((key, value)) = line.split_once('=') else {
+            continue;
+        };
+        values.insert(key.to_string(), value.to_string());
+    }
+    GitConfigSnapshot { values }
+}
+
+#[cfg(test)]
+pub(super) fn config_value(repo: Option<&Path>, key: &str) -> Option<String> {
+    config_snapshot(repo).get(key)
 }
 
 fn verify_config(
@@ -150,7 +185,8 @@ fn verify_config(
     commands: &DriverCommands,
 ) -> Result<(), String> {
     if enable {
-        if driver_configured(repo, commands) {
+        let config = config_snapshot(repo);
+        if driver_configured_snapshot(&config, commands) {
             Ok(())
         } else {
             Err("git config 写入后验证失败".to_string())
@@ -164,7 +200,7 @@ fn verify_config(
         ];
         let remaining: Vec<_> = keys
             .into_iter()
-            .filter(|key| config_value(repo, key).is_some())
+            .filter(|key| config_snapshot(repo).get(key).is_some())
             .collect();
         if remaining.is_empty() {
             Ok(())
@@ -178,13 +214,7 @@ pub(super) fn driver_commands(
     cli_in_path: Option<&Path>,
     stable_cli: Option<&Path>,
 ) -> DriverCommands {
-    if cli_in_path.is_some() {
-        DriverCommands {
-            source: "path".to_string(),
-            textconv: BARE_DIFF_TEXTCONV.to_string(),
-            merge_driver: BARE_MERGE_DRIVER.to_string(),
-        }
-    } else if let Some(stable_cli) = stable_cli {
+    if let Some(stable_cli) = stable_cli {
         #[cfg(windows)]
         let textconv = format!("{} git-diff", git_command_path(stable_cli));
         #[cfg(windows)]
@@ -198,6 +228,12 @@ pub(super) fn driver_commands(
             source: "stable".to_string(),
             textconv,
             merge_driver,
+        }
+    } else if cli_in_path.is_some() {
+        DriverCommands {
+            source: "path".to_string(),
+            textconv: BARE_DIFF_TEXTCONV.to_string(),
+            merge_driver: BARE_MERGE_DRIVER.to_string(),
         }
     } else {
         DriverCommands {

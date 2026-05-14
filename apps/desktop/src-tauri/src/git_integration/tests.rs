@@ -93,6 +93,15 @@ fn stable_cli_is_used_when_path_cli_is_missing() {
 }
 
 #[test]
+fn stable_cli_is_preferred_over_path_cli() {
+    let path_cli = Path::new(r"C:\Tools\aimd.exe");
+    let stable = stable_cli_path();
+    let commands = driver_commands(Some(path_cli), Some(stable.as_path()));
+    assert_eq!(commands.source, "stable");
+    assert_ne!(commands.textconv, BARE_DIFF_TEXTCONV);
+}
+
+#[test]
 fn missing_repo_path_is_not_reported_as_git_repo() {
     let status = status_impl(Some(""), "test-status".to_string());
     assert!(status.repo_path_requested == false);

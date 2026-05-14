@@ -1,9 +1,8 @@
+use crate::git_process;
 use serde::Serialize;
 use std::fs;
-use std::io;
 use std::path::{Component, Path, PathBuf};
-use std::process::{Command, Output, Stdio};
-use std::time::{Duration, Instant};
+use std::time::Duration;
 
 const GIT_TIMEOUT: Duration = Duration::from_secs(20);
 const OUTPUT_LIMIT: usize = 64 * 1024;
@@ -78,7 +77,7 @@ fn path_string(path: &Path) -> String {
 }
 
 fn canonical_root(root: &str) -> Result<PathBuf, String> {
-    let root = fs::canonicalize(root).map_err(|e| format!("无法访问目录: {e}"))?;
+    let root = fs::canonicalize(root).map_err(|e| format!("鏃犳硶璁块棶鐩綍: {e}"))?;
     if !root.is_dir() {
         return Err("工作目录不是文件夹".to_string());
     }
@@ -94,7 +93,7 @@ fn ensure_git_root(root: &Path) -> Result<(), String> {
     if is_git_repo_root(root) {
         Ok(())
     } else {
-        Err("当前目录不是 Git 仓库".to_string())
+        Err("褰撳墠鐩綍涓嶆槸 Git 浠撳簱".to_string())
     }
 }
 
@@ -110,14 +109,15 @@ fn path_has_escape(path: &Path) -> bool {
 fn safe_git_path(root: &Path, path: &str) -> Result<String, String> {
     let raw = Path::new(path);
     if raw.is_absolute() {
-        let canonical = fs::canonicalize(raw).map_err(|e| format!("路径不存在或无法访问: {e}"))?;
+        let canonical =
+            fs::canonicalize(raw).map_err(|e| format!("璺緞涓嶅瓨鍦ㄦ垨鏃犳硶璁块棶: {e}"))?;
         if !canonical.starts_with(root) {
             return Err("不能操作工作目录之外的文件".to_string());
         }
         return canonical
             .strip_prefix(root)
             .map(|p| p.to_string_lossy().replace('\\', "/"))
-            .map_err(|_| "无法解析相对路径".to_string());
+            .map_err(|_| "鏃犳硶瑙ｆ瀽鐩稿璺緞".to_string());
     }
     if path_has_escape(raw) {
         return Err("路径不能包含 .. 或绝对路径前缀".to_string());
@@ -129,7 +129,7 @@ fn truncate_output(value: &[u8]) -> String {
     let take = value.len().min(OUTPUT_LIMIT);
     let mut text = String::from_utf8_lossy(&value[..take]).to_string();
     if value.len() > OUTPUT_LIMIT {
-        text.push_str("\n...输出过长，已截断");
+        text.push_str("\n...杈撳嚭杩囬暱锛屽凡鎴柇");
     }
     text
 }
@@ -140,38 +140,8 @@ fn truncate_output_with_limit(value: &[u8], limit: usize) -> (String, bool) {
     (text, value.len() > limit)
 }
 
-fn run_git(root: &Path, args: &[&str]) -> Result<Output, String> {
-    let mut child = Command::new("git")
-        .args(args)
-        .current_dir(root)
-        .stdout(Stdio::piped())
-        .stderr(Stdio::piped())
-        .spawn()
-        .map_err(|e| {
-            if e.kind() == io::ErrorKind::NotFound {
-                "未找到 git 命令".to_string()
-            } else {
-                format!("启动 git 失败: {e}")
-            }
-        })?;
-    let start = Instant::now();
-    loop {
-        if child
-            .try_wait()
-            .map_err(|e| format!("等待 git 失败: {e}"))?
-            .is_some()
-        {
-            return child
-                .wait_with_output()
-                .map_err(|e| format!("读取 git 输出失败: {e}"));
-        }
-        if start.elapsed() > GIT_TIMEOUT {
-            let _ = child.kill();
-            let _ = child.wait();
-            return Err("git 命令超时".to_string());
-        }
-        std::thread::sleep(Duration::from_millis(20));
-    }
+fn run_git(root: &Path, args: &[&str]) -> Result<std::process::Output, String> {
+    git_process::run_git(root, args, GIT_TIMEOUT)
 }
 
 fn run_git_ok(root: &Path, args: &[&str]) -> Result<String, String> {
@@ -181,7 +151,7 @@ fn run_git_ok(root: &Path, args: &[&str]) -> Result<String, String> {
     }
     let stderr = truncate_output(&out.stderr);
     Err(if stderr.trim().is_empty() {
-        format!("git {:?} 执行失败", args)
+        format!("git {:?} 鎵ц澶辫触", args)
     } else {
         stderr
     })
@@ -194,7 +164,7 @@ fn run_git_ok_limited(root: &Path, args: &[&str], limit: usize) -> Result<(Strin
     }
     let stderr = truncate_output(&out.stderr);
     Err(if stderr.trim().is_empty() {
-        format!("git {:?} 执行失败", args)
+        format!("git {:?} 鎵ц澶辫触", args)
     } else {
         stderr
     })
@@ -355,29 +325,58 @@ fn status_for_root(root: &Path) -> Result<GitRepoStatus, String> {
     Ok(parse_git_status(path_string(root), &out.stdout))
 }
 
-#[tauri::command]
-pub fn get_git_repo_status(root: String) -> Result<GitRepoStatus, String> {
-    let root = canonical_root(&root)?;
-    status_for_root(&root)
+async fn run_blocking<T, F>(task: F) -> Result<T, String>
+where
+    T: Send + 'static,
+    F: FnOnce() -> Result<T, String> + Send + 'static,
+{
+    tauri::async_runtime::spawn_blocking(task)
+        .await
+        .map_err(|e| format!("Git 鍚庡彴浠诲姟澶辫触: {e}"))?
 }
 
 #[tauri::command]
-pub fn get_git_file_diff(root: String, path: String) -> Result<GitFileDiff, String> {
-    let root = canonical_root(&root)?;
-    ensure_git_root(&root)?;
-    let rel = safe_git_path(&root, &path)?;
-    let (staged_diff, staged_truncated) =
-        run_git_ok_limited(&root, &["diff", "--cached", "--", &rel], DIFF_OUTPUT_LIMIT)?;
-    let (unstaged_diff, unstaged_truncated) =
-        run_git_ok_limited(&root, &["diff", "--", &rel], DIFF_OUTPUT_LIMIT)?;
-    let combined = format!("{staged_diff}\n{unstaged_diff}");
-    Ok(GitFileDiff {
-        path: rel,
-        is_binary: combined.contains("Binary files") || combined.contains("GIT binary patch"),
-        staged_diff,
-        unstaged_diff,
-        truncated: staged_truncated || unstaged_truncated,
+pub async fn get_git_repo_status(root: String) -> Result<GitRepoStatus, String> {
+    run_blocking(move || {
+        let root = canonical_root(&root)?;
+        status_for_root(&root)
     })
+    .await
+}
+
+#[tauri::command]
+pub async fn get_git_file_diff(root: String, path: String) -> Result<GitFileDiff, String> {
+    run_blocking(move || {
+        let root = canonical_root(&root)?;
+        ensure_git_root(&root)?;
+        let rel = safe_git_path(&root, &path)?;
+        let (staged_diff, staged_truncated) = run_git_ok_limited(
+            &root,
+            &[
+                "diff",
+                "--no-ext-diff",
+                "--no-textconv",
+                "--cached",
+                "--",
+                &rel,
+            ],
+            DIFF_OUTPUT_LIMIT,
+        )?;
+        let (unstaged_diff, unstaged_truncated) = run_git_ok_limited(
+            &root,
+            &["diff", "--no-ext-diff", "--no-textconv", "--", &rel],
+            DIFF_OUTPUT_LIMIT,
+        )?;
+        let combined = format!("{staged_diff}\n{unstaged_diff}");
+        Ok(GitFileDiff {
+            path: rel,
+            is_binary: combined.contains("Binary files") || combined.contains("GIT binary patch"),
+            staged_diff,
+            unstaged_diff,
+            truncated: staged_truncated || unstaged_truncated,
+        })
+    })
+    .await
 }
 
 #[tauri::command]
@@ -414,14 +413,14 @@ pub fn git_unstage_all(root: String) -> Result<(), String> {
 pub fn git_commit(root: String, message: String) -> Result<GitRepoStatus, String> {
     let root = canonical_root(&root)?;
     if message.trim().is_empty() {
-        return Err("提交信息不能为空".to_string());
+        return Err("鎻愪氦淇℃伅涓嶈兘涓虹┖".to_string());
     }
     let status = status_for_root(&root)?;
     if !status.is_repo {
-        return Err("当前目录不是 Git 仓库".to_string());
+        return Err("褰撳墠鐩綍涓嶆槸 Git 浠撳簱".to_string());
     }
     if status.conflicted {
-        return Err("存在冲突文件，解决冲突后才能提交".to_string());
+        return Err("瀛樺湪鍐茬獊鏂囦欢锛岃В鍐冲啿绐佸悗鎵嶈兘鎻愪氦".to_string());
     }
     run_git_ok(&root, &["commit", "-m", message.trim()])?;
     status_for_root(&root)
@@ -432,10 +431,10 @@ pub fn git_pull(root: String) -> Result<GitRepoStatus, String> {
     let root = canonical_root(&root)?;
     let status = status_for_root(&root)?;
     if !status.is_repo {
-        return Err("当前目录不是 Git 仓库".to_string());
+        return Err("褰撳墠鐩綍涓嶆槸 Git 浠撳簱".to_string());
     }
     if status.conflicted {
-        return Err("存在冲突文件，解决冲突后才能 pull".to_string());
+        return Err("瀛樺湪鍐茬獊鏂囦欢锛岃В鍐冲啿绐佸悗鎵嶈兘 pull".to_string());
     }
     run_git_ok(&root, &["pull", "--ff-only"])?;
     status_for_root(&root)
@@ -446,10 +445,10 @@ pub fn git_push(root: String) -> Result<GitRepoStatus, String> {
     let root = canonical_root(&root)?;
     let status = status_for_root(&root)?;
     if !status.is_repo {
-        return Err("当前目录不是 Git 仓库".to_string());
+        return Err("褰撳墠鐩綍涓嶆槸 Git 浠撳簱".to_string());
     }
     if status.conflicted {
-        return Err("存在冲突文件，解决冲突后才能 push".to_string());
+        return Err("瀛樺湪鍐茬獊鏂囦欢锛岃В鍐冲啿绐佸悗鎵嶈兘 push".to_string());
     }
     run_git_ok(&root, &["push"])?;
     status_for_root(&root)
