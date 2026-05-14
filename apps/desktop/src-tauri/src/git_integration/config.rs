@@ -214,7 +214,9 @@ pub(super) fn driver_commands(
     cli_in_path: Option<&Path>,
     stable_cli: Option<&Path>,
 ) -> DriverCommands {
-    if let Some(stable_cli) = stable_cli {
+    if stable_cli.is_some() {
+        #[cfg(windows)]
+        let stable_cli = stable_cli.expect("stable_cli was checked above");
         #[cfg(windows)]
         let textconv = format!("{} git-diff", git_command_path(stable_cli));
         #[cfg(windows)]
