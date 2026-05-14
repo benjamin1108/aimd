@@ -1,6 +1,7 @@
 import { state } from "../core/state";
 import {
   emptyEl, readerEl, inlineEditorEl, editorWrapEl, formatToolbarEl,
+  gitDiffViewEl,
   modeReadEl, modeEditEl, modeSourceEl,
   sourceBannerEl, sourceBannerTextEl,
 } from "../core/dom";
@@ -36,8 +37,19 @@ export function setMode(mode: Mode) {
 
   state.mode = mode;
   const hasDoc = Boolean(state.doc);
+  if (state.mainView === "git-diff") {
+    emptyEl().hidden = true;
+    readerEl().hidden = true;
+    inlineEditorEl().hidden = true;
+    editorWrapEl().hidden = true;
+    formatToolbarEl().hidden = true;
+    gitDiffViewEl().hidden = false;
+    updateChrome();
+    return;
+  }
 
   emptyEl().hidden = hasDoc;
+  gitDiffViewEl().hidden = true;
   readerEl().hidden = !hasDoc || mode !== "read";
   inlineEditorEl().hidden = !hasDoc || mode !== "edit";
   editorWrapEl().hidden = !hasDoc || mode !== "source";

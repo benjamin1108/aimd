@@ -1,4 +1,5 @@
 import { panelEl, sidebarHrResizerEl } from "../core/dom";
+import { state, STORAGE_DOC_PANEL_COLLAPSED, STORAGE_WORKSPACE_COLLAPSED } from "../core/state";
 
 export const SIDEBAR_MIN_W = 160;
 export const SIDEBAR_DEFAULT_W = 244;
@@ -10,6 +11,31 @@ export function getSidebarMaxW() {
 export function applySidebarWidth(w: number) {
   const clamped = Math.min(Math.max(w, SIDEBAR_MIN_W), getSidebarMaxW());
   panelEl().style.gridTemplateColumns = `${clamped}px minmax(0, 1fr)`;
+}
+
+function expandForResize(el: HTMLElement) {
+  if (el.id === "workspace-section" && state.workspaceCollapsed) {
+    state.workspaceCollapsed = false;
+    window.localStorage.setItem(STORAGE_WORKSPACE_COLLAPSED, "false");
+    el.classList.remove("is-collapsed");
+    document.querySelector<HTMLButtonElement>("#workspace-collapse")?.setAttribute("aria-expanded", "true");
+    const btn = document.querySelector<HTMLButtonElement>("#workspace-collapse");
+    if (btn) {
+      btn.textContent = "⌃";
+      btn.title = "折叠目录";
+    }
+  }
+  if (el.id === "outline-section" && state.docPanelCollapsed) {
+    state.docPanelCollapsed = false;
+    window.localStorage.setItem(STORAGE_DOC_PANEL_COLLAPSED, "false");
+    el.classList.remove("is-collapsed");
+    const btn = document.querySelector<HTMLButtonElement>("#doc-panel-collapse");
+    if (btn) {
+      btn.setAttribute("aria-expanded", "true");
+      btn.textContent = "⌃";
+      btn.title = "折叠大纲/Git";
+    }
+  }
 }
 
 export function bindSidebarResizers() {
@@ -25,6 +51,8 @@ export function bindSidebarResizers() {
       bEl = document.querySelector(handle.dataset.below!);
       if (!aEl || !bEl) return;
       e.preventDefault();
+      expandForResize(aEl);
+      expandForResize(bEl);
       startY = e.clientY;
       aHeight = aEl.getBoundingClientRect().height;
       bHeight = bEl.getBoundingClientRect().height;

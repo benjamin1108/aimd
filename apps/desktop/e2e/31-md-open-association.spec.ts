@@ -54,6 +54,9 @@ function installMock(
   opts: {
     initialPath: string | null;
     chooseSaveAimdPath?: string | null;
+    md?: typeof mdContent;
+    aimd?: typeof aimdDoc;
+    confirmChoice?: "save" | "discard" | "cancel";
   },
 ) {
   return page.addInitScript(
@@ -65,6 +68,9 @@ function installMock(
       added,
       draft,
       chooseSaveAimdPath,
+      suppliedMd,
+      suppliedAimd,
+      confirmChoice,
     }: {
       initialPath: string | null;
       md: typeof mdContent;
@@ -73,26 +79,43 @@ function installMock(
       added: typeof addedAsset;
       draft: typeof draftDoc;
       chooseSaveAimdPath: string | null;
+      suppliedMd?: typeof mdContent;
+      suppliedAimd?: typeof aimdDoc;
+      confirmChoice: "save" | "discard" | "cancel";
     }) => {
       type Args = Record<string, unknown> | undefined;
       const callLog: Array<{ cmd: string; args?: Args }> = [];
       (window as any).__aimd_call_log = callLog;
+      const activeMd = suppliedMd ?? md;
+      const activeAimd = suppliedAimd ?? aimd;
+      const convertFileSrc = (path: string, protocol = "asset") => `${protocol}://localhost${encodeURI(path)}`;
 
       const handlers: Record<string, (a?: Args) => unknown> = {
         initial_open_path: () => initialPath,
-        convert_md_to_draft: () => md,
-        open_aimd: () => aimd,
+        convert_md_to_draft: () => activeMd,
+        open_aimd: () => activeAimd,
         create_aimd: () => upgradedAimd,
         create_aimd_draft: () => draft,
         delete_draft_file: () => undefined,
         cleanup_old_drafts: () => undefined,
         save_markdown: () => undefined,
-        save_aimd: () => aimd,
+        save_aimd: (a) => ({ ...activeAimd, markdown: String((a as any)?.markdown ?? activeAimd.markdown), dirty: false }),
         save_aimd_as: () => upgradedAimd,
-        render_markdown_standalone: () => ({ html: md.html }),
-        confirm_discard_changes: () => "discard",
+        render_markdown_standalone: () => ({ html: activeMd.html }),
+        render_markdown: (a) => ({ html: String((a as any)?.markdown ?? activeMd.markdown).replace(/!\[([^\]]*)\]\(([^)]+)\)/g, '<p><img src="$2" alt="$1"></p>') }),
+        confirm_discard_changes: () => confirmChoice,
         choose_save_aimd_file: () => chooseSaveAimdPath,
+        choose_image_file: () => "/mock/picked.png",
         add_image_bytes: () => added,
+        read_image_bytes: () => [
+          137, 80, 78, 71, 13, 10, 26, 10, 0, 0, 0, 13, 73, 72, 68, 82,
+          0, 0, 0, 1, 0, 0, 0, 1, 8, 4, 0, 0, 0, 181, 28, 12, 2,
+          0, 0, 0, 11, 73, 68, 65, 84, 120, 156, 99, 250, 207, 0, 0,
+          2, 7, 1, 2, 154, 28, 49, 113, 0, 0, 0, 0, 73, 69, 78, 68,
+          174, 66, 96, 130,
+        ],
+        package_local_images: () => upgradedAimd,
+        package_remote_images: () => upgradedAimd,
         list_aimd_assets: () => [],
       };
       (window as any).__TAURI_INTERNALS__ = {
@@ -103,6 +126,10 @@ function installMock(
           return fn(a);
         },
         transformCallback: (cb: Function) => cb,
+        convertFileSrc,
+      };
+      (window as any).__TAURI__ = {
+        core: { convertFileSrc },
       };
       (window as any).__TAURI_EVENT_PLUGIN_INTERNALS__ = {
         unregisterListener: () => {},
@@ -119,6 +146,9 @@ function installMock(
       chooseSaveAimdPath: Object.prototype.hasOwnProperty.call(opts, "chooseSaveAimdPath")
         ? opts.chooseSaveAimdPath!
         : "/mock/report.aimd",
+      suppliedMd: opts.md,
+      suppliedAimd: opts.aimd,
+      confirmChoice: opts.confirmChoice ?? "discard",
     },
   );
 }
@@ -171,6 +201,96 @@ test.describe("31. MD 按需升级方案", () => {
     await expect(page.locator("#doc-path")).toContainText("/mock/report.md");
   });
 
+  test("含相对本地图片的 .md 只改文本仍保存回原 Markdown", async ({ page }) => {
+    await installMock(page, {
+      initialPath: "/mock/report.md",
+      md: {
+        markdown: "# 月度报告\n\n![local](docs/a.png)\n",
+        title: "月度报告",
+        html: '<h1>月度报告</h1><p><img src="docs/a.png" alt="local"></p>',
+      },
+    });
+    await page.goto("/");
+    await expect(page.locator("#doc-path")).toContainText("/mock/report.md");
+    await expect(page.locator("#doc-path")).not.toContainText("AIMD");
+
+    await page.locator("#mode-source").click();
+    await page.locator("#markdown").fill("# 月度报告\n\n![local](docs/a.png)\n\n文本修改。\n");
+    await page.keyboard.press("Meta+s");
+
+    await page.waitForFunction(() => {
+      const log = (window as any).__aimd_call_log as Array<{ cmd: string }>;
+      return log && log.some((e) => e.cmd === "save_markdown");
+    }, { timeout: 3000 });
+    const log = await page.evaluate(() => (window as any).__aimd_call_log as Array<{ cmd: string }>);
+    expect(log.some((e) => e.cmd === "save_aimd_as")).toBe(false);
+    expect(log.some((e) => e.cmd === "package_local_images")).toBe(false);
+  });
+
+  test("含远程图片的 .md 只改文本不下载不打包", async ({ page }) => {
+    await installMock(page, {
+      initialPath: "/mock/report.md",
+      md: {
+        markdown: "# 月度报告\n\n![remote](https://example.com/a.png)\n",
+        title: "月度报告",
+        html: '<h1>月度报告</h1><p><img src="https://example.com/a.png" alt="remote"></p>',
+      },
+    });
+    await page.goto("/");
+    await page.locator("#mode-source").click();
+    await page.locator("#markdown").fill("# 月度报告\n\n![remote](https://example.com/a.png)\n\n文本修改。\n");
+    await page.keyboard.press("Meta+s");
+
+    await page.waitForFunction(() => {
+      const log = (window as any).__aimd_call_log as Array<{ cmd: string }>;
+      return log && log.some((e) => e.cmd === "save_markdown");
+    }, { timeout: 3000 });
+    const log = await page.evaluate(() => (window as any).__aimd_call_log as Array<{ cmd: string }>);
+    expect(log.some((e) => e.cmd === "save_aimd_as")).toBe(false);
+    expect(log.some((e) => e.cmd === "package_remote_images")).toBe(false);
+  });
+
+  test("含绝对本地图片路径的 .md 只改文本仍保存回原 Markdown", async ({ page }) => {
+    await installMock(page, {
+      initialPath: "/mock/report.md",
+      md: {
+        markdown: "# 月度报告\n\n![abs](/Users/benjamin/Pictures/a.png)\n",
+        title: "月度报告",
+        html: '<h1>月度报告</h1><p><img src="/Users/benjamin/Pictures/a.png" alt="abs"></p>',
+      },
+    });
+    await page.goto("/");
+    await page.locator("#mode-source").click();
+    await page.locator("#markdown").fill("# 月度报告\n\n![abs](/Users/benjamin/Pictures/a.png)\n\n文本修改。\n");
+    await page.keyboard.press("Meta+s");
+
+    await page.waitForFunction(() => {
+      const log = (window as any).__aimd_call_log as Array<{ cmd: string }>;
+      return log && log.some((e) => e.cmd === "save_markdown");
+    }, { timeout: 3000 });
+    const log = await page.evaluate(() => (window as any).__aimd_call_log as Array<{ cmd: string }>);
+    expect(log.some((e) => e.cmd === "save_aimd_as")).toBe(false);
+  });
+
+  test("关闭 dirty .md 选择保存时，仅文本变化保存回原 Markdown", async ({ page }) => {
+    await installMock(page, {
+      initialPath: "/mock/report.md",
+      confirmChoice: "save",
+    });
+    await page.goto("/");
+    await page.locator("#mode-source").click();
+    await page.locator("#markdown").fill("# 月度报告\n\n关闭前保存。\n");
+    await page.locator("#more-menu-toggle").click();
+    await page.locator("#close").click();
+
+    await page.waitForFunction(() => {
+      const log = (window as any).__aimd_call_log as Array<{ cmd: string }>;
+      return log && log.some((e) => e.cmd === "save_markdown");
+    }, { timeout: 3000 });
+    const log = await page.evaluate(() => (window as any).__aimd_call_log as Array<{ cmd: string }>);
+    expect(log.some((e) => e.cmd === "save_aimd_as")).toBe(false);
+  });
+
   test("粘贴图片不弹升级确认：仍显示 .md，保存时另存为 .aimd", async ({ page }) => {
     await installMock(page, {
       initialPath: "/mock/report.md",
@@ -208,7 +328,7 @@ test.describe("31. MD 按需升级方案", () => {
     expect(log.some((e) => e.cmd === "confirm_upgrade_to_aimd")).toBe(false);
 
     await expect(page.locator("#doc-path")).toContainText("/mock/report.md");
-    await expect(page.locator("#doc-path")).toContainText("保存时另存为 .aimd");
+    await expect(page.locator("#doc-path")).toContainText("保存时需转换为 AIMD");
 
     await page.keyboard.press("Meta+s");
     await page.waitForFunction(() => {
@@ -257,7 +377,119 @@ test.describe("31. MD 按需升级方案", () => {
     expect(log.some((e) => e.cmd === "confirm_upgrade_to_aimd")).toBe(false);
 
     await expect(page.locator("#doc-path")).toContainText("/mock/report.md");
-    await expect(page.locator("#doc-path")).toContainText("保存时另存为 .aimd");
+    await expect(page.locator("#doc-path")).toContainText("保存时需转换为 AIMD");
+  });
+
+  test("手动插入图片后保存 .md 会转换为 AIMD", async ({ page }) => {
+    await installMock(page, {
+      initialPath: "/mock/report.md",
+      chooseSaveAimdPath: "/mock/report.aimd",
+    });
+    await page.goto("/");
+    await page.locator("#mode-edit").click();
+    await page.locator('[data-cmd="image"]').click();
+
+    await page.waitForFunction(() => {
+      const log = (window as any).__aimd_call_log as Array<{ cmd: string }>;
+      return log && log.some((e) => e.cmd === "add_image_bytes");
+    }, { timeout: 5000 });
+    await expect(page.locator("#doc-path")).toContainText("保存时需转换为 AIMD");
+
+    await page.locator("#save").click();
+    await page.waitForFunction(() => {
+      const log = (window as any).__aimd_call_log as Array<{ cmd: string }>;
+      return log && log.some((e) => e.cmd === "save_aimd_as");
+    }, { timeout: 5000 });
+    const log = await page.evaluate(() => (window as any).__aimd_call_log as Array<{ cmd: string }>);
+    expect(log.some((e) => e.cmd === "save_markdown")).toBe(false);
+  });
+
+  test("关闭 dirty .md 且包含粘贴图片时，选择保存会转换为 AIMD", async ({ page }) => {
+    await installMock(page, {
+      initialPath: "/mock/report.md",
+      chooseSaveAimdPath: "/mock/report.aimd",
+      confirmChoice: "save",
+    });
+    await page.goto("/");
+    await page.locator("#mode-edit").click();
+
+    await page.evaluate(async () => {
+      const file = new File([new Uint8Array([137, 80, 78, 71])], "pasted.png", { type: "image/png" });
+      const dt = new DataTransfer();
+      dt.items.add(file);
+      const event = new ClipboardEvent("paste", { clipboardData: dt, bubbles: true, cancelable: true });
+      document.querySelector("#inline-editor")?.dispatchEvent(event);
+    });
+    await page.waitForFunction(() => {
+      const log = (window as any).__aimd_call_log as Array<{ cmd: string }>;
+      return log && log.some((e) => e.cmd === "add_image_bytes");
+    }, { timeout: 5000 });
+
+    await page.locator("#more-menu-toggle").click();
+    await page.locator("#close").click();
+    await page.waitForFunction(() => {
+      const log = (window as any).__aimd_call_log as Array<{ cmd: string }>;
+      return log && log.some((e) => e.cmd === "save_aimd_as");
+    }, { timeout: 5000 });
+    const log = await page.evaluate(() => (window as any).__aimd_call_log as Array<{ cmd: string }>);
+    expect(log.some((e) => e.cmd === "save_markdown")).toBe(false);
+  });
+
+  test("显式点击打包入口时才嵌入本地图片", async ({ page }) => {
+    await installMock(page, {
+      initialPath: "/mock/report.md",
+      chooseSaveAimdPath: "/mock/report.aimd",
+      md: {
+        markdown: "# 月度报告\n\n![local](docs/a.png)\n",
+        title: "月度报告",
+        html: '<h1>月度报告</h1><p><img src="docs/a.png" alt="local"></p>',
+      },
+    });
+    await page.goto("/");
+    await page.locator("#more-menu-toggle").click();
+    await page.locator("#package-local-images").click();
+
+    await page.waitForFunction(() => {
+      const log = (window as any).__aimd_call_log as Array<{ cmd: string }>;
+      return log && log.some((e) => e.cmd === "package_local_images");
+    }, { timeout: 5000 });
+    const log = await page.evaluate(() => (window as any).__aimd_call_log as Array<{ cmd: string }>);
+    expect(log.some((e) => e.cmd === "save_markdown")).toBe(false);
+  });
+
+  test(".aimd 混合 asset、本地路径、远程 URL 时普通保存不自动打包外部图片", async ({ page }) => {
+    await installMock(page, {
+      initialPath: "/mock/note.aimd",
+      aimd: {
+        ...aimdDoc,
+        markdown: [
+          "# 笔记文档",
+          "",
+          "![inner](asset://img)",
+          "![local](docs/a.png)",
+          "![remote](https://example.com/a.png)",
+        ].join("\n"),
+        html: [
+          "<h1>笔记文档</h1>",
+          '<p><img src="asset://img" alt="inner"></p>',
+          '<p><img src="docs/a.png" alt="local"></p>',
+          '<p><img src="https://example.com/a.png" alt="remote"></p>',
+        ].join(""),
+        assets: [{ id: "img", path: "assets/img.png", mime: "image/png", size: 1024, sha256: "abc", role: "image", url: "asset://img.png" }],
+      },
+    });
+    await page.goto("/");
+    await page.locator("#mode-source").click();
+    await page.locator("#markdown").fill("# 笔记文档\n\n![inner](asset://img)\n![local](docs/a.png)\n![remote](https://example.com/a.png)\n\n文本修改。\n");
+    await page.keyboard.press("Meta+s");
+
+    await page.waitForFunction(() => {
+      const log = (window as any).__aimd_call_log as Array<{ cmd: string }>;
+      return log && log.some((e) => e.cmd === "save_aimd");
+    }, { timeout: 3000 });
+    const log = await page.evaluate(() => (window as any).__aimd_call_log as Array<{ cmd: string }>);
+    expect(log.some((e) => e.cmd === "package_local_images")).toBe(false);
+    expect(log.some((e) => e.cmd === "package_remote_images")).toBe(false);
   });
 
   test(".aimd 路径仍走 open_aimd，显示文件路径", async ({ page }) => {

@@ -2,14 +2,15 @@ import { invoke } from "@tauri-apps/api/core";
 import { state } from "../core/state";
 import {
   readerEl, inlineEditorEl, previewEl,
-  outlineSectionEl, outlineListEl, outlineCountEl,
+  outlineSectionEl, outlineListEl,
 } from "../core/dom";
 import type { AimdAsset, Mode, OutlineNode, RenderResult } from "../core/types";
-import { rewriteAssetURLs } from "../document/assets";
+import { hydrateMarkdownLocalImages, rewriteAssetURLs, rewriteMarkdownLocalImageURLs } from "../document/assets";
 import { escapeAttr, escapeHTML } from "../util/escape";
 import { setStatus } from "./chrome";
 import { persistSessionSnapshot } from "../session/snapshot";
 import { enhanceRenderedDocument } from "../editor/interactive";
+import { renderDocPanelTabs } from "./doc-panel";
 
 export function scheduleRender() {
   if (state.renderTimer) window.clearTimeout(state.renderTimer);
@@ -35,7 +36,11 @@ export async function renderPreview() {
 }
 
 export function applyHTML(html: string) {
-  const renderedHTML = state.doc ? rewriteAssetURLs(html, state.doc.assets) : html;
+  const shouldHydrateMarkdownImages = state.doc?.format === "markdown" && Boolean(state.doc.path);
+  const withMarkdownImages = state.doc?.format === "markdown" && state.doc.path
+    ? rewriteMarkdownLocalImageURLs(html, state.doc.path)
+    : html;
+  const renderedHTML = state.doc ? rewriteAssetURLs(withMarkdownImages, state.doc.assets) : withMarkdownImages;
   state.htmlVersion += 1;
   previewEl().innerHTML = renderedHTML;
   readerEl().innerHTML = renderedHTML;
@@ -56,6 +61,15 @@ export function applyHTML(html: string) {
     enhanceRenderedDocument(readerEl(), { codeCopy: true, taskToggle: true, linkOpen: "plain" });
     enhanceRenderedDocument(previewEl(), { codeCopy: true, taskToggle: true, linkOpen: "plain" });
     enhanceRenderedDocument(inlineEditorEl(), { taskToggle: true, linkOpen: "modifier" });
+    if (shouldHydrateMarkdownImages) {
+      void Promise.all([
+        hydrateMarkdownLocalImages(readerEl()),
+        hydrateMarkdownLocalImages(previewEl()),
+        hydrateMarkdownLocalImages(inlineEditorEl()),
+      ]).then(() => {
+        if (state.doc) state.doc.html = readerEl().innerHTML;
+      });
+    }
   }
   state.outline = extractOutlineFromHTML(renderedHTML);
   if (state.doc) {
@@ -110,13 +124,14 @@ export function syncHeadingIds(target: HTMLElement, source: HTMLElement) {
 
 export function renderOutline() {
   if (!state.doc) {
-    outlineSectionEl().hidden = true;
+    outlineListEl().innerHTML = `<div class="empty-list">未打开文档</div>`;
+    renderDocPanelTabs();
     return;
   }
   outlineSectionEl().hidden = false;
-  outlineCountEl().textContent = String(state.outline.length);
   if (!state.outline.length) {
     outlineListEl().innerHTML = `<div class="empty-list">未发现标题</div>`;
+    renderDocPanelTabs();
     return;
   }
   const minLevel = Math.min(...state.outline.map((n) => n.level));
@@ -133,6 +148,7 @@ export function renderOutline() {
       target?.scrollIntoView({ behavior: "smooth", block: "start" });
     });
   });
+  renderDocPanelTabs();
 }
 
 export function currentScrollPane(): HTMLElement {
@@ -151,15 +167,18 @@ export function paintPaneIfStale(mode: Mode) {
     inlineEditorEl().innerHTML = tmpEdit.innerHTML;
     tagAssetImages(inlineEditorEl(), state.doc.assets);
     enhanceRenderedDocument(inlineEditorEl(), { taskToggle: true, linkOpen: "modifier" });
+    if (state.doc.format === "markdown") void hydrateMarkdownLocalImages(inlineEditorEl());
     state.inlineDirty = false;
   } else if (mode === "read") {
     readerEl().innerHTML = state.doc.html;
     tagAssetImages(readerEl(), state.doc.assets);
     enhanceRenderedDocument(readerEl(), { codeCopy: true, taskToggle: true, linkOpen: "plain" });
+    if (state.doc.format === "markdown") void hydrateMarkdownLocalImages(readerEl());
   } else {
     previewEl().innerHTML = state.doc.html;
     tagAssetImages(previewEl(), state.doc.assets);
     enhanceRenderedDocument(previewEl(), { codeCopy: true, taskToggle: true, linkOpen: "plain" });
+    if (state.doc.format === "markdown") void hydrateMarkdownLocalImages(previewEl());
   }
   state.paintedVersion[mode] = state.htmlVersion;
 }

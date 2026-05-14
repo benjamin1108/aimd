@@ -19,6 +19,8 @@ export type AimdDocument = {
   isDraft?: boolean;
   draftSourcePath?: string;
   needsAimdSave?: boolean;
+  hasExternalImageReferences?: boolean;
+  requiresAimdSave?: boolean;
   format: "aimd" | "markdown";
 };
 
@@ -36,6 +38,8 @@ export type SessionSnapshot = {
   isDraft: boolean;
   draftSourcePath?: string;
   needsAimdSave?: boolean;
+  hasExternalImageReferences?: boolean;
+  requiresAimdSave?: boolean;
   format: "aimd" | "markdown";
   mode: Mode;
 };
@@ -53,6 +57,7 @@ export type OutlineNode = {
 };
 
 export type Mode = "read" | "edit" | "source";
+export type MainView = "document" | "git-diff";
 
 export type MarkdownDraft = { markdown: string; title: string; html: string };
 
@@ -67,6 +72,25 @@ export type ExportMarkdownResult = {
     path: string;
     size: number;
   }>;
+};
+
+export type WorkspaceNodeKind = "folder" | "document";
+export type WorkspaceDocumentFormat = "aimd" | "markdown";
+
+export type WorkspaceTreeNode = {
+  id: string;
+  name: string;
+  path: string;
+  kind: WorkspaceNodeKind;
+  format?: WorkspaceDocumentFormat;
+  children?: WorkspaceTreeNode[];
+  modifiedAt?: string;
+  error?: string;
+};
+
+export type WorkspaceRoot = {
+  root: string;
+  tree: WorkspaceTreeNode;
 };
 
 export type HealthStatus = "offline_ready" | "risk" | "missing";
@@ -115,4 +139,56 @@ export type WebClipSettings = {
   llmEnabled: boolean;
   provider: ModelProvider;
   outputLanguage: WebClipOutputLanguage;
+};
+
+export type UiSettings = {
+  showAssetPanel: boolean;
+};
+
+export type SidebarDocTab = "outline" | "git";
+
+export type GitFileState =
+  | "none"
+  | "modified"
+  | "added"
+  | "deleted"
+  | "renamed"
+  | "untracked"
+  | "conflicted";
+
+export type GitFileKind =
+  | "modified"
+  | "added"
+  | "deleted"
+  | "renamed"
+  | "untracked"
+  | "conflicted";
+
+export type GitChangedFile = {
+  path: string;
+  originalPath?: string;
+  staged: GitFileState;
+  unstaged: GitFileState;
+  kind: GitFileKind;
+};
+
+export type GitRepoStatus = {
+  isRepo: boolean;
+  root: string;
+  branch?: string;
+  upstream?: string;
+  ahead?: number;
+  behind?: number;
+  clean: boolean;
+  conflicted: boolean;
+  files: GitChangedFile[];
+  error?: string;
+};
+
+export type GitFileDiff = {
+  path: string;
+  stagedDiff: string;
+  unstagedDiff: string;
+  isBinary: boolean;
+  truncated?: boolean;
 };

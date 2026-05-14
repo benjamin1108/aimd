@@ -1,8 +1,22 @@
-import type { AimdDocument, Mode, OutlineNode } from "./types";
+import type {
+  AimdDocument,
+  GitFileDiff,
+  GitRepoStatus,
+  MainView,
+  Mode,
+  OutlineNode,
+  SidebarDocTab,
+  WorkspaceRoot,
+  UiSettings,
+} from "./types";
 
 export const STORAGE_RECENTS = "aimd.desktop.recents";
 export const STORAGE_LAST = "aimd.desktop.last";
 export const STORAGE_SESSION = "aimd.desktop.session";
+export const STORAGE_WORKSPACE_ROOT = "aimd.desktop.workspace.root";
+export const STORAGE_WORKSPACE_EXPANDED = "aimd.desktop.workspace.expanded";
+export const STORAGE_WORKSPACE_COLLAPSED = "aimd.desktop.workspace.collapsed";
+export const STORAGE_DOC_PANEL_COLLAPSED = "aimd.desktop.docPanel.collapsed";
 export const MAX_RECENTS = 8;
 export const ASSET_URI_PREFIX = "asset://";
 
@@ -11,6 +25,8 @@ export const ICONS = {
   image: `<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="2.5" width="12" height="11" rx="1.5"/><circle cx="6" cy="6.5" r="1.2"/><path d="m2.5 12 3.5-3.5 3 3 2-2 2.5 2.5"/></svg>`,
   folder: `<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"><path d="M2 4.2v8a1.3 1.3 0 0 0 1.3 1.3h9.4a1.3 1.3 0 0 0 1.3-1.3V5.8a1.3 1.3 0 0 0-1.3-1.3H8L6.5 3H3.3A1.3 1.3 0 0 0 2 4.2Z"/></svg>`,
   plus: `<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><path d="M8 3v10M3 8h10"/></svg>`,
+  refresh: `<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"><path d="M13 7a5 5 0 0 0-8.6-3.2L3 5.2"/><path d="M3 2.5v2.7h2.7M3 9a5 5 0 0 0 8.6 3.2L13 10.8"/><path d="M13 13.5v-2.7h-2.7"/></svg>`,
+  chevron: `<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="m6 4 4 4-4 4"/></svg>`,
   read: `<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12.5V4a1 1 0 0 1 1.2-1l4.3 1 4.3-1A1 1 0 0 1 13 4v8.5"/><path d="M7.5 4v9"/></svg>`,
   edit: `<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"><path d="M11.2 2.5 13.5 4.8 5.4 12.9l-3 .7.7-3z"/><path d="m10.2 3.5 2.3 2.3"/></svg>`,
   source: `<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"><path d="m5.5 4-3 4 3 4M10.5 4l3 4-3 4"/></svg>`,
@@ -38,6 +54,7 @@ export const ICONS = {
 
 export const state: {
   doc: AimdDocument | null;
+  mainView: MainView;
   mode: Mode;
   renderTimer: number | null;
   flushTimer: number | null;
@@ -46,10 +63,34 @@ export const state: {
   htmlVersion: number;
   paintedVersion: Record<Mode, number>;
   recentPaths: string[];
+  workspace: WorkspaceRoot | null;
+  workspaceExpanded: Set<string>;
+  workspaceSelectedPath: string;
+  workspaceLoading: boolean;
+  workspaceError: string;
+  workspaceCollapsed: boolean;
+  docPanelCollapsed: boolean;
+  sidebarDocTab: SidebarDocTab;
+  git: {
+    isRepo: boolean;
+    status: GitRepoStatus | null;
+    diffView: {
+      path: string;
+      diff: GitFileDiff | null;
+      loading: boolean;
+      error: string;
+    };
+    loading: boolean;
+    action: boolean;
+    error: string;
+    selectedPath: string;
+  };
+  uiSettings: UiSettings;
   inlineDirty: boolean;
   isBootstrappingSession: boolean;
 } = {
   doc: null,
+  mainView: "document",
   mode: "read",
   renderTimer: null,
   flushTimer: null,
@@ -63,6 +104,29 @@ export const state: {
   htmlVersion: 0,
   paintedVersion: { read: -1, edit: -1, source: -1 },
   recentPaths: [],
+  workspace: null,
+  workspaceExpanded: new Set(),
+  workspaceSelectedPath: "",
+  workspaceLoading: false,
+  workspaceError: "",
+  workspaceCollapsed: false,
+  docPanelCollapsed: false,
+  sidebarDocTab: "outline",
+  git: {
+    isRepo: false,
+    status: null,
+    diffView: {
+      path: "",
+      diff: null,
+      loading: false,
+      error: "",
+    },
+    loading: false,
+    action: false,
+    error: "",
+    selectedPath: "",
+  },
+  uiSettings: { showAssetPanel: false },
   // Tracks whether the inline editor's DOM has been mutated by user input since
   // the last flush / paint. flushInline skips its (expensive) turndown call when
   // false — this is what keeps mode hops snappy on long documents.

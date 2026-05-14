@@ -190,6 +190,27 @@
   display: none !important;
 }
 
+.toggle-field {
+  display: grid;
+  grid-template-columns: 16px minmax(0, 1fr);
+  align-items: start;
+  gap: 10px;
+  cursor: pointer;
+}
+
+.toggle-field input {
+  width: 16px;
+  height: 16px;
+  margin: 2px 0 0;
+}
+
+.toggle-field-text {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+
 /* API Key 显隐：input 自身在 password / text 之间切换；上面叠一层 prefix + ••• + suffix
    浮层（仅在未聚焦时可见），让用户在不揭示明文的前提下确认"这是哪一把 key"。
    pointer-events: none 让点击穿透到 input。 */

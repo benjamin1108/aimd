@@ -10,6 +10,7 @@ import { applyHTML } from "../ui/outline";
 import { rememberOpenedPath } from "../ui/recents";
 import { fileStem } from "../util/path";
 import { applyDocument } from "./apply";
+import { hasExternalImageReferences } from "./assets";
 import { triggerOptimizeOnOpen } from "./optimize";
 import { saveDocument } from "./persist";
 import { deleteDocumentDraft } from "./drafts";
@@ -36,7 +37,9 @@ export async function openMarkdownDocument(markdownPath: string, opts?: { skipCo
       assets: [],
       dirty: false,
       isDraft: false,
-      needsAimdSave: /!\[[^\]]*\]\((?!https?:\/\/|data:|asset:\/\/)[^)]+\)/i.test(draft.markdown),
+      hasExternalImageReferences: hasExternalImageReferences(draft.markdown),
+      requiresAimdSave: false,
+      needsAimdSave: false,
       format: "markdown",
     };
     applyDocument(doc, "read");

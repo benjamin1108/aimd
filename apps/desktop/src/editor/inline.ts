@@ -6,6 +6,7 @@ import {
 } from "../ui/outline";
 import { persistSessionSnapshot } from "../session/snapshot";
 import { htmlToMarkdown } from "./markdown";
+import { hasAimdImageReferences, hasExternalImageReferences } from "../document/assets";
 
 export function lightNormalize(root: HTMLElement) {
   root.querySelectorAll<HTMLElement>("h1[style], h2[style], h3[style], h4[style], h5[style], h6[style], p[style]").forEach((el) => el.removeAttribute("style"));
@@ -111,6 +112,11 @@ export function flushInline() {
   if (md !== state.doc.markdown) {
     state.doc.markdown = md;
     markdownEl().value = md;
+    state.doc.hasExternalImageReferences = hasExternalImageReferences(md);
+    if (state.doc.format === "markdown") {
+      state.doc.requiresAimdSave = hasAimdImageReferences(md) || state.doc.assets.length > 0;
+      state.doc.needsAimdSave = state.doc.requiresAimdSave;
+    }
     state.outline = extractOutlineFromHTML(html);
     state.doc.html = inlineEditorEl().innerHTML;
     state.htmlVersion += 1;

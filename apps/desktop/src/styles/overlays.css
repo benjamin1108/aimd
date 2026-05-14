@@ -31,6 +31,19 @@
   background: var(--bg-sidebar-hover, #ece4d2);
 }
 
+.file-ctx-item.danger {
+  color: var(--danger, #9f342d);
+}
+
+.file-ctx-item:disabled {
+  color: var(--ink-faint);
+  cursor: default;
+}
+
+.file-ctx-item:disabled:hover {
+  background: transparent;
+}
+
 /* Link popover */
 
 .link-popover {

@@ -104,13 +104,16 @@ export async function pasteImageFiles(files: File[], target: "edit" | "source") 
       }
       state.doc.assets = [...state.doc.assets, added.asset];
       state.doc.dirty = true;
-      if (state.doc.format === "markdown") state.doc.needsAimdSave = true;
+      if (state.doc.format === "markdown") {
+        state.doc.requiresAimdSave = true;
+        state.doc.needsAimdSave = true;
+      }
     }
     updateChrome();
     if (target === "source") scheduleRender();
     setStatus(
       state.doc.format === "markdown"
-        ? "图片已粘贴，保存时会另存为 .aimd"
+        ? "图片已粘贴，保存时需转换为 AIMD"
         : "已粘贴图片",
       "success",
     );

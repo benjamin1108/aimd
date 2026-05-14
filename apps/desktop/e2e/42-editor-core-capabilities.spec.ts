@@ -65,6 +65,7 @@ async function installEditorCoreMock(page: Page) {
         .replace(/^# (.*)$/m, "<h1>$1</h1>")
         .replace(/\[([^\]]+)\]\((https?:\/\/[^)]+)\)/g, '<p><a href="$2">$1</a></p>')
         .replace(/!\[([^\]]*)\]\(asset:\/\/img-001\)/g, '<p><img src="asset://img-001" alt="$1"></p>')
+        .replace(/!\[([^\]]*)\]\(([^)]+)\)/g, '<p><img src="$2" alt="$1"></p>')
         .replace(/- \[ \] todo/g, '<ul><li><input type="checkbox" disabled> todo</li></ul>')
         .replace(/- \[x\] todo/g, '<ul><li><input type="checkbox" disabled checked> todo</li></ul>'),
     });
@@ -116,6 +117,13 @@ async function installEditorCoreMock(page: Page) {
       },
       render_markdown: (a) => renderFromMarkdown(String((a as any)?.markdown ?? "")),
       render_markdown_standalone: (a) => renderFromMarkdown(String((a as any)?.markdown ?? "")),
+      read_image_bytes: () => [
+        137, 80, 78, 71, 13, 10, 26, 10, 0, 0, 0, 13, 73, 72, 68, 82,
+        0, 0, 0, 1, 0, 0, 0, 1, 8, 4, 0, 0, 0, 181, 28, 12, 2,
+        0, 0, 0, 11, 73, 68, 65, 84, 120, 156, 99, 250, 207, 0, 0,
+        2, 7, 1, 2, 154, 28, 49, 113, 0, 0, 0, 0, 73, 69, 78, 68,
+        174, 66, 96, 130,
+      ],
       list_aimd_assets: () => [],
       check_document_health: () => {
         if (runtime.healthMode === "missing") return {
@@ -393,6 +401,46 @@ test.describe("Editor core capabilities", () => {
     await expect(page.locator("#export-markdown")).toBeDisabled();
   });
 
+  test("plain Markdown resolves local image paths against the Markdown file directory", async ({ page }) => {
+    await installEditorCoreMock(page);
+    await page.goto("/");
+
+    await page.evaluate(() => (window as any).__aimdEditorCoreMock.openMarkdownNext());
+    await page.locator("#empty-open").click();
+
+    await expect.poll(async () => page.locator("#reader img[alt='local']").evaluate((img: HTMLImageElement) => ({
+      src: img.getAttribute("src") || "",
+      localPath: img.dataset.aimdLocalImagePath || "",
+      naturalWidth: img.naturalWidth,
+    }))).toMatchObject({
+      src: expect.stringContaining("blob:"),
+      localPath: "/mock/images/local.png",
+      naturalWidth: 1,
+    });
+
+    await page.locator("#mode-source").click();
+    await page.locator("#markdown").fill("# 传统 Markdown\n\n![local](../shared/pic one.png)\n");
+    await expect.poll(async () => page.locator("#reader img[alt='local']").evaluate((img: HTMLImageElement) => ({
+      src: img.getAttribute("src") || "",
+      localPath: img.dataset.aimdLocalImagePath || "",
+      naturalWidth: img.naturalWidth,
+    }))).toMatchObject({
+      src: expect.stringContaining("blob:"),
+      localPath: "/shared/pic one.png",
+      naturalWidth: 1,
+    });
+    await page.locator("#mode-read").click();
+    await expect.poll(async () => page.locator("#reader img[alt='local']").evaluate((img: HTMLImageElement) => ({
+      src: img.getAttribute("src") || "",
+      localPath: img.dataset.aimdLocalImagePath || "",
+      naturalWidth: img.naturalWidth,
+    }))).toMatchObject({
+      src: expect.stringContaining("blob:"),
+      localPath: "/shared/pic one.png",
+      naturalWidth: 1,
+    });
+  });
+
   test("export actions surface cancel and failure status", async ({ page }) => {
     await installEditorCoreMock(page);
     await page.goto("/");
@@ -416,7 +464,7 @@ test.describe("Editor core capabilities", () => {
     expect(Object.keys(calls[calls.length - 1])).not.toContain(`debug${"Webkit"}`);
   });
 
-  test("saving AIMD silently collects remote images and only confirms when collection fails", async ({ page }) => {
+  test("saving AIMD preserves remote images unless explicitly packaged", async ({ page }) => {
     await installEditorCoreMock(page);
     await page.goto("/");
     await page.locator("#empty-open").click();
@@ -426,22 +474,19 @@ test.describe("Editor core capabilities", () => {
     await expect(page.locator("#save")).not.toBeDisabled();
     await page.locator("#save").click();
 
-    await expect(page.locator("#status")).toContainText("在线图片已收进文件");
-    let calls = await page.evaluate(() => (window as any).__aimdEditorCoreMock.getSaveCalls());
-    expect(calls[calls.length - 1].markdown).toContain("asset://remote-001");
+    await expect(page.locator("#status")).toContainText("已保存");
+    const calls = await page.evaluate(() => (window as any).__aimdEditorCoreMock.getSaveCalls());
+    expect(calls[calls.length - 1].markdown).toContain("https://example.com/a.png");
+    expect(await page.evaluate(() => (window as any).__aimdEditorCoreMock.getRemotePackageCalls())).toHaveLength(0);
     expect(await page.evaluate(() => (window as any).__aimdEditorCoreMock.getKeepOnlineConfirmCalls())).toHaveLength(0);
 
-    await page.evaluate(() => (window as any).__aimdEditorCoreMock.setRemotePackageMode("fail"));
-    await page.locator("#markdown").fill("# Save Remote\n\n![remote](https://example.com/a.png)\n\nkeep online\n");
-    await expect(page.locator("#save")).not.toBeDisabled();
-    const saveCountBeforeFailure = (await page.evaluate(() => (window as any).__aimdEditorCoreMock.getSaveCalls())).length;
-    await page.locator("#save").click();
+    await page.locator("#more-menu-toggle").click();
+    await page.locator("#health-check").click();
+    await page.locator("#health-package-local").click();
 
-    await expect.poll(() => page.evaluate(() => (window as any).__aimdEditorCoreMock.getSaveCalls().length)).toBe(saveCountBeforeFailure + 1);
-    await expect(page.locator("#status")).toContainText("仍使用在线链接");
-    calls = await page.evaluate(() => (window as any).__aimdEditorCoreMock.getSaveCalls());
-    expect(calls[calls.length - 1].markdown).toContain("https://example.com/a.png");
-    expect(await page.evaluate(() => (window as any).__aimdEditorCoreMock.getKeepOnlineConfirmCalls())).toHaveLength(1);
+    await expect.poll(() => page.evaluate(() => (window as any).__aimdEditorCoreMock.getRemotePackageCalls().length)).toBe(1);
+    const packageCalls = await page.evaluate(() => (window as any).__aimdEditorCoreMock.getRemotePackageCalls());
+    expect(packageCalls[0].markdown).toContain("https://example.com/a.png");
   });
 
   test("health panel surfaces missing, unused cleanup, and large asset risks", async ({ page }) => {

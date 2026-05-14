@@ -2,7 +2,8 @@ import { state } from "../core/state";
 import { markdownEl } from "../core/dom";
 import type { AimdAsset, AimdDocument, Mode } from "../core/types";
 import {
-  filePathToAssetURL, resolveLocalAssetPath, sanitizeDisplayURL,
+  filePathToAssetURL, hasAimdImageReferences, hasExternalImageReferences,
+  resolveLocalAssetPath, sanitizeDisplayURL,
 } from "./assets";
 import { applyHTML } from "../ui/outline";
 import { setMode } from "../ui/mode";
@@ -22,9 +23,19 @@ export function normalizeAssets(assets: AimdAsset[]): AimdAsset[] {
 }
 
 export function normalizeDocument(doc: AimdDocument): AimdDocument {
+  const format = inferFormat(doc);
+  const assets = normalizeAssets(doc.assets);
+  const externalImages = hasExternalImageReferences(doc.markdown);
+  const requiresAimdSave = format === "markdown"
+    ? Boolean(doc.requiresAimdSave || hasAimdImageReferences(doc.markdown) || assets.length > 0)
+    : false;
   return {
     ...doc,
-    assets: normalizeAssets(doc.assets),
+    format,
+    assets,
+    hasExternalImageReferences: externalImages,
+    requiresAimdSave,
+    needsAimdSave: requiresAimdSave,
   };
 }
 
@@ -37,12 +48,13 @@ export function inferFormat(doc: AimdDocument): "aimd" | "markdown" {
 }
 
 export function applyDocument(doc: AimdDocument, mode: Mode) {
-  const withFormat: AimdDocument = { ...doc, format: inferFormat(doc) };
-  const normalized = normalizeDocument(withFormat);
+  const normalized = normalizeDocument(doc);
   state.doc = normalized;
+  state.mainView = "document";
   markdownEl().value = normalized.markdown;
   refreshSourceHighlight();
   applyHTML(normalized.html);
   setMode(mode);
   updateChrome();
+  window.dispatchEvent(new CustomEvent("aimd-doc-applied"));
 }

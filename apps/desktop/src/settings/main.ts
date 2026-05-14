@@ -5,6 +5,7 @@ import "../styles.css";
 import {
   cloneSettings,
   DEFAULT_AI_SETTINGS,
+  DEFAULT_UI_SETTINGS,
   DEFAULT_WEB_CLIP_SETTINGS,
   loadAppSettings,
   saveAppSettings,
@@ -16,32 +17,16 @@ import type {
   ModelProvider,
   ProviderCredential,
   WebClipOutputLanguage,
+  UiSettings,
 } from "../core/types";
+import { MODEL_OPTIONS } from "./model-options";
 
 const CUSTOM_MODEL_VALUE = "__custom__";
-export type ModelOption = { value: string; label: string; };
 type ModelConnectionTestResult = {
   ok: boolean;
   latencyMs: number;
   message: string;
 };
-
-export const MODEL_OPTIONS: Record<ModelProvider, ModelOption[]> = {
-  dashscope: [
-    { value: "qwen3.6-plus", label: "Qwen3.6 Plus（推荐）" },
-    { value: "qwen3.6-flash", label: "Qwen3.6 Flash（更快）" },
-    { value: "qwen3.6-max-preview", label: "Qwen3.6 Max Preview（最强推理）" },
-    { value: "deepseek-v4-pro", label: "DeepSeek V4 Pro" },
-    { value: "deepseek-v4-flash", label: "DeepSeek V4 Flash" },
-    { value: "MiniMax/MiniMax-M2.7", label: "MiniMax M2.7（直供）" },
-  ],
-  gemini: [
-    { value: "gemini-3.1-flash-lite-preview", label: "Gemini 3.1 Flash-Lite Preview（低成本）" },
-    { value: "gemini-3-pro-preview", label: "Gemini 3 Pro Preview（推荐）" },
-    { value: "gemini-3-flash-preview", label: "Gemini 3 Flash Preview（更快）" },
-  ],
-};
-
 function modelOptionsForProvider(provider: ModelProvider) { return MODEL_OPTIONS[provider]; }
 function isKnownModel(provider: ModelProvider, model: string) { return MODEL_OPTIONS[provider].some((o) => o.value === model); }
 function customModelValue() { return CUSTOM_MODEL_VALUE; }
@@ -53,19 +38,35 @@ root.innerHTML = `
     <form id="settings-form" class="settings-panel">
       <header class="settings-head">
         <div>
-          <h1>大模型服务设置</h1>
-          <p class="settings-head-sub">配置模型连接凭证</p>
+          <h1>AIMD 设置</h1>
+          <p class="settings-head-sub">管理界面、模型和网页导入偏好</p>
         </div>
       </header>
 
       <div class="settings-body">
         <aside class="settings-nav" role="tablist" aria-label="设置分类">
-          <button type="button" class="settings-nav-item is-active" data-section="model" role="tab" aria-selected="true">模型</button>
-          <button type="button" class="settings-nav-item" data-section="webclip" role="tab" aria-selected="false">一键提取</button>
+          <button type="button" class="settings-nav-item is-active" data-section="general" role="tab" aria-selected="true">常规</button>
+          <button type="button" class="settings-nav-item" data-section="model" role="tab" aria-selected="false">AI / 模型</button>
+          <button type="button" class="settings-nav-item" data-section="webclip" role="tab" aria-selected="false">网页导入</button>
         </aside>
 
         <div class="settings-content">
-          <section class="settings-section is-active" data-section="model" role="tabpanel" aria-labelledby="settings-tab-model">
+          <section class="settings-section is-active" data-section="general" role="tabpanel" aria-labelledby="settings-tab-general">
+            <header class="settings-section-head">
+              <h2>常规</h2>
+              <p>调整主窗口的显示偏好。</p>
+            </header>
+
+            <label class="toggle-field">
+              <input type="checkbox" id="ui-show-asset-panel" />
+              <span class="toggle-field-text">
+                <span class="field-label">显示资源面板</span>
+                <span class="field-hint">在左侧栏显示当前文档内嵌资源列表。关闭后不影响图片保存、资源检查和导出。</span>
+              </span>
+            </label>
+          </section>
+
+          <section class="settings-section" data-section="model" role="tabpanel" aria-labelledby="settings-tab-model" hidden>
             <header class="settings-section-head">
               <h2>模型连接</h2>
               <p>请选择模型服务商并配置对应的访问凭据。</p>
@@ -165,6 +166,7 @@ const apiKeyMaskEl = $<HTMLElement>(".api-key-mask");
 const apiKeyRevealEl = $<HTMLButtonElement>("#api-key-reveal");
 const apiKeyErrorEl = $<HTMLElement>("#api-key-error");
 const apiBaseEl = $<HTMLInputElement>("#api-base");
+const uiShowAssetPanelEl = $<HTMLInputElement>("#ui-show-asset-panel");
 const webClipLlmEnabledEl = $<HTMLInputElement>("#webclip-llm-enabled");
 const webClipProviderEl = $<HTMLSelectElement>("#webclip-provider");
 const webClipOutputLanguageEl = $<HTMLSelectElement>("#webclip-output-language");
@@ -176,6 +178,7 @@ const testConnectionBtn = $<HTMLButtonElement>("#test-connection");
 const connectionTestStateEl = $<HTMLElement>("#connection-test-state");
 const navItems = root.querySelectorAll<HTMLButtonElement>(".settings-nav-item");
 const sections = root.querySelectorAll<HTMLElement>(".settings-section");
+resetModelBtn.hidden = true;
 
 let saving = false;
 let testingConnection = false;
@@ -189,6 +192,7 @@ let draft: Record<ModelProvider, ProviderCredential> = {
   gemini: { ...DEFAULT_AI_SETTINGS.providers.gemini },
 };
 let webClipConfig = { ...DEFAULT_WEB_CLIP_SETTINGS };
+let uiConfig: UiSettings = { ...DEFAULT_UI_SETTINGS };
 
 function switchTab(sectionId: string) {
   navItems.forEach((btn) => {
@@ -201,6 +205,8 @@ function switchTab(sectionId: string) {
     sec.classList.toggle("is-active", active);
     sec.hidden = !active;
   });
+  resetModelBtn.hidden = sectionId !== "model";
+  testConnectionBtn.disabled = testingConnection || sectionId !== "model";
 }
 
 navItems.forEach((btn) => {
@@ -236,6 +242,7 @@ function readCredFromForm(): ProviderCredential {
 
 function captureFormToDraft() {
   draft[activeProvider] = readCredFromForm();
+  uiConfig.showAssetPanel = uiShowAssetPanelEl.checked;
   webClipConfig.llmEnabled = webClipLlmEnabledEl.checked;
   webClipConfig.provider = webClipProviderEl.value as ModelProvider;
   webClipConfig.outputLanguage = webClipOutputLanguageEl.value as WebClipOutputLanguage;
@@ -270,6 +277,10 @@ function fill(settings: AppSettings) {
     provider: settings.webClip?.provider ?? "dashscope",
     outputLanguage: settings.webClip?.outputLanguage ?? "zh-CN",
   };
+  uiConfig = {
+    showAssetPanel: settings.ui?.showAssetPanel ?? false,
+  };
+  uiShowAssetPanelEl.checked = uiConfig.showAssetPanel;
   webClipLlmEnabledEl.checked = webClipConfig.llmEnabled;
   webClipProviderEl.value = webClipConfig.provider;
   webClipOutputLanguageEl.value = webClipConfig.outputLanguage;
@@ -295,7 +306,10 @@ function readSettings(): AppSettings {
       llmEnabled: webClipConfig.llmEnabled,
       provider: webClipConfig.provider,
       outputLanguage: webClipConfig.outputLanguage,
-    }
+    },
+    ui: {
+      showAssetPanel: uiConfig.showAssetPanel,
+    },
   };
 }
 
@@ -354,7 +368,7 @@ apiKeyRevealEl.addEventListener("click", () => {
   refreshApiKeyMask();
 });
 
-[apiBaseEl, modelEl, webClipLlmEnabledEl, webClipProviderEl, webClipOutputLanguageEl].forEach((el) => {
+[apiBaseEl, modelEl, uiShowAssetPanelEl, webClipLlmEnabledEl, webClipProviderEl, webClipOutputLanguageEl].forEach((el) => {
   el.addEventListener("input", () => {
     clearConnectionTestState();
     syncSaveButton();
@@ -371,7 +385,11 @@ async function bootstrap() {
     initial = await loadAppSettings();
   } catch (err) {
     console.error("load settings failed", err);
-    initial = { ai: cloneSettings(DEFAULT_AI_SETTINGS), webClip: { ...DEFAULT_WEB_CLIP_SETTINGS } };
+    initial = {
+      ai: cloneSettings(DEFAULT_AI_SETTINGS),
+      webClip: { ...DEFAULT_WEB_CLIP_SETTINGS },
+      ui: { ...DEFAULT_UI_SETTINGS },
+    };
   }
   fill(initial);
 

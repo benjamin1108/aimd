@@ -1,0 +1,30 @@
+/* Sidebar section folding and section splitters. */
+
+.section-toggle {
+  display: grid;
+  place-items: center;
+  width: 20px;
+  height: 20px;
+  border-radius: 5px;
+  color: var(--ink-muted);
+  font-size: 12px;
+}
+
+.section-toggle:hover {
+  background: var(--bg-sidebar-hover);
+  color: var(--ink);
+}
+
+.workspace-section.is-collapsed,
+#outline-section.is-collapsed {
+  flex: 0 0 auto !important;
+  min-height: 0;
+}
+
+.workspace-section.is-collapsed .workspace-scroll,
+.workspace-section.is-collapsed #workspace-refresh,
+.workspace-section.is-collapsed #workspace-new-doc,
+.workspace-section.is-collapsed #workspace-new-folder,
+#outline-section.is-collapsed .section-content {
+  display: none;
+}

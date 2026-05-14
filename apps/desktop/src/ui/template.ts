@@ -13,13 +13,39 @@ export const APP_HTML = `
         </header>
 
         <nav class="sidebar-body" id="sidebar-body">
+          <section class="nav-section workspace-section" id="workspace-section">
+            <div class="section-label workspace-label">
+              <span id="workspace-root-label">目录</span>
+              <button id="workspace-collapse" class="section-toggle" type="button" title="折叠目录" aria-expanded="true">⌃</button>
+            </div>
+            <div class="workspace-actions" aria-label="目录操作">
+              <button id="workspace-open" class="icon-btn" type="button" title="打开目录">${ICONS.folder}</button>
+              <button id="workspace-refresh" class="icon-btn" type="button" title="刷新目录" disabled>${ICONS.refresh}</button>
+              <button id="workspace-new-doc" class="icon-btn" type="button" title="新建文档" disabled>${ICONS.document}</button>
+              <button id="workspace-new-folder" class="icon-btn" type="button" title="新建文件夹" disabled>${ICONS.plus}</button>
+            </div>
+            <div class="section-content workspace-scroll">
+              <div id="workspace-tree" class="workspace-tree"></div>
+            </div>
+          </section>
+
+          <button class="sb-resizer" id="sb-resizer-workspace-doc"
+                  data-above="#workspace-section" data-below="#outline-section"
+                  aria-label="调整目录与大纲高度"></button>
+
           <section class="nav-section" id="outline-section" hidden>
-            <div class="section-label">
-              <span>大纲</span>
-              <span class="section-count" id="outline-count">0</span>
+            <div class="doc-panel-tabs" id="doc-panel-tabs" role="tablist" aria-label="文档侧栏">
+              <button id="sidebar-tab-outline" class="doc-panel-tab is-active" type="button" role="tab" aria-selected="true" aria-controls="outline-panel">大纲</button>
+              <button id="sidebar-tab-git" class="doc-panel-tab" type="button" role="tab" aria-selected="false" aria-controls="git-panel" hidden>Git</button>
+              <button id="doc-panel-collapse" class="section-toggle" type="button" title="折叠大纲/Git" aria-expanded="true">⌃</button>
             </div>
             <div class="section-content">
-              <div id="outline-list" class="outline-list"></div>
+              <div id="outline-panel" role="tabpanel">
+                <div id="outline-list" class="outline-list"></div>
+              </div>
+              <div id="git-panel" class="git-panel" role="tabpanel" hidden>
+                <div id="git-content" class="git-content"></div>
+              </div>
             </div>
           </section>
 
@@ -30,7 +56,6 @@ export const APP_HTML = `
           <section class="nav-section" id="asset-section" hidden>
             <div class="section-label">
               <span>资源</span>
-              <span class="section-count" id="asset-count">0</span>
             </div>
             <div class="section-content">
               <div id="asset-list" class="asset-list"></div>
@@ -262,6 +287,10 @@ export const APP_HTML = `
                 <span class="secondary-btn-icon">${ICONS.folder}</span>
                 <span>打开 .aimd</span>
               </button>
+              <button id="empty-open-workspace" class="secondary-btn" type="button">
+                <span class="secondary-btn-icon">${ICONS.folder}</span>
+                <span>打开目录</span>
+              </button>
               <button id="empty-import-web" class="secondary-btn" type="button">
                 <span class="secondary-btn-icon">${ICONS.link}</span>
                 <span>从网页导入</span>
@@ -281,6 +310,10 @@ export const APP_HTML = `
             </section>
 
             <div class="empty-hint">⌘N 新建 · ⌘O 打开 · ⇧⌘S 另存为 · 拖入 .aimd / Markdown 即可打开</div>
+          </article>
+
+          <article id="git-diff-view" class="git-diff-view" hidden>
+            <div id="git-diff-content" class="git-diff-content"></div>
           </article>
 
           <article id="reader" class="reader aimd" hidden></article>

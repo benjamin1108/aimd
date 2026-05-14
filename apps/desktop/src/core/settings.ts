@@ -4,6 +4,7 @@ import { invoke } from "@tauri-apps/api/core";
 import type {
   AiSettings,
   WebClipSettings,
+  UiSettings,
   ModelProvider,
   ProviderCredential,
   WebClipOutputLanguage,
@@ -12,6 +13,7 @@ import type {
 export type AppSettings = {
   ai: AiSettings;
   webClip: WebClipSettings;
+  ui: UiSettings;
 };
 
 export function defaultModelForProvider(provider: ModelProvider) {
@@ -34,6 +36,10 @@ export const DEFAULT_WEB_CLIP_SETTINGS: WebClipSettings = {
   llmEnabled: false,
   provider: "dashscope",
   outputLanguage: "zh-CN",
+};
+
+export const DEFAULT_UI_SETTINGS: UiSettings = {
+  showAssetPanel: false,
 };
 
 function normalizeProvider(value: unknown): ModelProvider {
@@ -85,6 +91,16 @@ export function coerceWebClipSettings(raw: unknown): WebClipSettings {
   };
 }
 
+export function coerceUiSettings(raw: unknown): UiSettings {
+  if (!raw || typeof raw !== "object") {
+    return { ...DEFAULT_UI_SETTINGS };
+  }
+  const obj = raw as Record<string, unknown>;
+  return {
+    showAssetPanel: obj.showAssetPanel === true,
+  };
+}
+
 export function cloneSettings(s: AiSettings): AiSettings {
   return {
     activeProvider: s.activeProvider,
@@ -97,16 +113,18 @@ export function cloneSettings(s: AiSettings): AiSettings {
 
 export async function loadAppSettings(): Promise<AppSettings> {
   try {
-    const raw = await invoke<{ ai?: unknown, webClip?: unknown } | null>("load_settings");
+    const raw = await invoke<{ ai?: unknown, webClip?: unknown, ui?: unknown } | null>("load_settings");
     return { 
       ai: coerceSettings(raw?.ai ?? null),
-      webClip: coerceWebClipSettings(raw?.webClip ?? null)
+      webClip: coerceWebClipSettings(raw?.webClip ?? null),
+      ui: coerceUiSettings(raw?.ui ?? null),
     };
   } catch (err) {
     console.warn("load_settings failed; using defaults", err);
     return { 
       ai: cloneSettings(DEFAULT_AI_SETTINGS),
-      webClip: { ...DEFAULT_WEB_CLIP_SETTINGS }
+      webClip: { ...DEFAULT_WEB_CLIP_SETTINGS },
+      ui: { ...DEFAULT_UI_SETTINGS },
     };
   }
 }
@@ -114,7 +132,8 @@ export async function loadAppSettings(): Promise<AppSettings> {
 export async function saveAppSettings(settings: AppSettings): Promise<void> {
   const normalized: AppSettings = { 
     ai: coerceSettings(settings.ai),
-    webClip: coerceWebClipSettings(settings.webClip)
+    webClip: coerceWebClipSettings(settings.webClip),
+    ui: coerceUiSettings(settings.ui),
   };
   await invoke("save_settings", { settings: normalized });
 }

@@ -355,8 +355,8 @@ fn normalize_web_clip_output_language(value: &str) -> &'static str {
 }
 
 fn web_clip_refine_system_prompt(target_language: &str) -> String {
-    let language_policy = WEB_CLIP_REFINE_LANGUAGE_POLICY_PROMPT
-        .replace("{target_language}", target_language);
+    let language_policy =
+        WEB_CLIP_REFINE_LANGUAGE_POLICY_PROMPT.replace("{target_language}", target_language);
     format!(
         "{}\n\n{}",
         WEB_CLIP_REFINE_SYSTEM_PROMPT.trim(),
@@ -370,10 +370,8 @@ mod tests {
 
     #[test]
     fn refine_user_prompt_keeps_raw_markdown() {
-        let prompt = web_clip_refine_user_prompt(
-            "# Raw\n\nLong body",
-            Some("ignored guard reason"),
-        );
+        let prompt =
+            web_clip_refine_user_prompt("# Raw\n\nLong body", Some("ignored guard reason"));
 
         assert_eq!(prompt, "# Raw\n\nLong body");
     }

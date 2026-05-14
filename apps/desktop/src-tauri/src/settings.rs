@@ -4,7 +4,7 @@ use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use std::fs;
 use std::path::PathBuf;
-use tauri::{AppHandle, Manager};
+use tauri::{AppHandle, Emitter, Manager};
 
 const SETTINGS_FILE: &str = "settings.json";
 
@@ -110,11 +110,20 @@ impl Default for WebClipSettings {
 
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
+pub struct UiSettings {
+    #[serde(default)]
+    pub show_asset_panel: bool,
+}
+
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct AppSettings {
     #[serde(default)]
     pub ai: AiSettings,
     #[serde(default)]
     pub web_clip: WebClipSettings,
+    #[serde(default)]
+    pub ui: UiSettings,
 }
 
 fn settings_path(app: &AppHandle) -> Result<PathBuf, String> {
@@ -273,6 +282,7 @@ pub fn save_settings(app: AppHandle, settings: AppSettings) -> Result<(), String
         let _ = fs::remove_file(&tmp);
         format!("保存设置失败: {err}")
     })?;
+    let _ = app.emit("aimd-settings-updated", &normalized);
     Ok(())
 }
 
@@ -305,5 +315,18 @@ mod tests {
             "sk-legacy-dashscope"
         );
         assert_eq!(providers.get("gemini").unwrap().get("apiKey").unwrap(), "");
+    }
+
+    #[test]
+    fn missing_ui_defaults_asset_panel_to_hidden() {
+        let settings: AppSettings = serde_json::from_value(serde_json::json!({
+            "ai": {
+                "activeProvider": "dashscope",
+                "providers": {}
+            },
+            "webClip": {}
+        }))
+        .unwrap();
+        assert!(!settings.ui.show_asset_panel);
     }
 }

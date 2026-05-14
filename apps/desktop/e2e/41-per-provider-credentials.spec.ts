@@ -54,6 +54,11 @@ async function installMock(page: Page, initial: Stored, opts?: { onSave?: (v: an
   }
 }
 
+async function openModelSettings(page: Page) {
+  await page.goto("/settings.html");
+  await page.locator(".settings-nav-item", { hasText: "AI / 模型" }).click();
+}
+
 test.describe("per-provider 凭证 — 切 provider 不串台", () => {
   test("dashscope 和 gemini 的 apiKey 各自独立显示", async ({ page }) => {
     await installMock(page, {
@@ -65,7 +70,7 @@ test.describe("per-provider 凭证 — 切 provider 不串台", () => {
         },
       },
     });
-    await page.goto("/settings.html");
+    await openModelSettings(page);
 
     // 默认 active=dashscope
     await expect(page.locator("#provider")).toHaveValue("dashscope");
@@ -90,7 +95,7 @@ test.describe("per-provider 凭证 — 切 provider 不串台", () => {
         },
       },
     });
-    await page.goto("/settings.html");
+    await openModelSettings(page);
     await expect(page.locator("#api-key")).toHaveValue("only-this-one");
     await page.locator("#provider").selectOption("gemini");
     await expect(page.locator("#api-key")).toHaveValue("");
@@ -113,7 +118,7 @@ test.describe("per-provider 凭证 — 切 provider 不串台", () => {
       },
       { onSave: (v) => { received = v; } },
     );
-    await page.goto("/settings.html");
+    await openModelSettings(page);
     // 在 dashscope 下改 apiKey
     await page.locator("#api-key").fill("kA-updated");
     // 切 gemini，填一把 key
@@ -127,5 +132,4 @@ test.describe("per-provider 凭证 — 切 provider 不串台", () => {
     expect(received?.ai?.activeProvider).toBe("gemini");
   });
 });
-
 

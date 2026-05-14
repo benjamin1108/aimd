@@ -135,12 +135,15 @@ export async function insertImage() {
     }
     state.doc.assets = [...state.doc.assets, added.asset];
     state.doc.dirty = true;
-    if (state.doc.format === "markdown") state.doc.needsAimdSave = true;
+    if (state.doc.format === "markdown") {
+      state.doc.requiresAimdSave = true;
+      state.doc.needsAimdSave = true;
+    }
     updateChrome();
     if (state.mode === "source") scheduleRender();
     setStatus(
       state.doc.format === "markdown"
-        ? "图片已加入，保存时会另存为 .aimd"
+        ? "图片已加入，保存时需转换为 AIMD"
         : "图片已就绪，保存后写入正文",
       "info",
     );

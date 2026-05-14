@@ -9,6 +9,7 @@ mod documents;
 mod drafts;
 mod dto;
 mod external;
+mod git;
 mod importer;
 mod llm;
 mod macos_assoc;
@@ -16,6 +17,7 @@ mod menu;
 mod settings;
 mod web_clip_image_proxy;
 mod windows;
+mod workspace;
 
 #[cfg(any(target_os = "macos", target_os = "ios"))]
 use std::sync::atomic::Ordering;
@@ -91,6 +93,22 @@ pub fn run() {
             dialogs::confirm_upgrade_to_aimd,
             dialogs::confirm_keep_online_images,
             dialogs::reveal_in_finder,
+            git::get_git_repo_status,
+            git::get_git_file_diff,
+            git::git_stage_file,
+            git::git_unstage_file,
+            git::git_stage_all,
+            git::git_unstage_all,
+            git::git_commit,
+            git::git_pull,
+            git::git_push,
+            workspace::open_workspace_dir,
+            workspace::read_workspace_tree,
+            workspace::create_workspace_file,
+            workspace::create_workspace_folder,
+            workspace::rename_workspace_entry,
+            workspace::trash_workspace_entry,
+            workspace::move_workspace_entry,
             documents::initial_open_path,
             documents::open_aimd,
             documents::create_aimd,

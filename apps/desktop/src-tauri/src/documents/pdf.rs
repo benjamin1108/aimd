@@ -41,7 +41,13 @@ pub(super) async fn export_pdf(
         ),
     );
     let html = export_html_for_document(file, &markdown)?;
-    diagnostics::emit(&app, &trace_id, start, "debug", diagnostics::html_summary(&html));
+    diagnostics::emit(
+        &app,
+        &trace_id,
+        start,
+        "debug",
+        diagnostics::html_summary(&html),
+    );
     if let Some(snapshot_path) = diagnostics::write_html_snapshot(&trace_id, &html) {
         diagnostics::emit(
             &app,

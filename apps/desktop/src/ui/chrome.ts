@@ -1,7 +1,7 @@
 import { state } from "../core/state";
 import {
   titleEl, pathEl, statusEl, statusPillEl, panelEl, emptyEl,
-  outlineSectionEl, assetSectionEl, assetListEl, assetCountEl,
+  outlineSectionEl, assetSectionEl, assetListEl,
   sidebarOutlineAssetResizerEl,
   starterActionsEl, docActionsEl, sidebarFootEl,
   sidebarNewEl, sidebarSaveEl, saveEl, saveLabelEl, saveAsEl, closeEl,
@@ -74,23 +74,25 @@ export function setStatus(text: string, tone: "idle" | "loading" | "success" | "
 
 export function updateChrome() {
   const doc = state.doc;
+  const hasWorkspace = Boolean(state.workspace);
   renderRecentList();
-  panelEl().dataset.shell = doc ? "document" : "launch";
+  panelEl().dataset.shell = doc || hasWorkspace ? "document" : "launch";
   // Sidebar resizer writes an inline `grid-template-columns` (e.g.
   // "460px minmax(0,1fr)") which beats the launch-shell CSS rule. In launch
   // mode the sidebar is `display: none`, so the now-only workspace child
   // collapses into the first column of that two-column track and the right
   // side renders empty. Drop the inline override before each launch transition.
-  if (!doc) panelEl().style.gridTemplateColumns = "";
-  starterActionsEl().hidden = Boolean(doc);
-  docActionsEl().hidden = !doc;
-  docToolbarEl().hidden = !doc;
+  if (!doc && !hasWorkspace) panelEl().style.gridTemplateColumns = "";
+  const inDiffView = state.mainView === "git-diff";
+  starterActionsEl().hidden = Boolean(doc) || inDiffView;
+  docActionsEl().hidden = !doc || inDiffView;
+  docToolbarEl().hidden = !doc || inDiffView;
   sidebarFootEl().hidden = !doc;
 
   titleEl().textContent = doc ? displayDocTitle(doc) : "AIMD Desktop";
   pathEl().textContent = doc
-    ? (doc.needsAimdSave
-      ? `${doc.path ? formatPathHint(doc.path) : "Markdown 草稿"} · 保存时另存为 .aimd`
+    ? (doc.requiresAimdSave
+      ? `${doc.path ? formatPathHint(doc.path) : "Markdown 草稿"} · 保存时需转换为 AIMD`
       : (doc.path || "未保存草稿 · 先另存为 .aimd"))
     : "正文、图片和元信息始终在一起";
   // 保存按钮在文档没有变化时禁用：用户的"按钮亮着但其实没活做"会变成第二种困惑。
@@ -116,10 +118,10 @@ export function updateChrome() {
 
   if (!doc) {
     assetSectionEl().hidden = true;
-    outlineSectionEl().hidden = true;
+    outlineSectionEl().hidden = !state.git.isRepo;
     sidebarOutlineAssetResizerEl().hidden = true;
     assetListEl().innerHTML = "";
-    emptyEl().hidden = false;
+    emptyEl().hidden = inDiffView;
     if (!state.isBootstrappingSession) persistSessionSnapshot();
     return;
   }
@@ -133,11 +135,15 @@ export function updateChrome() {
 
   outlineSectionEl().hidden = false;
   // 资源区无内容时折叠：空区域只会降低 sidebar 信息密度。
-  const hasAssets = doc.assets.length > 0;
+  const hasAssets = state.uiSettings.showAssetPanel && doc.assets.length > 0;
+  const assetVisibilityChanged = assetSectionEl().hidden === hasAssets;
   assetSectionEl().hidden = !hasAssets;
   sidebarOutlineAssetResizerEl().hidden = !hasAssets;
+  if (assetVisibilityChanged) {
+    outlineSectionEl().style.flex = "";
+    assetSectionEl().style.flex = "";
+  }
 
-  assetCountEl().textContent = String(doc.assets.length);
   if (hasAssets) {
     assetListEl().innerHTML = doc.assets.map(assetItem).join("");
   } else {
@@ -148,8 +154,8 @@ export function updateChrome() {
   // 已保存 / 失败）窗口期内 statusTimer 非 null，这里不抢；timer 回调结束后
   // 会自己根据 dirty 回退到稳定态。
   if (state.statusTimer == null) {
-    if (doc.needsAimdSave) {
-      statusEl().textContent = "保存时需要另存为 .aimd";
+    if (doc.requiresAimdSave) {
+      statusEl().textContent = "保存时需转换为 AIMD";
       statusPillEl().dataset.tone = "info";
     } else if (doc.isDraft && !doc.dirty) {
       setStatus("这是未保存草稿，保存后才会生成 .aimd 文件", "info");

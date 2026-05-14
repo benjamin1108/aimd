@@ -34,6 +34,7 @@ import {
   routeOpenedPath, openDocument, chooseAndImportMarkdownProject,
 } from "./document/lifecycle";
 import { saveDocument, saveDocumentAs } from "./document/persist";
+import { hasAimdImageReferences, hasExternalImageReferences } from "./document/assets";
 import { importWebClip } from "./document/web-clip";
 import { cleanupOldDrafts } from "./document/drafts";
 import { optimizeDocumentAssets } from "./document/optimize";
@@ -45,6 +46,11 @@ import {
 import { persistSessionSnapshot, restoreSession } from "./session/snapshot";
 import { applyDocument } from "./document/apply";
 import { debugLog, installDebugConsole, openDebugConsole, onDebugChange } from "./debug/console";
+import { bindWorkspacePanel, openWorkspacePicker } from "./ui/workspace";
+import { bindDocPanelTabs } from "./ui/doc-panel";
+import { bindGitPanel, refreshGitStatus } from "./ui/git";
+import { bindGitDiffView } from "./ui/git-diff";
+import { loadAppSettings, type AppSettings } from "./core/settings";
 
 installDebugConsole();
 if (isTauri()) {
@@ -62,6 +68,11 @@ if (isTauri()) {
       `[pdf:${payload.traceId || "-"} +${payload.elapsedMs ?? "?"}ms] ${payload.message || ""}`,
     );
   });
+}
+
+function applyAppSettings(settings: AppSettings) {
+  state.uiSettings = { ...settings.ui };
+  updateChrome();
 }
 
 // footer 状态条上的隐式调试指示器：只有出现 warn / error 时才显示，
@@ -111,6 +122,7 @@ $("body").addEventListener("dragover", onWindowDragOver);
 $("body").addEventListener("drop", onWindowDrop);
 $("body").addEventListener("dragleave", onWindowDragLeave);
 $("#empty-open").addEventListener("click", chooseAndOpen);
+$("#empty-open-workspace").addEventListener("click", () => { void openWorkspacePicker(); });
 $("#empty-new").addEventListener("click", () => { void newDocument(); });
 $("#empty-import-web").addEventListener("click", () => { void importWebClip(); });
 $("#empty-import-md-project").addEventListener("click", () => { void chooseAndImportMarkdownProject(); });
@@ -143,6 +155,11 @@ markdownEl().addEventListener("input", () => {
   if (!state.doc) return;
   state.doc.markdown = markdownEl().value;
   state.doc.dirty = true;
+  state.doc.hasExternalImageReferences = hasExternalImageReferences(state.doc.markdown);
+  if (state.doc.format === "markdown") {
+    state.doc.requiresAimdSave = hasAimdImageReferences(state.doc.markdown) || state.doc.assets.length > 0;
+    state.doc.needsAimdSave = state.doc.requiresAimdSave;
+  }
   updateChrome();
   refreshSourceBanner();
   scheduleRender();
@@ -170,6 +187,10 @@ bindFormatToolbar();
 bindSearch();
 bindSourceHighlight();
 bindHealthPanel();
+bindWorkspacePanel();
+bindDocPanelTabs(() => { void refreshGitStatus(); });
+bindGitPanel();
+bindGitDiffView();
 bindWidthSwitch();
 bindImageDeleteGuard(inlineEditorEl());
 bindSidebarResizers();
@@ -248,6 +269,11 @@ window.addEventListener("beforeunload", () => {
 window.addEventListener("DOMContentLoaded", async () => {
   state.recentPaths = loadRecentPaths();
   state.isBootstrappingSession = true;
+  try {
+    applyAppSettings(await loadAppSettings());
+  } catch {
+    updateChrome();
+  }
   updateChrome();
   try {
     await listen<string>("aimd-open-file", (event) => {
@@ -271,6 +297,9 @@ window.addEventListener("DOMContentLoaded", async () => {
     };
     await listen<string>("aimd-menu", (event) => {
       menuHandlers[event.payload]?.();
+    });
+    await listen<AppSettings>("aimd-settings-updated", (event) => {
+      applyAppSettings(event.payload);
     });
   } catch {
     // Ignore event binding failures outside the Tauri shell.
