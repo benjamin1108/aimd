@@ -1,6 +1,7 @@
 import type {
   AimdDocument,
   GitFileDiff,
+  GitDiffTab,
   GitRepoStatus,
   MainView,
   MarkdownSourceModel,
@@ -82,6 +83,7 @@ export const state: {
   git: {
     isRepo: boolean;
     status: GitRepoStatus | null;
+    diffTabs: GitDiffTab[];
     diffView: {
       path: string;
       diff: GitFileDiff | null;
@@ -131,6 +133,7 @@ export const state: {
   git: {
     isRepo: false,
     status: null,
+    diffTabs: [],
     diffView: {
       path: "",
       diff: null,

@@ -163,7 +163,7 @@ test.describe("设置：双栏 IA + API Key 半遮罩", () => {
     await page.locator(".settings-nav-item[data-section='model']").click();
   }
 
-  test("API Key 默认半遮罩：mask 文本含 prefix4 + ••• + suffix4", async ({ page }) => {
+  test("API Key 默认半遮罩：mask 文本只保留 prefix4 + suffix4，不显示圆点墙", async ({ page }) => {
     await installMock(page);
     await page.goto("/settings.html");
     await openModelSettings(page);
@@ -173,10 +173,12 @@ test.describe("设置：双栏 IA + API Key 半遮罩", () => {
     const masked = await mask.textContent();
     expect(masked || "").toContain("sk-t");
     expect(masked || "").toContain("cdef");
-    expect(masked || "").toMatch(/•+/);
+    expect(masked || "").toContain("…");
+    expect(masked || "").not.toMatch(/[•●]/);
+    await expect(page.locator("#api-key")).toHaveCSS("-webkit-text-fill-color", "rgba(0, 0, 0, 0)");
   });
 
-  test("聚焦 input 不会暴露明文：仍是 type=password；只有点眼睛才切 type=text", async ({ page }) => {
+  test("聚焦 input 不会暴露明文或圆点墙：只有点眼睛才切 type=text", async ({ page }) => {
     await installMock(page);
     await page.goto("/settings.html");
     await openModelSettings(page);
@@ -185,12 +187,13 @@ test.describe("设置：双栏 IA + API Key 半遮罩", () => {
     // 默认 password
     await expect(input).toHaveAttribute("type", "password");
 
-    // 聚焦 → overlay 让位，但 input 仍是 password（不会泄露明文）
+    // 聚焦后仍保持紧凑遮罩；不显示明文，也不显示浏览器 password 圆点墙。
     await input.focus();
     await expect(input).toHaveAttribute("type", "password");
-    await expect(page.locator(".api-key-wrap")).toHaveAttribute("data-state", "visible");
+    await expect(page.locator(".api-key-wrap")).toHaveAttribute("data-state", "masked");
+    await expect(page.locator(".api-key-mask")).toContainText("sk-t…cdef");
 
-    // 失焦回 masked overlay
+    // 失焦后仍是同一个 masked overlay。
     await page.locator("#api-base").focus();
     await expect(page.locator(".api-key-wrap")).toHaveAttribute("data-state", "masked");
 

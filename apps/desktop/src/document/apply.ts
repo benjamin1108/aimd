@@ -4,6 +4,7 @@ import type { AimdDocument, Mode } from "../core/types";
 import { applyHTML } from "../ui/outline";
 import { setMode } from "../ui/mode";
 import { updateChrome } from "../ui/chrome";
+import { renderDocPanelTabs } from "../ui/doc-panel";
 import { refreshSourceHighlight } from "../editor/source-highlight";
 import { flushInline } from "../editor/inline";
 import {
@@ -39,6 +40,7 @@ export function paintActiveDocument(mode: Mode) {
   setMode(mode, { skipCapture: true });
   restoreActiveViewState(mode);
   updateChrome();
+  renderDocPanelTabs();
   window.dispatchEvent(new CustomEvent("aimd-doc-applied"));
 }
 

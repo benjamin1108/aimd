@@ -26,6 +26,7 @@ import {
   syncActiveTabFromFacade,
 } from "./open-document-state";
 import { refreshTabFingerprint } from "./fingerprint";
+import { activateGitDiffTab, firstGitDiffTabId, isGitDiffTabId } from "../ui/git-diff";
 
 export type OpenRouteResult = "opened" | "focused" | "current" | "cancelled" | "failed" | "unsupported";
 
@@ -229,12 +230,17 @@ export async function closeDocumentTab(tabId: string): Promise<boolean> {
   }
   removeTab(tab.id);
   if (nextId) {
-    await activateDocumentTab(nextId);
+    if (isGitDiffTabId(nextId)) await activateGitDiffTab(nextId);
+    else await activateDocumentTab(nextId);
+  } else if (wasActive && firstGitDiffTabId()) {
+    state.doc = null;
+    await activateGitDiffTab(firstGitDiffTabId()!);
   } else {
     clearDocumentSurface();
     clearSessionSnapshot();
     clearLastSessionPath();
   }
+  if (!state.openDocuments.tabs.length && state.mainView === "git-diff") state.doc = null;
   updateChrome();
   setStatus("已关闭标签页", "info");
   return true;

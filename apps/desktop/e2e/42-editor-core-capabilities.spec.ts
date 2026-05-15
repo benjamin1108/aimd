@@ -352,24 +352,16 @@ test.describe("Editor core capabilities", () => {
     await expect(page.locator("#markdown")).toHaveValue(/!\[new alt\]\(asset:\/\/img-001\)/);
   });
 
-  test("health check panel and HTML export surface status", async ({ page }) => {
+  test("HTML export keeps resource preflight without exposing the old health panel", async ({ page }) => {
     await installEditorCoreMock(page);
     await page.goto("/");
     await page.locator("#empty-open").click();
 
     await page.locator("#more-menu-toggle").click();
-    await page.locator("#health-check").click();
-    await expect(page.locator("#health-panel")).toBeVisible();
-    await expect(page.locator("#health-summary")).toContainText("资源风险");
-    await expect(page.locator("#health-list")).toContainText("远程图片");
-    await expect(page.locator("#health-package-local")).toContainText("嵌入远程图片");
-    await expect(page.locator("#health-package-local")).not.toBeDisabled();
-    await page.locator("#health-package-local").click();
-    await expect(page.locator("#health-summary")).toContainText("资源完整");
-
-    await page.locator("#more-menu-toggle").click();
+    await expect(page.locator("#health-check")).toBeHidden();
     await page.locator("#export-html").click();
     await expect(page.locator("#status")).toContainText("已导出 HTML");
+    await expect(page.locator("#health-panel")).toBeHidden();
   });
 
   test("action menu labels and enabled states match document format", async ({ page }) => {
@@ -382,8 +374,7 @@ test.describe("Editor core capabilities", () => {
     await expect(page.locator("#package-local-images")).toBeDisabled();
     await expect(page.locator("#more-menu #web-import")).toContainText("从网页导入");
     await expect(page.locator("#more-menu #web-import")).not.toBeDisabled();
-    await expect(page.locator("#more-menu #health-check")).toContainText("检查当前文档资源");
-    await expect(page.locator("#more-menu #health-check")).not.toBeDisabled();
+    await expect(page.locator("#more-menu #health-check")).toBeHidden();
     await expect(page.locator("#export-markdown")).toContainText("导出 Markdown");
     await expect(page.locator("#export-markdown")).not.toBeDisabled();
     await expect(page.locator("#export-pdf")).toContainText("导出 PDF");
@@ -484,38 +475,25 @@ test.describe("Editor core capabilities", () => {
     expect(await page.evaluate(() => (window as any).__aimdEditorCoreMock.getRemotePackageCalls())).toHaveLength(0);
     expect(await page.evaluate(() => (window as any).__aimdEditorCoreMock.getKeepOnlineConfirmCalls())).toHaveLength(0);
 
-    await page.locator("#more-menu-toggle").click();
-    await page.locator("#health-check").click();
-    await page.locator("#health-package-local").click();
+    await page.evaluate(async () => {
+      const { packageRemoteImages } = await import("/src/document/health.ts");
+      await packageRemoteImages();
+    });
 
     await expect.poll(() => page.evaluate(() => (window as any).__aimdEditorCoreMock.getRemotePackageCalls().length)).toBe(1);
     const packageCalls = await page.evaluate(() => (window as any).__aimdEditorCoreMock.getRemotePackageCalls());
     expect(packageCalls[0].markdown).toContain("https://example.com/a.png");
   });
 
-  test("health panel surfaces missing, unused cleanup, and large asset risks", async ({ page }) => {
+  test("health panel controls are not exposed in the document UI", async ({ page }) => {
     await installEditorCoreMock(page);
     await page.goto("/");
     await page.locator("#empty-open").click();
 
-    await page.evaluate(() => (window as any).__aimdEditorCoreMock.setHealthMode("missing"));
     await page.locator("#more-menu-toggle").click();
-    await page.locator("#health-check").click();
-    await expect(page.locator("#health-summary")).toContainText("资源缺失");
-    await expect(page.locator("#health-list")).toContainText("missing-001");
-
-    await page.evaluate(() => (window as any).__aimdEditorCoreMock.setHealthMode("unused"));
-    await page.locator("#more-menu-toggle").click();
-    await page.locator("#health-check").click();
-    await expect(page.locator("#health-clean-unused")).not.toBeDisabled();
-    await page.evaluate(() => (window as any).__aimdEditorCoreMock.setHealthMode("clean"));
-    await page.locator("#health-clean-unused").click();
-    await expect(page.locator("#health-summary")).toContainText("资源完整");
-
-    await page.evaluate(() => (window as any).__aimdEditorCoreMock.setHealthMode("large"));
-    await page.locator("#more-menu-toggle").click();
-    await page.locator("#health-check").click();
-    await expect(page.locator("#health-list")).toContainText("资源体积较大");
+    await expect(page.locator("#health-check")).toBeHidden();
+    await expect(page.locator("#sidebar-tab-health")).toBeHidden();
+    await expect(page.locator("#health-panel")).toBeHidden();
   });
 
   test("document links open through the system browser command", async ({ page }) => {

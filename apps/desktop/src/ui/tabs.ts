@@ -11,13 +11,15 @@ function tabFormat(doc: { isDraft?: boolean; format: "aimd" | "markdown" }) {
 export function renderOpenTabs() {
   syncActiveTabFromFacade();
   const tabs = state.openDocuments.tabs;
-  tabBarEl().hidden = tabs.length === 0;
-  if (tabs.length === 0) {
+  const gitDiffTabs = state.git.diffTabs;
+  const total = tabs.length + gitDiffTabs.length;
+  tabBarEl().hidden = total === 0;
+  if (total === 0) {
     openTabsEl().innerHTML = "";
     return;
   }
   const activeId = state.openDocuments.activeTabId;
-  openTabsEl().innerHTML = tabs.map((tab) => {
+  const documentTabs = tabs.map((tab) => {
     const title = displayTabTitle(tab.doc);
     const full = tab.doc.path || title;
     const dirty = tab.doc.dirty ? `<span class="open-tab-dirty" aria-label="未保存">●</span>` : "";
@@ -37,5 +39,21 @@ export function renderOpenTabs() {
         </button>
       </div>
     `;
-  }).join("");
+  });
+  const diffTabs = gitDiffTabs.map((tab) => `
+    <div class="open-tab is-git-diff ${tab.id === activeId ? "is-active" : ""}"
+         role="tab"
+         aria-selected="${tab.id === activeId ? "true" : "false"}"
+         data-tab-id="${escapeAttr(tab.id)}"
+         title="${escapeAttr(tab.path)}">
+      <button class="open-tab-main" type="button" data-tab-activate="${escapeAttr(tab.id)}" aria-label="切换到 Git Diff ${escapeAttr(tab.title)}">
+        <span class="open-tab-title">${escapeHTML(tab.title)}</span>
+        <span class="open-tab-format">Git Diff</span>
+      </button>
+      <button class="open-tab-close" type="button" data-tab-close="${escapeAttr(tab.id)}" title="关闭标签页：${escapeAttr(tab.title)}" aria-label="关闭标签页：${escapeAttr(tab.title)}">
+        ${ICONS.close}
+      </button>
+    </div>
+  `);
+  openTabsEl().innerHTML = [...documentTabs, ...diffTabs].join("");
 }

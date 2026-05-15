@@ -90,7 +90,7 @@ export const APP_HTML = `
                   <span class="action-menu-icon">${ICONS.link}</span>
                   <span>从网页导入</span>
                 </button>
-                <button id="health-check" class="action-menu-item" type="button" disabled>
+                <button id="health-check" class="action-menu-item" type="button" disabled hidden>
                   <span class="action-menu-icon">${ICONS.info}</span>
                   <span>检查当前文档资源</span>
                 </button>
@@ -416,7 +416,7 @@ export const APP_HTML = `
             <button id="sidebar-tab-outline" class="doc-panel-tab is-active" type="button" role="tab" aria-selected="true" aria-controls="outline-panel">大纲</button>
             <button id="sidebar-tab-assets" class="doc-panel-tab" type="button" role="tab" aria-selected="false" aria-controls="asset-panel">资源</button>
             <button id="sidebar-tab-git" class="doc-panel-tab" type="button" role="tab" aria-selected="false" aria-controls="git-panel" hidden>Git</button>
-            <button id="sidebar-tab-health" class="doc-panel-tab" type="button" role="tab" aria-selected="false" aria-controls="health-panel">健康</button>
+            <button id="sidebar-tab-health" class="doc-panel-tab" type="button" role="tab" aria-selected="false" aria-controls="health-panel" hidden>健康</button>
             <button id="doc-panel-collapse" class="section-toggle" type="button" title="折叠检查器" aria-expanded="true">⌃</button>
           </div>
           <div class="section-content inspector-scroll">

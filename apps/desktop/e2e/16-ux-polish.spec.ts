@@ -338,6 +338,34 @@ test.describe("4. Text selectability", () => {
     // Buttons should have user-select: none (or browser-equivalent "none")
     expect(userSelectValue).toBe("none");
   });
+
+  test("code copy button stays fixed while long code scrolls horizontally", async ({ page }) => {
+    await installTauriMock(page);
+    await page.goto("/");
+    await page.locator("#empty-open").click();
+
+    const result = await page.locator("#reader").evaluate((reader) => {
+      const longLine = Array.from({ length: 80 }, (_, index) => `token${index}`).join("_");
+      reader.innerHTML = `<pre><code>${longLine}</code><button class="code-copy" type="button">复制</button></pre>`;
+      const code = reader.querySelector<HTMLElement>("pre code")!;
+      const button = reader.querySelector<HTMLElement>(".code-copy")!;
+      const before = button.getBoundingClientRect();
+      code.scrollLeft = code.scrollWidth;
+      const after = button.getBoundingClientRect();
+      const pre = reader.querySelector<HTMLElement>("pre")!;
+      return {
+        codeScrolls: code.scrollWidth > code.clientWidth,
+        preScrolls: pre.scrollWidth > pre.clientWidth,
+        deltaRight: Math.abs(before.right - after.right),
+        deltaTop: Math.abs(before.top - after.top),
+      };
+    });
+
+    expect(result.codeScrolls).toBe(true);
+    expect(result.preScrolls).toBe(false);
+    expect(result.deltaRight).toBeLessThan(1);
+    expect(result.deltaTop).toBeLessThan(1);
+  });
 });
 
 test.describe("5. Image lightbox in read mode", () => {

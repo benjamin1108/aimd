@@ -52,9 +52,15 @@ import { persistSessionSnapshot, restoreSession } from "./session/snapshot";
 import { activateDocumentTab, applyDocument, hasGitConflictMarkers } from "./document/apply";
 import { debugLog, installDebugConsole, openDebugConsole, onDebugChange, setDebugMode } from "./debug/console";
 import { bindWorkspacePanel, openWorkspacePicker } from "./ui/workspace";
-import { bindDocPanelTabs } from "./ui/doc-panel";
+import { bindDocPanelTabs, renderDocPanelTabs } from "./ui/doc-panel";
 import { bindGitPanel, refreshGitStatus } from "./ui/git";
-import { bindGitDiffView } from "./ui/git-diff";
+import {
+  activateGitDiffTab,
+  captureActiveGitDiffScroll,
+  bindGitDiffView,
+  closeGitDiffTab,
+  isGitDiffTabId,
+} from "./ui/git-diff";
 import { bindSelectionBoundary } from "./ui/selection";
 import { loadAppSettings, type AppSettings } from "./core/settings";
 import { createSourceModel } from "./editor/source-preserve";
@@ -84,6 +90,7 @@ if (isTauri()) {
 function applyAppSettings(settings: AppSettings) {
   state.uiSettings = { ...settings.ui };
   setDebugMode(state.uiSettings.debugMode);
+  renderDocPanelTabs();
   updateChrome();
 }
 
@@ -169,12 +176,19 @@ openTabsEl().addEventListener("click", (event) => {
   const close = target?.closest<HTMLButtonElement>("[data-tab-close]");
   if (close?.dataset.tabClose) {
     event.stopPropagation();
-    void closeDocumentTab(close.dataset.tabClose);
+    const tabId = close.dataset.tabClose;
+    void (isGitDiffTabId(tabId) ? closeGitDiffTab(tabId) : closeDocumentTab(tabId));
     return;
   }
   const activate = target?.closest<HTMLButtonElement>("[data-tab-activate]");
   if (activate?.dataset.tabActivate) {
-    void activateDocumentTab(activate.dataset.tabActivate);
+    const tabId = activate.dataset.tabActivate;
+    if (isGitDiffTabId(tabId)) {
+      void activateGitDiffTab(tabId);
+    } else {
+      captureActiveGitDiffScroll();
+      void activateDocumentTab(tabId);
+    }
   }
 });
 document.addEventListener("click", (event) => {
@@ -306,18 +320,61 @@ window.addEventListener("beforeunload", () => {
 });
 
 let closeAlreadyApproved = false;
+let closeApprovalInFlight = false;
+
+async function destroyCurrentWindowAfterCloseApproval() {
+  closeAlreadyApproved = true;
+  try {
+    await invoke("destroy_current_window");
+    return;
+  } catch (err) {
+    console.error("destroy current window command failed", err);
+    debugLog("warn", `window destroy command fallback: ${err instanceof Error ? err.message : String(err)}`);
+  }
+  try {
+    await getCurrentWindow().destroy();
+    return;
+  } catch (err) {
+    console.error("destroy current window failed", err);
+    debugLog("warn", `window destroy fallback: ${err instanceof Error ? err.message : String(err)}`);
+  }
+  try {
+    await invoke("close_current_window");
+    return;
+  } catch (err) {
+    console.error("close current window fallback failed", err);
+    debugLog("warn", `window close fallback failed: ${err instanceof Error ? err.message : String(err)}`);
+  }
+  try {
+    await getCurrentWindow().close();
+  } catch (err) {
+    closeAlreadyApproved = false;
+    setStatus(`关闭窗口失败: ${err instanceof Error ? err.message : String(err)}`, "warn");
+  }
+}
+
 async function bindWindowCloseGuard() {
   if (!isTauri()) return;
   try {
-    await getCurrentWindow().onCloseRequested(async (event) => {
+    await getCurrentWindow().onCloseRequested((event) => {
       if (closeAlreadyApproved) return;
-      if (state.mode === "edit" && state.inlineDirty) flushInline();
-      syncActiveTabFromFacade();
-      if (!(await confirmAllDirtyTabsForWindowClose())) {
-        event.preventDefault();
-        return;
-      }
-      closeAlreadyApproved = true;
+      event.preventDefault();
+      if (closeApprovalInFlight) return;
+      closeApprovalInFlight = true;
+      void (async () => {
+        try {
+          if (state.mode === "edit" && state.inlineDirty) flushInline();
+          syncActiveTabFromFacade();
+          if (await confirmAllDirtyTabsForWindowClose()) {
+            await destroyCurrentWindowAfterCloseApproval();
+          }
+        } catch (err) {
+          console.error("window close guard failed", err);
+          setStatus(`关闭窗口失败: ${err instanceof Error ? err.message : String(err)}`, "warn");
+        } finally {
+          if (!closeAlreadyApproved) closeApprovalInFlight = false;
+        }
+      })();
     });
   } catch {
     // Browser/e2e shells do not expose native window lifecycle hooks.

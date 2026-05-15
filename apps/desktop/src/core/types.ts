@@ -264,3 +264,15 @@ export type GitFileDiff = {
   isBinary: boolean;
   truncated?: boolean;
 };
+
+export type GitDiffTab = {
+  id: OpenDocumentId;
+  repoRoot: string;
+  path: string;
+  title: string;
+  directory: string;
+  diff: GitFileDiff | null;
+  loading: boolean;
+  error: string;
+  scroll: number;
+};

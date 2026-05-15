@@ -301,7 +301,6 @@ type VisualState =
   | "dirty-markdown-requires-aimd"
   | "aimd-git-conflict"
   | "git-inspector"
-  | "health-inspector"
   | "source-markdown-mode";
 
 async function setupVisualState(page: Page, stateName: VisualState) {
@@ -330,16 +329,6 @@ async function setupVisualState(page: Page, stateName: VisualState) {
     if (!await ensureInspectorTabReachable(page, "#sidebar-tab-git")) return;
     await page.locator("#sidebar-tab-git").click();
     await expect(page.locator("#git-panel")).toBeVisible();
-    return;
-  }
-  if (stateName === "health-inspector") {
-    await page.evaluate(async () => {
-      const { runHealthCheck } = await import("/src/document/health.ts");
-      await runHealthCheck();
-    });
-    if (!await ensureInspectorTabReachable(page, "#sidebar-tab-health")) return;
-    await page.locator("#sidebar-tab-health").click();
-    await expect(page.locator("#health-panel")).toBeVisible();
     return;
   }
   await page.locator("#mode-source").click();
@@ -424,7 +413,6 @@ test.describe("three-column CSS production polish", () => {
       "dirty-markdown-requires-aimd",
       "aimd-git-conflict",
       "git-inspector",
-      "health-inspector",
       "source-markdown-mode",
     ];
 

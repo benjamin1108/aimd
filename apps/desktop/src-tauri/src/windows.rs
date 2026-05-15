@@ -244,6 +244,13 @@ pub fn close_current_window(window: tauri::Window) -> Result<(), String> {
     window.close().map_err(|err| format!("close window: {err}"))
 }
 
+#[tauri::command]
+pub fn destroy_current_window(window: tauri::Window) -> Result<(), String> {
+    window
+        .destroy()
+        .map_err(|err| format!("destroy window: {err}"))
+}
+
 pub fn open_or_focus_settings_window(app: &AppHandle) -> Result<(), String> {
     let state = app.state::<SettingsWindowState>();
     let _guard = state

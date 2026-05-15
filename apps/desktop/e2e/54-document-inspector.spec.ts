@@ -265,24 +265,20 @@ test.describe("Document inspector ownership", () => {
     await expect(page.locator("#asset-list")).toContainText("packed-alpha");
   });
 
-  test("health check result is scoped to the tab that launched it", async ({ page }) => {
+  test("health inspector is not exposed as a document tab", async ({ page }) => {
     await installInspectorMock(page);
     await page.goto("/");
     await openWorkspaceAndDocs(page);
 
     await page.locator(".open-tab", { hasText: "Alpha" }).locator(".open-tab-main").click();
-    const healthTask = page.evaluate(async () => {
+    await page.evaluate(async () => {
       const { runHealthCheck } = await import("/src/document/health.ts");
       await runHealthCheck();
     });
-    await page.locator(".open-tab", { hasText: "Beta" }).locator(".open-tab-main").click();
-    await healthTask;
 
-    await page.locator("#sidebar-tab-health").click();
-    await expect(page.locator("#health-summary")).toContainText("尚未检查");
-    await page.locator(".open-tab", { hasText: "Alpha" }).locator(".open-tab-main").click();
-    await page.locator("#sidebar-tab-health").click();
-    await expect(page.locator("#health-summary")).toContainText("Alpha health");
+    await expect(page.locator("#sidebar-tab-health")).toBeHidden();
+    await expect(page.locator("#health-panel")).toBeHidden();
+    await expect(page.locator("#sidebar-tab-outline")).toHaveAttribute("aria-selected", "true");
   });
 
   test("Git review stays project-scoped and returns to the active document mode", async ({ page }) => {
@@ -292,15 +288,20 @@ test.describe("Document inspector ownership", () => {
 
     await page.locator(".open-tab", { hasText: "Alpha" }).locator(".open-tab-main").click();
     await page.locator("#sidebar-tab-git").click();
-    await page.locator(".git-file-row", { hasText: "Alpha.aimd" }).locator("[data-git-action='select']").click();
+    await page.locator(".git-file-row[data-path='Alpha.aimd']").locator("[data-git-action='select']").click();
 
     await expect(page.locator("#git-diff-view")).toBeVisible();
-    await expect(page.locator(".git-diff-scope")).toContainText("Git review");
-    await expect(page.locator("#git-diff-back")).toContainText("返回当前文档：Alpha");
+    await expect(page.locator(".git-diff-scope")).toHaveCount(0);
+    await expect(page.locator("#git-diff-back")).toHaveCount(0);
+    await expect(page.locator("#doc-title")).toHaveText("Alpha.aimd");
+    await expect(page.locator(".open-tab.is-active")).toContainText("Git Diff");
     await expect(page.locator(".open-tab.is-active")).toContainText("Alpha");
     await expect(page.locator(".git-diff-line.is-add")).toContainText("+# Alpha reviewed");
+    await expect(page.locator("#sidebar-tab-assets")).toBeHidden();
+    await page.locator("#sidebar-tab-outline").click();
+    await expect(page.locator("#outline-list")).toContainText("Git Diff 没有文档大纲");
 
-    await page.locator("#git-diff-back").click();
+    await page.locator(".open-tab", { hasText: "Alpha" }).first().locator(".open-tab-main").click();
     await expect(page.locator("#doc-title")).toHaveText("Alpha");
     await expect(page.locator("#mode-read")).toHaveClass(/active/);
   });

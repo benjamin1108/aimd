@@ -4,9 +4,77 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>AIMD 设置</title>
+    <style>
+      .settings-preboot {
+        box-sizing: border-box;
+        display: grid;
+        align-content: center;
+        min-height: 100vh;
+        padding: 32px;
+        background: #f7f4ee;
+        color: #201a14;
+        font: 14px/1.5 -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      }
+      .settings-preboot h1 {
+        margin: 0 0 8px;
+        font-size: 17px;
+        font-weight: 650;
+      }
+      .settings-preboot p {
+        margin: 0;
+        max-width: 520px;
+        color: #6f655c;
+      }
+      .settings-preboot--error p + p {
+        margin-top: 8px;
+        color: #9b342e;
+        overflow-wrap: anywhere;
+      }
+    </style>
+    <script>
+      (() => {
+        const messageFor = (reason) => {
+          if (!reason) return "未知错误";
+          if (typeof reason === "string") return reason;
+          if (reason instanceof Error) return reason.message || reason.name;
+          return String(reason);
+        };
+        const renderFailure = (reason) => {
+          const root = document.getElementById("settings-app");
+          if (!root || root.dataset.booted === "true") return;
+          root.innerHTML = `
+            <main class="settings-preboot settings-preboot--error" role="alert">
+              <h1>设置加载失败</h1>
+              <p>设置窗口初始化时遇到错误，请关闭后重新打开。错误信息已写入控制台。</p>
+              <p data-settings-boot-error></p>
+            </main>
+          `;
+          const message = root.querySelector("[data-settings-boot-error]");
+          if (message) message.textContent = messageFor(reason);
+        };
+        window.__AIMD_SETTINGS_FATAL__ = renderFailure;
+        window.addEventListener("error", (event) => {
+          window.setTimeout(() => renderFailure(event.error || event.message), 0);
+        });
+        window.addEventListener("unhandledrejection", (event) => {
+          window.setTimeout(() => renderFailure(event.reason), 0);
+        });
+        window.setTimeout(() => {
+          const root = document.getElementById("settings-app");
+          if (root && root.dataset.booted !== "true" && !root.querySelector(".settings-shell")) {
+            renderFailure("设置页启动超时");
+          }
+        }, 8000);
+      })();
+    </script>
   </head>
   <body>
-    <div id="settings-app"></div>
+    <div id="settings-app">
+      <main class="settings-preboot" aria-live="polite">
+        <h1>AIMD 设置</h1>
+        <p>正在加载设置...</p>
+      </main>
+    </div>
     <script type="module" src="/src/settings/main.ts"></script>
   </body>
 </html>

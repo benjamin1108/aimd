@@ -1,6 +1,6 @@
 import { test, expect, Page } from "@playwright/test";
 
-type GitMode = "none" | "repo" | "conflict";
+type GitMode = "none" | "repo" | "crowded" | "clean" | "conflict";
 
 async function installGitWorkspaceMock(page: Page, initialMode: GitMode) {
   await page.addInitScript((mode: GitMode) => {
@@ -61,6 +61,33 @@ async function installGitWorkspaceMock(page: Page, initialMode: GitMode) {
           }],
         };
       }
+      if (runtime.mode === "clean") {
+        return {
+          isRepo: true,
+          root,
+          branch: "main",
+          upstream: "origin/main",
+          ahead: 0,
+          behind: 0,
+          clean: true,
+          conflicted: false,
+          files: [],
+        };
+      }
+      const files = [
+        { path: "apps/foo.ts", staged: "modified", unstaged: "none", kind: "modified" },
+        { path: "docs/draft.md", staged: "none", unstaged: "untracked", kind: "untracked" },
+      ];
+      if (runtime.mode === "crowded") {
+        for (let index = 1; index <= 30; index += 1) {
+          files.push({
+            path: `docs/archive/2026/release-note-${String(index).padStart(2, "0")}.md`,
+            staged: index === 1 ? "modified" : "none",
+            unstaged: index === 1 ? "none" : "modified",
+            kind: "modified",
+          });
+        }
+      }
       return {
         isRepo: true,
         root,
@@ -70,10 +97,7 @@ async function installGitWorkspaceMock(page: Page, initialMode: GitMode) {
         behind: 2,
         clean: false,
         conflicted: false,
-        files: [
-          { path: "apps/foo.ts", staged: "modified", unstaged: "none", kind: "modified" },
-          { path: "docs/draft.md", staged: "none", unstaged: "untracked", kind: "untracked" },
-        ],
+        files,
       };
     };
     const handlers: Record<string, (a: Args) => unknown> = {
@@ -158,23 +182,40 @@ test.describe("Git workspace panel", () => {
     await expect(page.locator("#git-panel")).toBeVisible();
     await expect(page.locator(".git-branch")).toContainText("main");
     await expect(page.locator(".git-meta")).toContainText("origin/main ↑1 ↓2");
-    await expect(page.locator(".git-file-row", { hasText: "apps/foo.ts" })).toBeVisible();
-    await expect(page.locator(".git-file-row", { hasText: "docs/draft.md" })).toContainText("NEW");
+    const branchBox = await page.locator(".git-branch").boundingBox();
+    const syncBox = await page.locator(".git-sync-actions").boundingBox();
+    expect(branchBox && syncBox).toBeTruthy();
+    expect(syncBox!.y).toBeGreaterThanOrEqual(branchBox!.y + branchBox!.height - 1);
+    await expect(page.locator(".git-file-row[data-path='apps/foo.ts']")).toBeVisible();
+    await expect(page.locator(".git-file-row[data-path='apps/foo.ts'] .git-file-name")).toHaveText("foo.ts");
+    await expect(page.locator(".git-file-row[data-path='apps/foo.ts'] .git-file-dir")).toHaveText("apps");
+    await expect(page.locator(".git-file-row[data-path='docs/draft.md']")).toContainText("NEW");
+    await expect(page.locator(".git-file-row[data-path='docs/draft.md'] .git-mini-btn")).toHaveText(["s", "u"]);
+    await expect(page.locator(".git-file-row[data-path='docs/draft.md'] .git-file-status")).toBeVisible();
+    const columns = await page.locator(".git-file-row[data-path='docs/draft.md']").evaluate((el) => getComputedStyle(el).gridTemplateColumns);
+    expect(columns).toContain("64px");
     await expect(page.locator("#git-panel")).not.toContainText("diff --git");
     await expect(page.locator("#git-panel")).not.toContainText("??");
 
-    await page.locator(".git-file-row", { hasText: "apps/foo.ts" }).locator("[data-git-action='select']").click();
+    await page.locator(".git-file-row[data-path='apps/foo.ts']").locator("[data-git-action='select']").click();
     await expect(page.locator("#git-diff-view")).toBeVisible();
     await expect(page.locator("#doc-toolbar")).toBeHidden();
     await expect(page.locator("#format-toolbar")).toBeHidden();
-    await expect(page.locator("#git-diff-back")).toBeDisabled();
-    await expect(page.locator(".git-diff-title")).toContainText("apps/foo.ts");
+    await expect(page.locator("#git-diff-back")).toHaveCount(0);
+    await expect(page.locator(".open-tab.is-active")).toContainText("foo.ts");
+    await expect(page.locator(".open-tab.is-active")).toContainText("Git Diff");
+    await expect(page.locator("#doc-title")).toHaveText("foo.ts");
+    await expect(page.locator("#doc-path")).toHaveText("Git Diff · apps");
+    await expect(page.locator(".git-diff-scope")).toHaveCount(0);
     await expect(page.locator(".git-diff-line.is-add")).toContainText("+changed line");
     await expect(page.locator(".git-diff-line.is-del")).toContainText("-old line");
     await expect(page.locator(".git-diff-line.is-hunk")).toContainText("@@");
     await expect(page.locator(".git-diff-line.is-meta").first()).toContainText("diff --git");
     const overflows = await page.locator(".git-diff-code").first().evaluate((el) => el.scrollWidth > el.clientWidth);
     expect(overflows).toBeTruthy();
+
+    await page.locator(".git-file-row[data-path='apps/foo.ts']").locator("[data-git-action='select']").click();
+    await expect(page.locator(".open-tab", { hasText: "foo.ts" })).toHaveCount(1);
   });
 
   test("stages, unstages, and commits through fixed commands", async ({ page }) => {
@@ -183,8 +224,10 @@ test.describe("Git workspace panel", () => {
 
     await page.locator("#empty-open-workspace").click();
     await page.locator("#sidebar-tab-git").click();
-    await page.locator(".git-file-row", { hasText: "docs/draft.md" }).locator("[data-git-action='stage-file']").click();
-    await page.locator(".git-file-row", { hasText: "apps/foo.ts" }).locator("[data-git-action='unstage-file']").click();
+    await page.locator(".git-file-row[data-path='docs/draft.md']").hover();
+    await page.locator(".git-file-row[data-path='docs/draft.md']").locator("[data-git-action='stage-file']").click();
+    await page.locator(".git-file-row[data-path='apps/foo.ts']").hover();
+    await page.locator(".git-file-row[data-path='apps/foo.ts']").locator("[data-git-action='unstage-file']").click();
     await expect(page.locator("#git-commit-submit")).toBeDisabled();
     await page.locator("#git-commit-message").fill("Update docs");
     await expect(page.locator("#git-commit-submit")).toBeEnabled();
@@ -195,6 +238,26 @@ test.describe("Git workspace panel", () => {
     expect(calls.some((call: any) => call.cmd === "git_unstage_file" && call.args.path === "apps/foo.ts")).toBeTruthy();
     expect(calls.some((call: any) => call.cmd === "git_commit" && call.args.message === "Update docs")).toBeTruthy();
     expect(calls.filter((call: any) => call.cmd === "get_git_repo_status").length).toBeGreaterThan(1);
+  });
+
+  test("keeps commit composer reachable when many files changed", async ({ page }) => {
+    await installGitWorkspaceMock(page, "crowded");
+    await page.setViewportSize({ width: 1400, height: 560 });
+    await page.goto("/");
+
+    await page.locator("#empty-open-workspace").click();
+    await page.locator("#sidebar-tab-git").click();
+    await expect(page.locator(".git-file-row")).toHaveCount(32);
+
+    const listScrolls = await page.locator(".git-file-list").evaluate((el) => el.scrollHeight > el.clientHeight);
+    expect(listScrolls).toBeTruthy();
+    const commitBefore = await page.locator(".git-commit").boundingBox();
+    await page.locator(".git-file-list").evaluate((el) => { el.scrollTop = el.scrollHeight; });
+    await expect(page.locator(".git-file-row[data-path='docs/archive/2026/release-note-30.md']")).toBeVisible();
+    const commitAfter = await page.locator(".git-commit").boundingBox();
+    expect(commitBefore && commitAfter).toBeTruthy();
+    expect(Math.abs(commitBefore!.y - commitAfter!.y)).toBeLessThan(1);
+    await expect(page.locator("#git-commit-message")).toBeVisible();
   });
 
   test("disables commit, pull, and push while conflicted", async ({ page }) => {
@@ -210,7 +273,7 @@ test.describe("Git workspace panel", () => {
     await expect(page.locator("#git-commit-submit")).toBeDisabled();
   });
 
-  test("returns from diff to document and document tree clicks restore document view", async ({ page }) => {
+  test("opens Git diff as a readonly tab without taking over the document tab", async ({ page }) => {
     await installGitWorkspaceMock(page, "repo");
     await page.goto("/");
 
@@ -218,16 +281,45 @@ test.describe("Git workspace panel", () => {
     await page.locator(".workspace-row", { hasText: "Readme.aimd" }).click();
     await expect(page.locator("#reader")).toContainText("Document body");
     await page.locator("#sidebar-tab-git").click();
-    await page.locator(".git-file-row", { hasText: "apps/foo.ts" }).locator("[data-git-action='select']").click();
+    await page.locator(".git-file-row[data-path='apps/foo.ts']").locator("[data-git-action='select']").click();
     await expect(page.locator("#git-diff-view")).toBeVisible();
-    await page.locator("#git-diff-back").click();
+    await expect(page.locator(".open-tab")).toHaveCount(2);
+    await expect(page.locator(".open-tab.is-active")).toContainText("Git Diff");
+    await page.locator(".open-tab.is-active .open-tab-close").click();
     await expect(page.locator("#reader")).toBeVisible();
+    await expect(page.locator(".open-tab.is-active")).toContainText("Readme");
 
-    await page.locator(".git-file-row", { hasText: "docs/draft.md" }).locator("[data-git-action='select']").click();
+    await page.locator(".git-file-row[data-path='apps/foo.ts']").locator("[data-git-action='select']").click();
+    await expect(page.locator(".open-tab.is-active")).toContainText("foo.ts");
+    await page.locator(".open-tab", { hasText: "Readme" }).locator(".open-tab-main").click();
+    await expect(page.locator("#reader")).toBeVisible();
+    await expect(page.locator("#git-diff-view")).toBeHidden();
+
+    await page.locator(".git-file-row[data-path='docs/draft.md']").locator("[data-git-action='select']").click();
     await expect(page.locator("#git-diff-view")).toBeVisible();
     await page.locator(".workspace-row", { hasText: "Readme.aimd" }).click();
     await expect(page.locator("#reader")).toBeVisible();
     await expect(page.locator("#git-diff-view")).toBeHidden();
+
+    await page.locator(".git-file-row[data-path='apps/foo.ts']").locator("[data-git-action='select']").click();
+    await expect(page.locator(".open-tab.is-active")).toContainText("foo.ts");
+    await page.locator(".open-tab.is-active .open-tab-close").click();
+    await expect(page.locator(".open-tab", { hasText: "Readme" })).toBeVisible();
+  });
+
+  test("keeps an existing Git diff tab open when the file no longer has changes", async ({ page }) => {
+    await installGitWorkspaceMock(page, "repo");
+    await page.goto("/");
+
+    await page.locator("#empty-open-workspace").click();
+    await page.locator("#sidebar-tab-git").click();
+    await page.locator(".git-file-row[data-path='apps/foo.ts']").locator("[data-git-action='select']").click();
+    await expect(page.locator(".open-tab.is-active")).toContainText("foo.ts");
+
+    await page.evaluate(() => (window as any).__aimdGitMock.setMode("clean"));
+    await page.locator("[data-git-action='refresh']").click();
+    await expect(page.locator(".open-tab.is-active")).toContainText("foo.ts");
+    await expect(page.locator("#git-diff-view")).toContainText("该文件已无待 review 变更");
   });
 
   test("collapses project and inspector rails while keeping their widths independent", async ({ page }) => {

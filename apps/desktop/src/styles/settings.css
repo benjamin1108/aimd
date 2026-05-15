@@ -213,8 +213,8 @@
   min-width: 0;
 }
 
-/* API Key 显隐：input 自身在 password / text 之间切换；上面叠一层 prefix + ••• + suffix
-   浮层（仅在未聚焦时可见），让用户在不揭示明文的前提下确认"这是哪一把 key"。
+/* API Key 显隐：input 自身在 password / text 之间切换；隐藏态叠一层 prefix + suffix
+   浮层，让用户在不揭示明文的前提下确认"这是哪一把 key"。
    pointer-events: none 让点击穿透到 input。 */
 .api-key-wrap {
   position: relative;
@@ -226,6 +226,12 @@
   font-family: var(--font-mono);
   font-size: 12.5px;
   letter-spacing: 0;
+}
+
+.api-key-wrap[data-state="masked"] .api-key-input {
+  color: transparent;
+  -webkit-text-fill-color: transparent;
+  caret-color: transparent;
 }
 
 .api-key-mask {

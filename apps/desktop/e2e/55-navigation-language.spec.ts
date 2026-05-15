@@ -230,7 +230,7 @@ test.describe("Phase 4 navigation language and stable status", () => {
     await expect(page.locator("#mode-source")).toHaveText("Markdown");
 
     await page.locator("#more-menu-toggle").click();
-    await expect(page.locator("#health-check")).toContainText("检查当前文档资源");
+    await expect(page.locator("#health-check")).toBeHidden();
     await expect(page.locator("#close")).toContainText("关闭当前标签页");
     await expect(page.locator("#more-menu")).toContainText("检查更新");
     await expect(page.locator("#more-menu")).toContainText("关于 AIMD");
@@ -292,11 +292,13 @@ test.describe("Phase 4 navigation language and stable status", () => {
     await expect(page.locator("[data-git-action='push']")).toHaveText("推送");
     await expect(page.locator("#git-panel")).not.toContainText("Changes");
 
-    await page.locator(".git-file-row", { hasText: "src/app.ts" }).locator("[data-git-action='select']").click();
+    await page.locator(".git-file-row[data-path='src/app.ts']").locator("[data-git-action='select']").click();
     await expect(page.locator("#git-diff-view")).toBeVisible();
-    await expect(page.locator(".git-diff-scope")).toHaveText("Git review · 项目变更");
-    await expect(page.locator("#git-diff-back")).toContainText("返回当前文档：Report");
-    await expect(page.locator("#doc-title")).toHaveText("Report");
+    await expect(page.locator(".git-diff-scope")).toHaveCount(0);
+    await expect(page.locator("#git-diff-back")).toHaveCount(0);
+    await expect(page.locator(".open-tab.is-active")).toContainText("Git Diff");
+    await expect(page.locator("#doc-title")).toHaveText("app.ts");
+    await expect(page.locator("#doc-path")).toHaveText("Git Diff · src");
   });
 
   test("covers empty states for no project, project without tabs, and tabs without project", async ({ page }) => {

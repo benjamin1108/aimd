@@ -2,7 +2,7 @@
 
 .doc-panel-tabs {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr)) auto;
+  grid-template-columns: repeat(var(--doc-panel-tab-count, 1), minmax(0, 1fr)) auto;
   align-items: center;
   gap: 5px;
   padding: 0 6px 6px;
@@ -14,7 +14,6 @@
 }
 
 #outline-section.has-git-tab .doc-panel-tabs {
-  grid-template-columns: repeat(4, minmax(0, 1fr)) auto;
   gap: 4px;
 }
 
@@ -56,14 +55,20 @@
   min-height: 0;
 }
 
+.git-panel {
+  height: 100%;
+}
+
 .git-content {
   display: flex;
   flex-direction: column;
   gap: 8px;
+  height: 100%;
+  overflow: hidden;
   font-size: 12px;
 }
 
-.git-toolbar,
+.git-top,
 .git-sync-actions,
 .git-bulk-actions,
 .git-commit,
@@ -73,8 +78,28 @@
   gap: 6px;
 }
 
-.git-toolbar {
-  justify-content: space-between;
+.git-top {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 4px 8px;
+  align-items: center;
+}
+
+.git-top .git-icon-btn {
+  justify-self: end;
+}
+
+.git-top .git-meta {
+  min-width: 0;
+}
+
+.git-top .git-sync-actions {
+  justify-self: end;
+}
+
+.git-sync-actions .git-action-btn {
+  min-width: 40px;
+  padding: 0 6px;
 }
 
 .git-branch {
@@ -140,13 +165,20 @@
 
 .git-file-list {
   display: flex;
+  flex: 1 1 auto;
   flex-direction: column;
   gap: 2px;
+  min-height: 0;
+  overflow-y: auto;
+  padding-right: 2px;
+  scrollbar-width: thin;
+  scrollbar-color: var(--hairline-strong) transparent;
 }
 
 .git-file-row {
+  position: relative;
   display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
+  grid-template-columns: 64px minmax(0, 1fr);
   align-items: center;
   min-height: 30px;
   border-radius: 6px;
@@ -156,23 +188,34 @@
   background: rgba(31, 22, 11, 0.07);
 }
 
+.git-file-status {
+  display: grid;
+  grid-template-columns: 28px 17px 17px;
+  align-items: center;
+  gap: 1px;
+  min-width: 0;
+}
+
 .git-file-row.is-conflicted .git-file-badge {
   color: var(--danger, #a33);
 }
 
 .git-file-main {
-  display: grid;
-  grid-template-columns: 46px minmax(0, 1fr);
+  display: flex;
   align-items: center;
+  justify-self: stretch;
   min-width: 0;
-  height: 30px;
+  min-height: 34px;
   text-align: left;
 }
 
 .git-file-badge {
+  overflow: hidden;
   color: var(--ink-muted);
   font: 700 10px/1 var(--font-mono);
   text-align: center;
+  text-overflow: clip;
+  white-space: nowrap;
 }
 
 .git-file-badge[data-kind="conflicted"] {
@@ -180,18 +223,47 @@
   font-size: 9px;
 }
 
-.git-file-path {
+.git-file-text {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: 1px;
+  padding: 3px 0;
+}
+
+.git-file-name,
+.git-file-dir {
   overflow: hidden;
-  color: var(--ink);
-  font: 12px/1.2 var(--font-mono);
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
-.git-file-actions {
-  display: flex;
-  gap: 3px;
-  padding-right: 3px;
+.git-file-name {
+  color: var(--ink);
+  font: 12px/1.2 var(--font-mono);
+}
+
+.git-file-dir {
+  color: var(--ink-muted);
+  font: 10.5px/1.15 var(--font-mono);
+}
+
+.git-file-status .git-mini-btn {
+  display: grid;
+  place-items: center;
+  min-width: 17px;
+  width: 17px;
+  min-height: 20px;
+  padding: 0;
+  background: rgba(255, 253, 248, 0.82);
+  box-shadow: none;
+  color: var(--ink-muted);
+  font: 700 10px/1 var(--font-mono);
+}
+
+.git-file-status .git-mini-btn:hover:not(:disabled) {
+  background: rgba(255, 255, 255, 0.92);
+  color: var(--ink);
 }
 
 .git-commit-input {

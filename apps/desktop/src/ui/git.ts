@@ -6,6 +6,7 @@ import { escapeAttr, escapeHTML } from "../util/escape";
 import { setStatus } from "./chrome";
 import { renderDocPanelTabs } from "./doc-panel";
 import { openGitDiffView, refreshCurrentGitDiff, showDocumentView } from "./git-diff";
+import { gitPathDirectoryLabel, splitGitPath } from "./git-path";
 
 let refreshTimer: number | null = null;
 
@@ -57,16 +58,25 @@ function renderFile(file: GitChangedFile): string {
   const canStage = file.unstaged !== "none" || file.kind === "untracked";
   const canUnstage = file.staged !== "none";
   const [badge, label] = fileBadge(file);
+  const path = splitGitPath(file.path);
+  const originalPath = file.originalPath ? splitGitPath(file.originalPath) : null;
+  const directory = gitPathDirectoryLabel(path.directory);
+  const meta = originalPath
+    ? `${gitPathDirectoryLabel(originalPath.directory)}/${originalPath.fileName} → ${directory}`
+    : directory;
   return `
-    <div class="git-file-row ${selected ? "is-active" : ""} ${file.kind === "conflicted" ? "is-conflicted" : ""}">
-      <button class="git-file-main" type="button" data-git-action="select" data-path="${escapeAttr(file.path)}" title="${escapeAttr(`${label}: ${file.path}`)}">
+    <div class="git-file-row ${selected ? "is-active" : ""} ${file.kind === "conflicted" ? "is-conflicted" : ""}" data-path="${escapeAttr(file.path)}">
+      <div class="git-file-status">
         <span class="git-file-badge" data-kind="${escapeAttr(file.kind)}">${escapeHTML(badge)}</span>
-        <span class="git-file-path">${escapeHTML(file.path)}</span>
-      </button>
-      <div class="git-file-actions">
-        <button class="git-mini-btn" type="button" data-git-action="stage-file" data-path="${escapeAttr(file.path)}" ${!canStage || state.git.action ? "disabled" : ""}>暂存</button>
-        <button class="git-mini-btn" type="button" data-git-action="unstage-file" data-path="${escapeAttr(file.path)}" ${!canUnstage || state.git.action ? "disabled" : ""}>取消暂存</button>
+        <button class="git-mini-btn" type="button" data-git-action="stage-file" data-path="${escapeAttr(file.path)}" title="暂存" aria-label="暂存 ${escapeAttr(file.path)}" ${!canStage || state.git.action ? "disabled" : ""}>s</button>
+        <button class="git-mini-btn" type="button" data-git-action="unstage-file" data-path="${escapeAttr(file.path)}" title="取消暂存" aria-label="取消暂存 ${escapeAttr(file.path)}" ${!canUnstage || state.git.action ? "disabled" : ""}>u</button>
       </div>
+      <button class="git-file-main" type="button" data-git-action="select" data-path="${escapeAttr(file.path)}" title="${escapeAttr(`${label}: ${file.path}`)}">
+        <span class="git-file-text">
+          <span class="git-file-name">${escapeHTML(path.fileName)}</span>
+          <span class="git-file-dir">${escapeHTML(meta)}</span>
+        </span>
+      </button>
     </div>`;
 }
 
@@ -87,21 +97,21 @@ export function renderGitPanel() {
   const canCommit = !disabled && hasStagedChanges(status);
   const canSync = !disabled && Boolean(status.upstream);
   gitContentEl().innerHTML = `
-    <div class="git-toolbar">
+    <div class="git-top">
       <div class="git-branch">
         <strong>${escapeHTML(status.branch || "HEAD")}</strong>
         <span>${status.clean ? "干净" : `${status.files.length} 个变更`}</span>
       </div>
       <button class="git-icon-btn" type="button" data-git-action="refresh" ${state.git.loading ? "disabled" : ""}>刷新</button>
+      <div class="git-meta">${upstream}</div>
+      <div class="git-sync-actions">
+        <button class="git-action-btn" type="button" data-git-action="pull" ${!canSync ? "disabled" : ""}>拉取</button>
+        <button class="git-action-btn" type="button" data-git-action="push" ${!canSync ? "disabled" : ""}>推送</button>
+      </div>
     </div>
-    <div class="git-meta">${upstream}</div>
     ${status.error ? `<div class="git-error">${escapeHTML(status.error)}</div>` : ""}
     ${state.git.error ? `<div class="git-error">${escapeHTML(state.git.error)}</div>` : ""}
     ${status.conflicted ? `<div class="git-warning">存在冲突文件，请先使用外部 Git 工具或命令行解决。</div>` : ""}
-    <div class="git-sync-actions">
-      <button class="git-action-btn" type="button" data-git-action="pull" ${!canSync ? "disabled" : ""}>拉取</button>
-      <button class="git-action-btn" type="button" data-git-action="push" ${!canSync ? "disabled" : ""}>推送</button>
-    </div>
     <div class="git-section-head">
       <span>项目变更</span>
       <span>${escapeHTML(summarize(status) || "干净")}</span>
@@ -110,13 +120,13 @@ export function renderGitPanel() {
       <button class="git-action-btn" type="button" data-git-action="stage-all" ${disabled || status.clean ? "disabled" : ""}>全部暂存</button>
       <button class="git-action-btn" type="button" data-git-action="unstage-all" ${disabled || !hasStagedChanges(status) ? "disabled" : ""}>全部取消暂存</button>
     </div>
-    <div class="git-file-list">
-      ${status.files.length ? status.files.map(renderFile).join("") : `<div class="git-empty">没有待提交修改</div>`}
-    </div>
     <div class="git-section-head"><span>提交</span></div>
     <div class="git-commit">
       <input id="git-commit-message" class="git-commit-input" type="text" placeholder="提交说明" autocomplete="off" ${canCommit ? "" : "disabled"} />
       <button id="git-commit-submit" class="git-action-btn" type="button" data-git-action="commit" disabled>提交</button>
+    </div>
+    <div class="git-file-list">
+      ${status.files.length ? status.files.map(renderFile).join("") : `<div class="git-empty">没有待提交修改</div>`}
     </div>
   `;
   bindCommitInput(canCommit);
@@ -148,6 +158,7 @@ export async function refreshGitStatus(silent = false) {
     if (!status.isRepo) {
       state.sidebarDocTab = "outline";
       state.git.selectedPath = "";
+      state.git.diffTabs = [];
       state.git.diffView = { path: "", diff: null, loading: false, error: "" };
       if (state.mainView === "git-diff") showDocumentView();
     } else if (!status.files.some((file) => file.path === state.git.selectedPath)) {
@@ -176,6 +187,7 @@ export function resetGitState() {
   state.git = {
     isRepo: false,
     status: null,
+    diffTabs: [],
     diffView: { path: "", diff: null, loading: false, error: "" },
     loading: false,
     action: false,

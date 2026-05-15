@@ -16,6 +16,12 @@ import { setupGitIntegration } from "./git-integration";
 import { settingsTemplateHTML } from "./template";
 import { bindSelectionBoundary } from "../ui/selection";
 
+declare global {
+  interface Window {
+    __AIMD_SETTINGS_FATAL__?: (reason: unknown) => void;
+  }
+}
+
 const CUSTOM_MODEL_VALUE = "__custom__";
 type ModelConnectionTestResult = {
   ok: boolean;
@@ -26,11 +32,16 @@ function modelOptionsForProvider(provider: ModelProvider) { return MODEL_OPTIONS
 function isKnownModel(provider: ModelProvider, model: string) { return MODEL_OPTIONS[provider].some((o) => o.value === model); }
 function customModelValue() { return CUSTOM_MODEL_VALUE; }
 
-const root = document.querySelector<HTMLDivElement>("#settings-app")!;
+const root = document.querySelector<HTMLDivElement>("#settings-app");
+if (!root) throw new Error("设置页缺少 #settings-app 挂载点");
 root.innerHTML = settingsTemplateHTML();
 bindSelectionBoundary("settings");
 
-const $ = <T extends HTMLElement>(selector: string) => root.querySelector<T>(selector)!;
+const $ = <T extends HTMLElement>(selector: string) => {
+  const el = root.querySelector<T>(selector);
+  if (!el) throw new Error(`设置页模板缺少 ${selector}`);
+  return el;
+};
 
 const formEl = $<HTMLFormElement>("#settings-form");
 const providerEl = $<HTMLSelectElement>("#provider");
@@ -83,25 +94,34 @@ let webClipModelDraft: Record<ModelProvider, string> = {
 let formatConfig: FormatSettings = { ...DEFAULT_FORMAT_SETTINGS };
 let uiConfig: UiSettings = { ...DEFAULT_UI_SETTINGS };
 
-function switchTab(sectionId: string) {
+function normalizeSectionId(sectionId: string | undefined): string {
+  if (!sectionId) return "general";
+  for (const sec of sections) {
+    if (sec.dataset.section === sectionId) return sectionId;
+  }
+  return "general";
+}
+
+function switchTab(sectionId: string | undefined) {
+  const targetSectionId = normalizeSectionId(sectionId);
   navItems.forEach((btn) => {
-    const active = btn.dataset.section === sectionId;
+    const active = btn.dataset.section === targetSectionId;
     btn.classList.toggle("is-active", active);
     btn.setAttribute("aria-selected", String(active));
   });
   sections.forEach((sec) => {
-    const active = sec.dataset.section === sectionId;
+    const active = sec.dataset.section === targetSectionId;
     sec.classList.toggle("is-active", active);
     sec.hidden = !active;
   });
-  resetModelBtn.hidden = sectionId !== "model";
-  testConnectionBtn.disabled = testingConnection || sectionId !== "model";
-  if (sectionId === "git") void gitIntegration.refresh();
+  resetModelBtn.hidden = targetSectionId !== "model";
+  testConnectionBtn.disabled = testingConnection || targetSectionId !== "model";
+  if (targetSectionId === "git") void gitIntegration.refresh();
 }
 
 navItems.forEach((btn) => {
   btn.addEventListener("click", () => {
-    switchTab(btn.dataset.section!);
+    switchTab(btn.dataset.section);
   });
 });
 
@@ -289,15 +309,14 @@ async function closeWindow() {
 function maskedDisplay(value: string): string {
   const v = value.trim();
   if (!v) return "";
-  if (v.length <= 8) return "•".repeat(Math.min(8, v.length));
-  return `${v.slice(0, 4)}${"•".repeat(Math.min(8, v.length - 8))}${v.slice(-4)}`;
+  if (v.length <= 8) return "已隐藏";
+  return `${v.slice(0, 4)}…${v.slice(-4)}`;
 }
 
 function refreshApiKeyMask() {
-  const focused = document.activeElement === apiKeyEl;
   const hasValue = apiKeyEl.value.trim().length > 0;
   apiKeyEl.type = revealApiKey ? "text" : "password";
-  const showOverlay = !revealApiKey && hasValue && !focused;
+  const showOverlay = !revealApiKey && hasValue;
   apiKeyWrapEl.dataset.state = showOverlay ? "masked" : "visible";
   apiKeyMaskEl.textContent = showOverlay ? maskedDisplay(apiKeyEl.value) : "";
 }
@@ -497,4 +516,11 @@ formEl.addEventListener("submit", async (event) => {
   }
 });
 
-void bootstrap();
+bootstrap()
+  .then(() => {
+    root.dataset.booted = "true";
+  })
+  .catch((err) => {
+    console.error("settings bootstrap failed", err);
+    window.__AIMD_SETTINGS_FATAL__?.(err);
+  });

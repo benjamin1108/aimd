@@ -148,6 +148,7 @@ test.describe("Rust invoke_handler 命令注册校验", () => {
     "initial_draft_path",
     "open_settings_window",
     "close_current_window",
+    "destroy_current_window",
     "focus_doc_window",
     "register_window_path",
     "unregister_window_path",

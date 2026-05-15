@@ -243,7 +243,7 @@ test.describe("selection boundary and select-all shortcuts", () => {
     expectNoChrome(text);
 
     await clearSelection(page);
-    await page.locator(".git-file-row", { hasText: "apps/foo.ts" }).locator("[data-git-action='select']").click();
+    await page.locator(".git-file-row[data-path='apps/foo.ts']").locator("[data-git-action='select']").click();
     await expect(page.locator("#git-diff-view")).toBeVisible();
     await page.locator(".git-diff-scroll").click();
     await pressSelectAll(page);

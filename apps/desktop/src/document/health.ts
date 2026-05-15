@@ -63,9 +63,8 @@ export function showHealthReport(report: DocumentHealthReport, tabId = state.ope
   const tab = findTab(tabId);
   if (tab) tab.healthReport = report;
   if (!tab || tab.id !== state.openDocuments.activeTabId) return;
-  state.sidebarDocTab = "health";
-  renderHealthReport(report);
-  window.dispatchEvent(new CustomEvent("aimd-health-report-updated"));
+  if (state.sidebarDocTab === "health") state.sidebarDocTab = "outline";
+  if (!healthPanelEl().hidden) renderHealthReport(report);
 }
 
 export function renderActiveHealthReport() {

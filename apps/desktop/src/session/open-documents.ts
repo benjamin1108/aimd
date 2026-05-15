@@ -59,11 +59,14 @@ export function buildOpenDocumentsSessionSnapshot(): {
   syncActiveTabFromFacade();
   const tabs = state.openDocuments.tabs;
   if (tabs.length === 0) return null;
+  const activeDocumentId = tabs.some((tab) => tab.id === state.openDocuments.activeTabId)
+    ? state.openDocuments.activeTabId
+    : tabs[0]?.id ?? null;
 
   const drafts: PersistedOpenDocumentsSessionV2["drafts"] = [];
   const snapshot: PersistedOpenDocumentsSessionV2 = {
     schemaVersion: 2,
-    activeTabId: state.openDocuments.activeTabId,
+    activeTabId: activeDocumentId,
     tabs: tabs.map((tab) => {
       const scroll = { ...tab.scroll };
       const sourceSelection = { ...tab.sourceSelection };
@@ -110,7 +113,9 @@ export function buildOpenDocumentsSessionSnapshot(): {
     }),
     drafts,
   };
-  const activePath = state.doc?.path || tabs.find((tab) => tab.doc.path)?.doc.path || "";
+  const activePath = tabs.find((tab) => tab.id === activeDocumentId)?.doc.path
+    || tabs.find((tab) => tab.doc.path)?.doc.path
+    || "";
   return { snapshot, activePath };
 }
 

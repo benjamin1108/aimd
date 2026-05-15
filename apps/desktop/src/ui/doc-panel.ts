@@ -19,12 +19,13 @@ import {
 import { STORAGE_DOC_PANEL_COLLAPSED } from "../core/state";
 import type { SidebarDocTab } from "../core/types";
 import { activeTab, displayTabTitle } from "../document/open-document-state";
-import { renderActiveHealthReport } from "../document/health";
 
 export function setSidebarDocTab(tab: SidebarDocTab) {
   if (tab === "git" && !state.git.isRepo) {
     state.sidebarDocTab = "outline";
-  } else if ((tab === "assets" || tab === "health") && !state.doc) {
+  } else if (tab === "assets" && (!state.doc || state.mainView === "git-diff" || !state.uiSettings.showAssetPanel)) {
+    state.sidebarDocTab = "outline";
+  } else if (tab === "health") {
     state.sidebarDocTab = "outline";
   } else {
     state.sidebarDocTab = tab;
@@ -34,10 +35,16 @@ export function setSidebarDocTab(tab: SidebarDocTab) {
 
 export function renderDocPanelTabs() {
   const showGit = state.git.isRepo;
+  const inDiffView = state.mainView === "git-diff";
+  const showAssets = Boolean(state.doc && !inDiffView && state.uiSettings.showAssetPanel);
   const showSection = Boolean(state.doc || state.workspace || showGit);
-  const activeDocumentTab = activeTab();
+  const activeDocumentTab = inDiffView ? null : activeTab();
+  const activeDiffTab = inDiffView
+    ? state.git.diffTabs.find((tab) => tab.id === state.openDocuments.activeTabId) || null
+    : null;
   inspectorEl().hidden = !showSection;
   outlineSectionEl().hidden = !showSection;
+  outlineSectionEl().style.setProperty("--doc-panel-tab-count", String(1 + (showAssets ? 1 : 0) + (showGit ? 1 : 0)));
   sidebarWorkspaceDocResizerEl().hidden = true;
   outlineSectionEl().classList.toggle("is-collapsed", state.docPanelCollapsed);
   inspectorEl().classList.toggle("is-collapsed", state.docPanelCollapsed);
@@ -53,32 +60,36 @@ export function renderDocPanelTabs() {
   docPanelCollapseEl().setAttribute("aria-expanded", String(!state.docPanelCollapsed));
   docPanelCollapseEl().textContent = state.docPanelCollapsed ? "‹" : "›";
   docPanelCollapseEl().title = state.docPanelCollapsed ? "展开检查器" : "折叠检查器";
-  inspectorOwnerEl().textContent = activeDocumentTab
-    ? `当前文档 · ${displayTabTitle(activeDocumentTab.doc)}`
-    : "项目检查";
+  inspectorOwnerEl().textContent = activeDiffTab
+    ? `Git Diff · ${activeDiffTab.title}`
+    : activeDocumentTab
+      ? `当前文档 · ${displayTabTitle(activeDocumentTab.doc)}`
+      : "项目检查";
   gitTabEl().hidden = !showGit;
-  assetTabEl().hidden = !state.doc;
-  healthTabEl().hidden = !state.doc;
+  assetTabEl().hidden = !showAssets;
+  healthTabEl().hidden = true;
   outlineSectionEl().classList.toggle("has-git-tab", showGit);
   if (!showGit && state.sidebarDocTab === "git") state.sidebarDocTab = "outline";
-  if (!state.doc && (state.sidebarDocTab === "assets" || state.sidebarDocTab === "health")) state.sidebarDocTab = "outline";
+  if (state.sidebarDocTab === "assets" && !showAssets) state.sidebarDocTab = "outline";
+  if (state.sidebarDocTab === "health") state.sidebarDocTab = "outline";
 
   const active = state.sidebarDocTab;
   outlineTabEl().classList.toggle("is-active", active === "outline");
   assetTabEl().classList.toggle("is-active", active === "assets");
   gitTabEl().classList.toggle("is-active", active === "git");
-  healthTabEl().classList.toggle("is-active", active === "health");
+  healthTabEl().classList.remove("is-active");
   outlineTabEl().setAttribute("aria-selected", String(active === "outline"));
   assetTabEl().setAttribute("aria-selected", String(active === "assets"));
   gitTabEl().setAttribute("aria-selected", String(active === "git"));
-  healthTabEl().setAttribute("aria-selected", String(active === "health"));
+  healthTabEl().setAttribute("aria-selected", "false");
   outlinePanelEl().hidden = active !== "outline";
   assetPanelEl().hidden = active !== "assets";
   assetSectionEl().hidden = active !== "assets";
   gitPanelEl().hidden = active !== "git";
-  healthPanelEl().hidden = active !== "health";
-  if (active === "health") renderActiveHealthReport();
-  if (!state.doc && showSection) {
+  healthPanelEl().hidden = true;
+  if (inDiffView && active === "outline") {
+    outlineListEl().innerHTML = `<div class="empty-list">Git Diff 没有文档大纲</div>`;
+  } else if (!state.doc && showSection && active === "outline") {
     outlineListEl().innerHTML = `<div class="empty-list">未打开文档</div>`;
   }
 }
@@ -100,6 +111,5 @@ export function bindDocPanelTabs(onGitOpen: () => void) {
     onGitOpen();
   });
   healthTabEl().addEventListener("click", () => setSidebarDocTab("health"));
-  window.addEventListener("aimd-health-report-updated", renderDocPanelTabs);
   renderDocPanelTabs();
 }

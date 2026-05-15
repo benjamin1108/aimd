@@ -20,34 +20,6 @@
   min-height: 0;
 }
 
-.git-diff-head {
-  display: flex;
-  flex: 0 0 auto;
-  align-items: center;
-  gap: 10px;
-  min-width: 0;
-  border-bottom: 1px solid var(--hairline);
-  background: var(--bg-soft);
-  padding: 10px 14px;
-}
-
-.git-diff-title {
-  min-width: 0;
-  overflow: hidden;
-  color: var(--ink);
-  font: 600 13px/1.2 var(--font-mono);
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.git-diff-scope {
-  margin-bottom: 2px;
-  color: var(--ink-faint);
-  font: 700 10.5px/1.2 var(--font-mono);
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
-}
-
 .git-diff-scroll {
   flex: 1 1 auto;
   min-width: 0;

@@ -142,7 +142,9 @@ function renderStableStatus() {
   }
   const doc = state.doc;
   const tab = activeTab();
-  if (doc && (doc.hasGitConflicts || hasGitConflictMarkers(doc.markdown) || hasGitConflictMarkers(doc.html))) {
+  if (state.mainView === "git-diff") {
+    applyStatus("Git Diff 只读", "info");
+  } else if (doc && (doc.hasGitConflicts || hasGitConflictMarkers(doc.markdown) || hasGitConflictMarkers(doc.html))) {
     doc.hasGitConflicts = true;
     applyStatus("文档包含 Git 冲突，请解决后保存", "warn");
   } else if (tab?.recoveryState === "disk-changed") {
@@ -180,36 +182,47 @@ export function updateChrome() {
   starterActionsEl().hidden = Boolean(doc) || inDiffView;
   docActionsEl().hidden = !doc || inDiffView;
   docToolbarEl().hidden = !doc || inDiffView;
-  sidebarFootEl().hidden = !doc;
+  sidebarFootEl().hidden = !doc || inDiffView;
 
-  titleEl().textContent = doc ? displayDocTitle(doc) : "AIMD Desktop";
-  pathEl().textContent = doc
-    ? (doc.requiresAimdSave
-      ? `${doc.path ? formatPathHint(doc.path) : "Markdown 草稿"} · 保存时需选择格式`
-      : (doc.path || "未保存草稿 · 保存时选择 .md / .aimd"))
-    : "未打开文档";
-  renderDocumentStateBadges(doc);
+  if (inDiffView) {
+    const diffTab = state.git.diffTabs.find((tab) => tab.id === state.openDocuments.activeTabId) || null;
+    titleEl().textContent = diffTab?.title || "Git Diff";
+    pathEl().textContent = diffTab?.path ? `Git Diff · ${diffTab.directory}` : "Git Diff";
+    docStateBadgesEl().hidden = false;
+    docStateBadgesEl().innerHTML = `
+      <span class="doc-state-badge" data-tone="strong">Git Diff</span>
+      <span class="doc-state-badge" data-tone="info">只读</span>
+    `;
+  } else {
+    titleEl().textContent = doc ? displayDocTitle(doc) : "AIMD Desktop";
+    pathEl().textContent = doc
+      ? (doc.requiresAimdSave
+        ? `${doc.path ? formatPathHint(doc.path) : "Markdown 草稿"} · 保存时需选择格式`
+        : (doc.path || "未保存草稿 · 保存时选择 .md / .aimd"))
+      : "未打开文档";
+    renderDocumentStateBadges(doc);
+  }
   // 保存按钮在文档没有变化时禁用：用户的"按钮亮着但其实没活做"会变成第二种困惑。
   // 草稿状态(isDraft)即使 dirty=false 也要保留可点（点击会触发 saveDocumentAs 创建文件）。
-  const canSave = Boolean(doc && (doc.dirty || doc.isDraft));
+  const canSave = Boolean(!inDiffView && doc && (doc.dirty || doc.isDraft));
   saveEl().disabled = !canSave;
-  saveAsEl().disabled = !doc;
-  formatDocumentEl().disabled = !doc || !doc.markdown.trim();
-  packageLocalImagesEl().disabled = doc?.format !== "markdown";
-  healthCheckEl().disabled = !doc;
-  webImportEl().disabled = !doc;
-  exportMarkdownEl().disabled = !doc || doc.format === "markdown";
-  exportHtmlEl().disabled = !doc;
-  exportPdfEl().disabled = !doc;
-  findToggleEl().disabled = !doc;
-  newWindowEl().disabled = !doc;
-  closeEl().disabled = !doc;
+  saveAsEl().disabled = !doc || inDiffView;
+  formatDocumentEl().disabled = !doc || inDiffView || !doc.markdown.trim();
+  packageLocalImagesEl().disabled = inDiffView || doc?.format !== "markdown";
+  healthCheckEl().disabled = !doc || inDiffView;
+  webImportEl().disabled = !doc || inDiffView;
+  exportMarkdownEl().disabled = !doc || inDiffView || doc.format === "markdown";
+  exportHtmlEl().disabled = !doc || inDiffView;
+  exportPdfEl().disabled = !doc || inDiffView;
+  findToggleEl().disabled = !doc || inDiffView;
+  newWindowEl().disabled = !doc || inDiffView;
+  closeEl().disabled = !doc || inDiffView;
   // 顶部的主按钮统一显示「保存」：草稿状态下点击仍走 saveDocumentAs 创建文件，
   // 但视觉/语义上对用户都是"保存"动作（与 sidebar-foot 一致）。
   saveLabelEl().textContent = "保存";
-  modeReadEl().disabled = !doc;
-  modeEditEl().disabled = !doc;
-  modeSourceEl().disabled = !doc;
+  modeReadEl().disabled = !doc || inDiffView;
+  modeEditEl().disabled = !doc || inDiffView;
+  modeSourceEl().disabled = !doc || inDiffView;
 
   if (!doc) {
     assetSectionEl().hidden = true;
@@ -217,6 +230,7 @@ export function updateChrome() {
     sidebarOutlineAssetResizerEl().hidden = true;
     assetListEl().innerHTML = "";
     emptyEl().hidden = inDiffView;
+    if (state.statusTimer == null) renderStableStatus();
     if (!state.isBootstrappingSession) persistSessionSnapshot();
     return;
   }
@@ -229,7 +243,6 @@ export function updateChrome() {
   sidebarSaveEl().hidden = !draftWithContent;
 
   outlineSectionEl().hidden = false;
-  const hasAssets = doc.assets.length > 0;
   const showActiveAssetPanel = state.sidebarDocTab === "assets";
   const assetVisibilityChanged = assetSectionEl().hidden === showActiveAssetPanel;
   assetSectionEl().hidden = !showActiveAssetPanel;
@@ -239,7 +252,7 @@ export function updateChrome() {
     assetSectionEl().style.flex = "";
   }
 
-  if (hasAssets) {
+  if (doc.assets.length > 0) {
     assetListEl().innerHTML = doc.assets.map(assetItem).join("");
   } else {
     assetListEl().innerHTML = `<div class="empty-list">当前文档没有 AIMD 托管资源</div>`;

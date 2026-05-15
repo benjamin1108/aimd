@@ -22,6 +22,8 @@ const ASSET_DOC = {
 async function installMainMock(page: Page, showAssetPanel?: boolean) {
   await page.addInitScript(({ doc, showAssetPanel }) => {
     type Args = Record<string, unknown> | undefined;
+    const listeners = new Map<number, { event: string; handler: Function }>();
+    let nextListenerId = 1;
     const settings = showAssetPanel === undefined
       ? {
           ai: {
@@ -46,6 +48,11 @@ async function installMainMock(page: Page, showAssetPanel?: boolean) {
           ui: { showAssetPanel, debugMode: false },
         };
     const handlers: Record<string, (a: Args) => unknown> = {
+      "plugin:event|listen": (a) => {
+        const id = nextListenerId++;
+        listeners.set(id, { event: String((a as any)?.event ?? ""), handler: (a as any)?.handler });
+        return id;
+      },
       load_settings: () => settings,
       initial_draft_path: () => null,
       initial_open_path: () => null,
@@ -70,6 +77,11 @@ async function installMainMock(page: Page, showAssetPanel?: boolean) {
       transformCallback: (cb: Function) => cb,
     };
     (window as any).__TAURI_EVENT_PLUGIN_INTERNALS__ = { unregisterListener: () => {} };
+    (window as any).__aimdEmitTauriEvent = (event: string, payload: unknown) => {
+      for (const item of listeners.values()) {
+        if (item.event === event) item.handler({ event, payload });
+      }
+    };
   }, { doc: ASSET_DOC, showAssetPanel });
 }
 
@@ -116,9 +128,10 @@ test.describe("asset panel visibility preference", () => {
 
     await expect(page.locator("#reader img")).toHaveCount(1);
     await expect(page.locator("#asset-section")).toBeHidden();
+    await expect(page.locator("#sidebar-tab-assets")).toBeHidden();
 
     await page.locator("#more-menu-toggle").click();
-    await expect(page.locator("#health-check")).toBeEnabled();
+    await expect(page.locator("#health-check")).toBeHidden();
   });
 
   test("resource preference keeps the asset tab target-scoped", async ({ page }) => {
@@ -126,6 +139,7 @@ test.describe("asset panel visibility preference", () => {
     await page.goto("/");
     await page.locator("#empty-open").click();
 
+    await expect(page.locator("#sidebar-tab-assets")).toBeVisible();
     await expect(page.locator("#asset-section")).toBeHidden();
     await page.locator("#sidebar-tab-assets").click();
     await expect(page.locator("#asset-section")).toBeVisible();
@@ -145,6 +159,52 @@ test.describe("asset panel visibility preference", () => {
     await expect(page.locator("#outline-section")).toHaveClass(/is-collapsed/);
     await page.locator("#doc-panel-collapse").click();
     await expect(page.locator("#outline-section")).not.toHaveClass(/is-collapsed/);
+  });
+
+  test("settings update event toggles the resource tab immediately without blanking the page", async ({ page }) => {
+    await installMainMock(page, false);
+    await page.goto("/");
+    await page.locator("#empty-open").click();
+
+    await expect(page.locator("#reader img")).toHaveCount(1);
+    await expect(page.locator("#sidebar-tab-assets")).toBeHidden();
+
+    await page.evaluate(() => (window as any).__aimdEmitTauriEvent("aimd-settings-updated", {
+      ai: {
+        activeProvider: "dashscope",
+        providers: {
+          dashscope: { model: "qwen3.6-plus", apiKey: "", apiBase: "" },
+          gemini: { model: "gemini-3.1-flash-lite-preview", apiKey: "", apiBase: "" },
+        },
+      },
+      webClip: { llmEnabled: false, provider: "dashscope", model: "qwen3.6-plus", outputLanguage: "zh-CN" },
+      format: { provider: "dashscope", model: "qwen3.6-plus", outputLanguage: "zh-CN" },
+      ui: { showAssetPanel: true, debugMode: false },
+    }));
+
+    await expect(page.locator("#sidebar-tab-assets")).toBeVisible();
+    await expect(page.locator("#asset-section")).toBeHidden();
+    await page.locator("#sidebar-tab-assets").click();
+    await expect(page.locator("#asset-section")).toBeVisible();
+    await expect(page.locator("#asset-list")).toContainText("img-001");
+
+    await page.evaluate(() => (window as any).__aimdEmitTauriEvent("aimd-settings-updated", {
+      ai: {
+        activeProvider: "dashscope",
+        providers: {
+          dashscope: { model: "qwen3.6-plus", apiKey: "", apiBase: "" },
+          gemini: { model: "gemini-3.1-flash-lite-preview", apiKey: "", apiBase: "" },
+        },
+      },
+      webClip: { llmEnabled: false, provider: "dashscope", model: "qwen3.6-plus", outputLanguage: "zh-CN" },
+      format: { provider: "dashscope", model: "qwen3.6-plus", outputLanguage: "zh-CN" },
+      ui: { showAssetPanel: false, debugMode: false },
+    }));
+
+    await expect(page.locator("#sidebar-tab-assets")).toBeHidden();
+    await expect(page.locator("#asset-section")).toBeHidden();
+    await expect(page.locator("#outline-panel")).toBeVisible();
+    await expect(page.locator("#reader img")).toHaveCount(1);
   });
 
   test("settings page saves the resource panel preference", async ({ page }) => {

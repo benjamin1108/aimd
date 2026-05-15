@@ -214,6 +214,7 @@ pub fn run() {
             windows::initial_draft_path,
             windows::open_settings_window,
             windows::close_current_window,
+            windows::destroy_current_window,
             windows::focus_doc_window,
             windows::register_window_path,
             windows::unregister_window_path,

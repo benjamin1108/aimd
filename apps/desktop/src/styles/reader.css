@@ -253,14 +253,19 @@
   font-family: var(--font-mono);
   font-size: 12.5px;
   line-height: 1.6;
-  overflow-x: auto;
+  overflow: hidden;
   scrollbar-width: thin;
 }
 
 .aimd pre code {
+  display: block;
+  max-width: 100%;
+  overflow-x: auto;
   padding: 0;
   background: transparent;
   font-size: inherit;
+  white-space: pre;
+  scrollbar-width: thin;
 }
 
 .code-copy {
