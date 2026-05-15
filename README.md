@@ -161,12 +161,21 @@ npm run release -- major  # 1.4.27 -> 2.0.0
 
 `patch` 用于日常修复发布；`minor` 用于大型 feature 发布；`major` 用于平台级重构或破坏兼容的发布。普通 dev/build/check/package 命令只同步或校验版本，不会自增版本号。
 
+如果当前版本已经创建过 tag / GitHub Release，但 release 构建失败或产物需要覆盖补发，使用：
+
+```bash
+npm run release -- republish
+```
+
+`republish` 不会自增版本号，会用 `release.config.json` 的当前版本覆盖重发对应的 `v<version>` tag / GitHub Release。它要求当前分支是 `main`，本地 `HEAD` 和 `origin/main` 一致，并且版本检查通过。
+
 发布前可先 dry-run：
 
 ```bash
 npm run release:dry -- patch
 npm run release:dry -- minor
 npm run release:dry -- major
+npm run release:dry -- republish
 ```
 
 Git tag 必须和配置版本一致：`release.config.json` 中的 `1.4.28` 对应 tag `v1.4.28`。

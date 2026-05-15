@@ -43,6 +43,9 @@ jobs:
       - name: Release dry-run major
         run: npm run release:dry -- major
 
+      - name: Release dry-run republish
+        run: npm run release:dry -- republish
+
   checks:
     name: Checks
     runs-on: ubuntu-latest

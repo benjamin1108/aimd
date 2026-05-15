@@ -10,6 +10,7 @@ import {
   updateReleaseConfigVersion,
 } from "./version-tools.mjs";
 
+const RELEASE_MODES = new Set(["patch", "minor", "major", "republish"]);
 const RELEASE_FILES = new Set([
   "release.config.json",
   "Cargo.toml",
@@ -25,9 +26,13 @@ function parseArgs(argv) {
   const resume = args.includes("--resume") || args.includes("--no-bump");
   const filtered = args.filter((arg) => arg !== "--dry-run" && arg !== "--resume" && arg !== "--no-bump");
   if (filtered.length !== 1) {
-    throw new Error("Usage: npm run release -- <patch|minor|major> [-- --dry-run|--resume]");
+    throw new Error("Usage: npm run release -- <patch|minor|major|republish> [-- --dry-run|--resume]");
   }
-  return { level: filtered[0], dryRun, resume };
+  const mode = filtered[0];
+  if (!RELEASE_MODES.has(mode)) {
+    throw new Error(`Invalid release mode: ${mode}. Expected patch, minor, major, or republish.`);
+  }
+  return { mode, dryRun, resume };
 }
 
 function shortStatus() {
@@ -73,19 +78,83 @@ function tagExists(tag) {
   }
 }
 
+function ensureMainBranch() {
+  const branch = execFileSync("git", ["branch", "--show-current"], { cwd: REPO_ROOT, encoding: "utf8" }).trim();
+  if (branch !== "main") {
+    throw new Error(`Release must run from main branch, current branch is ${branch || "(detached)"}`);
+  }
+}
+
+function ensureHeadMatchesOriginMain() {
+  runCommand("git", ["fetch", "origin", "main"], { cwd: REPO_ROOT });
+  const head = execFileSync("git", ["rev-parse", "HEAD"], { cwd: REPO_ROOT, encoding: "utf8" }).trim();
+  const originMain = execFileSync("git", ["rev-parse", "origin/main"], { cwd: REPO_ROOT, encoding: "utf8" }).trim();
+  if (head !== originMain) {
+    throw new Error("Release requires HEAD to match origin/main");
+  }
+}
+
+function deleteGithubRelease(tag, dryRun) {
+  try {
+    execFileSync("gh", ["release", "view", tag], { cwd: REPO_ROOT, stdio: "ignore" });
+  } catch {
+    console.log(`release ${tag}: no existing GitHub release to delete`);
+    return;
+  }
+  runCommand("gh", ["release", "delete", tag, "--cleanup-tag", "-y"], { cwd: REPO_ROOT, dryRun });
+}
+
+function deleteLocalTag(tag, dryRun) {
+  if (!tagExists(tag)) return;
+  runCommand("git", ["tag", "-d", tag], { cwd: REPO_ROOT, dryRun });
+}
+
+function remoteTagExists(tag) {
+  const output = execFileSync("git", ["ls-remote", "--tags", "origin", `refs/tags/${tag}`], {
+    cwd: REPO_ROOT,
+    encoding: "utf8",
+  }).trim();
+  return output.length > 0;
+}
+
+function deleteRemoteTag(tag, dryRun) {
+  if (!remoteTagExists(tag)) return;
+  runCommand("git", ["push", "origin", `:refs/tags/${tag}`], { cwd: REPO_ROOT, dryRun });
+}
+
+function pushRepublishTag(tag, dryRun) {
+  deleteGithubRelease(tag, dryRun);
+  deleteRemoteTag(tag, dryRun);
+  deleteLocalTag(tag, dryRun);
+  runCommand("git", ["tag", tag], { cwd: REPO_ROOT, dryRun });
+  runCommand("git", ["push", "origin", tag], { cwd: REPO_ROOT, dryRun });
+}
+
 try {
-  const { level, dryRun, resume } = parseArgs(process.argv.slice(2));
+  const { mode, dryRun, resume } = parseArgs(process.argv.slice(2));
   if (!dryRun) ensureReleaseWorktree({ resume });
 
   const current = loadReleaseConfig(REPO_ROOT).version;
-  const next = resume ? current : bumpVersion(current, level);
+  const republish = mode === "republish";
+  const next = republish || resume ? current : bumpVersion(current, mode);
   const tag = `v${next}`;
 
   assertTagMatchesVersion(next, tag);
 
   if (dryRun) {
-    console.log(`release ${level}: ${current} -> ${next}`);
-    console.log(`[dry-run] would sync, check, commit, tag ${tag}, and push`);
+    console.log(republish ? `release republish: ${tag}` : `release ${mode}: ${current} -> ${next}`);
+    console.log(republish
+      ? `[dry-run] would check main/origin, delete existing ${tag} release/tag, recreate tag, and push`
+      : `[dry-run] would sync, check, commit, tag ${tag}, and push`);
+    process.exit(0);
+  }
+
+  ensureMainBranch();
+
+  if (republish) {
+    syncVersion({ check: true });
+    ensureHeadMatchesOriginMain();
+    pushRepublishTag(tag, dryRun);
     process.exit(0);
   }
 

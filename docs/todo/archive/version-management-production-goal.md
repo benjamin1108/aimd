@@ -82,9 +82,11 @@ Make AIMD versioning deterministic and release-safe:
   - `npm run release -- patch`
   - `npm run release -- minor`
   - `npm run release -- major`
+  - `npm run release -- republish`
   - `npm run release:dry -- patch`
   - `npm run release:dry -- minor`
   - `npm run release:dry -- major`
+  - `npm run release:dry -- republish`
 - Bash and PowerShell release wrappers are allowed only as thin wrappers around
   the Node release script. They must not reimplement release flow, SemVer bump,
   tag validation, Git operations, or resume/no-bump behavior.
@@ -92,6 +94,7 @@ Make AIMD versioning deterministic and release-safe:
   - `patch`
   - `minor`
   - `major`
+  - `republish`
 - `patch` is the default daily release mode and must increment only the SemVer
   patch component, for example `1.4.27 -> 1.4.28`.
 - `minor` is for large feature releases and must increment the SemVer minor
@@ -105,6 +108,13 @@ Make AIMD versioning deterministic and release-safe:
 - Only the release entrypoint may bump versions. Normal dev/build/check/package
   commands must sync or validate existing versions, but must not increment any
   version component.
+- `republish` must not bump the version. It must read the current
+  `release.config.json` version, delete or replace the matching GitHub Release
+  and tag, recreate `vX.Y.Z` at current `HEAD`, and push the tag to trigger the
+  release workflow again.
+- `republish` must require a clean worktree, current branch `main`, local
+  `HEAD == origin/main`, and passing version check before it deletes or replaces
+  the release/tag.
 - Re-running a failed release must not accidentally bump twice. The release
   script must detect an existing matching release commit/tag or provide an
   explicit resume/no-bump mode.
@@ -212,8 +222,12 @@ The production release flow must be:
 - Running `npm run release -- patch` changes `1.4.27` to `1.4.28`.
 - Running `npm run release -- minor` changes `1.4.27` to `1.5.0`.
 - Running `npm run release -- major` changes `1.4.27` to `2.0.0`.
+- Running `npm run release -- republish` keeps `1.4.27` as `1.4.27` and
+  replaces `v1.4.27` tag / GitHub Release.
 - Running `npm run release:dry -- patch`, `minor`, and `major` computes the
   correct next version without changing the worktree.
+- Running `npm run release:dry -- republish` reports the current tag that would
+  be replaced without changing the worktree.
 - The same npm release commands work on macOS, Windows, and Linux.
 - Normal `dev`, `build`, `check`, macOS package, and Windows package commands
   do not bump the version.
@@ -244,6 +258,8 @@ The production release flow must be:
 - `npm run release:dry -- patch` maps `1.0.0 -> 1.0.1` without file changes.
 - `npm run release:dry -- minor` maps `1.0.7 -> 1.1.0` without file changes.
 - `npm run release:dry -- major` maps `1.9.7 -> 2.0.0` without file changes.
+- `npm run release:dry -- republish` maps `1.0.7 -> v1.0.7` without file
+  changes or version bump.
 - The npm release and release dry-run commands pass on macOS, Windows, and
   Linux CI.
 - Release bump rejects missing bump level unless an explicit documented default
@@ -278,7 +294,9 @@ The production release flow must be:
    compute `1.0.0 -> 1.1.0`.
 10. Run `npm run release:dry -- major` and confirm it would
     compute `1.0.0 -> 2.0.0`.
-11. Confirm the dry-run release path does not change the worktree.
+11. Run `npm run release:dry -- republish` and confirm it would republish
+    `v1.0.0` without bumping.
+12. Confirm the dry-run release path does not change the worktree.
 
 ## Delivery Requirements
 
@@ -290,6 +308,8 @@ This goal is complete only when the automated version flow is production-ready:
 - Sync is automatic in every normal dev/build/package/release path.
 - Release bumping supports explicit `patch`, `minor`, and `major` modes with
   SemVer reset rules.
+- Release republishing supports explicit `republish` mode that replaces the
+  current config version tag/release without bumping.
 - Only the release entrypoint increments versions; normal sync/check/build
   commands never increment versions.
 - Failed release retries cannot accidentally bump the version twice.
