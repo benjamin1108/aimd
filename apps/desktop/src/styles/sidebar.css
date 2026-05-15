@@ -216,7 +216,7 @@ body.resizing-v * {
 
 .workspace-actions {
   display: grid;
-  grid-template-columns: repeat(4, 28px);
+  grid-template-columns: repeat(5, 28px);
   gap: 4px;
   padding: 0 6px 8px;
 }

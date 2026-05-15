@@ -6,6 +6,7 @@ import {
   STORAGE_WORKSPACE_ROOT,
 } from "../core/state";
 import {
+  workspaceCloseEl,
   workspaceNewDocEl,
   workspaceNewFolderEl,
   workspaceOpenEl,
@@ -26,9 +27,7 @@ import { refreshGitStatus, resetGitState } from "./git";
 import { showDocumentView } from "./git-diff";
 import { applyWorkspaceCollapseState, bindWorkspaceCollapse } from "./sidebar-layout";
 
-function samePath(a: string, b: string): boolean {
-  return a.replace(/\\/g, "/").toLowerCase() === b.replace(/\\/g, "/").toLowerCase();
-}
+function samePath(a: string, b: string): boolean { return a.replace(/\\/g, "/").toLowerCase() === b.replace(/\\/g, "/").toLowerCase(); }
 
 function parentPath(path: string): string {
   const normalized = path.replace(/\\/g, "/");
@@ -38,8 +37,7 @@ function parentPath(path: string): string {
 }
 
 function joinPath(parent: string, name: string): string {
-  const sep = parent.includes("\\") ? "\\" : "/";
-  return `${parent.replace(/[\\/]+$/, "")}${sep}${name}`;
+  return `${parent.replace(/[\\/]+$/, "")}${parent.includes("\\") ? "\\" : "/"}${name}`;
 }
 
 function updateDefaultHeadingAfterRename(oldPath: string, newPath: string) {
@@ -98,9 +96,7 @@ function applyWorkspace(workspace: WorkspaceRoot) {
   void refreshGitStatus(true);
 }
 
-function workspaceIcon(node: WorkspaceTreeNode): string {
-  return node.kind === "folder" ? ICONS.folder : ICONS.document;
-}
+function workspaceIcon(node: WorkspaceTreeNode): string { return node.kind === "folder" ? ICONS.folder : ICONS.document; }
 
 function renderNode(node: WorkspaceTreeNode, depth: number): string {
   const expanded = state.workspaceExpanded.has(node.path);
@@ -129,6 +125,7 @@ export function renderWorkspaceTree() {
   workspaceRefreshEl().disabled = !state.workspace || state.workspaceLoading;
   workspaceNewDocEl().disabled = !state.workspace || state.workspaceLoading;
   workspaceNewFolderEl().disabled = !state.workspace || state.workspaceLoading;
+  workspaceCloseEl().disabled = !state.workspace || state.workspaceLoading;
 
   if (state.workspaceLoading) {
     workspaceRootLabelEl().textContent = "目录";
@@ -470,6 +467,23 @@ export async function refreshWorkspace(message = "目录已刷新") {
   }
 }
 
+export function closeWorkspace() {
+  if (!state.workspace && !state.workspaceError) return;
+  dismissContextMenu();
+  state.workspace = null;
+  state.workspaceError = "";
+  state.workspaceLoading = false;
+  state.workspaceSelectedPath = "";
+  state.workspaceExpanded = new Set();
+  window.localStorage.removeItem(STORAGE_WORKSPACE_ROOT);
+  window.localStorage.removeItem(STORAGE_WORKSPACE_EXPANDED);
+  resetGitState();
+  showDocumentView();
+  updateChrome();
+  renderWorkspaceTree();
+  setStatus("目录已关闭", "success");
+}
+
 export function bindWorkspacePanel() {
   loadExpandedState();
   bindWorkspaceCollapse(renderWorkspaceTree);
@@ -477,6 +491,7 @@ export function bindWorkspacePanel() {
   workspaceRefreshEl().addEventListener("click", () => { void refreshWorkspace(); });
   workspaceNewDocEl().addEventListener("click", () => { void createDocument(null); });
   workspaceNewFolderEl().addEventListener("click", () => { void createFolder(null); });
+  workspaceCloseEl().addEventListener("click", closeWorkspace);
   window.addEventListener("aimd-doc-applied", () => {
     if (state.doc?.path) state.workspaceSelectedPath = state.doc.path;
     renderWorkspaceTree();

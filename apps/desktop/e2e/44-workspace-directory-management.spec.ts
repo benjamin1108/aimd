@@ -172,6 +172,27 @@ async function installWorkspaceMock(page: Page) {
 }
 
 test.describe("Workspace directory management", () => {
+  test("closes the current directory from the workspace toolbar", async ({ page }) => {
+    await installWorkspaceMock(page);
+    await page.goto("/");
+
+    await page.locator("#empty-open-workspace").click();
+    await expect(page.locator("#workspace-root-label")).toHaveText("workspace");
+    await expect(page.locator(".workspace-row", { hasText: "Report.aimd" })).toBeVisible();
+
+    await expect(page.locator("#workspace-close")).toBeEnabled();
+    await page.locator("#workspace-close").click();
+
+    await expect(page.locator("#workspace-root-label")).toHaveText("目录");
+    await expect(page.locator(".workspace-row", { hasText: "Report.aimd" })).toHaveCount(0);
+    await expect(page.locator("#workspace-tree")).toHaveText("打开目录");
+    await expect(page.locator("#workspace-refresh")).toBeDisabled();
+    await expect(page.locator("#workspace-new-doc")).toBeDisabled();
+    await expect(page.locator("#workspace-new-folder")).toBeDisabled();
+    await expect(page.locator("#workspace-close")).toBeDisabled();
+    await expect.poll(() => page.evaluate(() => window.localStorage.getItem("aimd.desktop.workspace.root"))).toBeNull();
+  });
+
   test("opens a directory, creates markdown in a folder, renames, saves, and deletes it", async ({ page }) => {
     await installWorkspaceMock(page);
     await page.goto("/");

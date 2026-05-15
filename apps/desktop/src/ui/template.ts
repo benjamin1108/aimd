@@ -23,6 +23,7 @@ export const APP_HTML = `
               <button id="workspace-refresh" class="icon-btn" type="button" title="刷新目录" disabled>${ICONS.refresh}</button>
               <button id="workspace-new-doc" class="icon-btn" type="button" title="新建文档" disabled>${ICONS.document}</button>
               <button id="workspace-new-folder" class="icon-btn" type="button" title="新建文件夹" disabled>${ICONS.plus}</button>
+              <button id="workspace-close" class="icon-btn" type="button" title="关闭当前目录" disabled>${ICONS.close}</button>
             </div>
             <div class="section-content workspace-scroll">
               <div id="workspace-tree" class="workspace-tree"></div>

@@ -36,6 +36,7 @@ export const workspaceOpenEl = lazyEl<HTMLButtonElement>("#workspace-open");
 export const workspaceRefreshEl = lazyEl<HTMLButtonElement>("#workspace-refresh");
 export const workspaceNewDocEl = lazyEl<HTMLButtonElement>("#workspace-new-doc");
 export const workspaceNewFolderEl = lazyEl<HTMLButtonElement>("#workspace-new-folder");
+export const workspaceCloseEl = lazyEl<HTMLButtonElement>("#workspace-close");
 export const docPanelCollapseEl = lazyEl<HTMLButtonElement>("#doc-panel-collapse");
 export const sidebarWorkspaceDocResizerEl = lazyEl<HTMLElement>("#sb-resizer-workspace-doc");
 export const sidebarOutlineAssetResizerEl = lazyEl<HTMLElement>("#sb-resizer-outline-asset");
