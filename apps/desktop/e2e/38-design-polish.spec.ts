@@ -77,7 +77,7 @@ test.describe("顶部工具栏视觉权重", () => {
 });
 
 test.describe("模式切换 — 纯文字分段控件", () => {
-  test("阅读 / 编辑 / 源码三个按钮不渲染 SVG 图标", async ({ page }) => {
+  test("预览 / 可视编辑 / Markdown 三个按钮不渲染 SVG 图标", async ({ page }) => {
     await installTauriMock(page);
     await page.goto("/");
     await page.locator("#empty-open").click();
@@ -87,9 +87,9 @@ test.describe("模式切换 — 纯文字分段控件", () => {
     await expect(page.locator(".mode-btn-icon")).toHaveCount(0);
 
     // 文字仍然在
-    await expect(page.locator("#mode-read")).toContainText("阅读");
-    await expect(page.locator("#mode-edit")).toContainText("编辑");
-    await expect(page.locator("#mode-source")).toContainText("源码");
+    await expect(page.locator("#mode-read")).toContainText("预览");
+    await expect(page.locator("#mode-edit")).toContainText("可视编辑");
+    await expect(page.locator("#mode-source")).toContainText("Markdown");
   });
 });
 
@@ -101,7 +101,7 @@ test.describe("⋯ 菜单：不再用危险分组", () => {
     await page.locator("#more-menu-toggle").click();
     await expect(page.locator("#more-menu .action-menu-group-label")).toHaveCount(0);
     await expect(page.locator("#close")).not.toHaveClass(/action-menu-item--danger/);
-    await expect(page.locator("#more-menu .action-menu-sep")).toBeVisible();
+    await expect(page.locator("#more-menu .action-menu-divider").first()).toBeVisible();
   });
 
   test("窄窗口下长状态和菜单文字不会撑坏按钮形状", async ({ page }) => {

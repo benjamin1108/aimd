@@ -177,13 +177,13 @@ test.describe("Workspace directory management", () => {
     await page.goto("/");
 
     await page.locator("#empty-open-workspace").click();
-    await expect(page.locator("#workspace-root-label")).toHaveText("workspace");
+    await expect(page.locator("#workspace-root-label")).toHaveText("项目");
     await expect(page.locator(".workspace-row", { hasText: "Report.aimd" })).toBeVisible();
 
     await expect(page.locator("#workspace-close")).toBeEnabled();
     await page.locator("#workspace-close").click();
 
-    await expect(page.locator("#workspace-root-label")).toHaveText("目录");
+    await expect(page.locator("#workspace-root-label")).toHaveText("项目");
     await expect(page.locator(".workspace-row", { hasText: "Report.aimd" })).toHaveCount(0);
     await expect(page.locator("#workspace-tree")).toHaveText("打开目录");
     await expect(page.locator("#workspace-refresh")).toBeDisabled();
@@ -199,7 +199,7 @@ test.describe("Workspace directory management", () => {
 
     await expect(page.locator("#empty-open-workspace")).toContainText("打开目录");
     await page.locator("#empty-open-workspace").click();
-    await expect(page.locator("#workspace-root-label")).toHaveText("workspace");
+    await expect(page.locator("#workspace-root-label")).toHaveText("项目");
     await expect(page.locator("#workspace-count")).toHaveCount(0);
     await expect(page.locator(".workspace-row", { hasText: "Report.aimd" })).toBeVisible();
 
@@ -237,6 +237,8 @@ test.describe("Workspace directory management", () => {
     await page.locator(".file-ctx-item", { hasText: "删除" }).click();
     await page.locator(".link-popover [data-action='confirm']").click();
     await expect(page.locator(".workspace-row", { hasText: "Daily Renamed.md" })).toHaveCount(0);
-    await expect(page.locator("#empty")).toBeVisible();
+    await expect(page.locator(".open-tab", { hasText: "Daily Renamed" })).toHaveCount(0);
+    await expect(page.locator(".open-tab", { hasText: "Report" })).toBeVisible();
+    await expect(page.locator("#doc-title")).toHaveText("Report");
   });
 });

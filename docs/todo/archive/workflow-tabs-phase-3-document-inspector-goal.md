@@ -254,3 +254,38 @@ Required completion actions:
 Do not archive this file before the phase is truly complete. Do not make a
 standalone commit that only moves this file to `archive/`. Do not report the
 goal complete while the active copy still exists under `docs/todo/`.
+
+## Completion Note - 2026-05-15
+
+Implemented Phase 3 as a current-document inspector in the existing sidebar:
+
+- The inspector now has explicit `大纲` / `资源` / `Git` / `健康` tabs plus an
+  owner label showing the active document. Project Git remains project-scoped;
+  document tabs remain the active work-session identity.
+- Outline and assets are derived from the active tab and re-render immediately
+  on tab switch. Stale async render results keep using operation guards and do
+  not replace the active inspector.
+- Health reports are stored on the tab that launched the check. Switching tabs
+  while a health check is running no longer shows stale results on the active
+  tab; returning to the original tab shows its saved report.
+- Resource packaging captures the launching tab and operation version. If the
+  user switches tabs before the command finishes, the result is applied to the
+  original tab with `applyDocumentToTab` and never overwrites the active tab.
+- Git review placement remains a clearly labeled main-surface review mode:
+  `Git review · 项目变更`. The open tab bar and active document identity remain
+  visible, and the return button names the document being restored.
+- Opening Git review captures the active view state before hiding the document
+  surface, preserving the tab's mode/scroll model used by Phase 2.
+- Markdown/AIMD save semantics remain unchanged: ordinary Markdown saves still
+  save `.md` unless the document requires AIMD packaging, and packaging actions
+  continue through the existing explicit entrypoints.
+- Narrow viewport behavior is covered by inspector collapse tests; mobile-width
+  responsive hiding remains controlled by the existing breakpoint.
+
+Validation run:
+
+- `npm --prefix apps/desktop run check`
+- `cargo check --workspace`
+- `git diff --check`
+- `npx playwright test e2e/54-document-inspector.spec.ts e2e/45-asset-panel-settings.spec.ts e2e/46-git-workspace-panel.spec.ts`
+- `npx playwright test e2e/52-open-documents-tabs.spec.ts e2e/53-tab-session-state.spec.ts e2e/54-document-inspector.spec.ts e2e/45-asset-panel-settings.spec.ts e2e/46-git-workspace-panel.spec.ts e2e/50-source-preserving-editor.spec.ts e2e/31-md-open-association.spec.ts`

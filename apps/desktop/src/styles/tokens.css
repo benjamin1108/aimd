@@ -62,7 +62,7 @@
   font-feature-settings: "ss01", "cv11", "tnum";
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
-  letter-spacing: -0.005em;
+  letter-spacing: 0;
 }
 
 * {
@@ -75,6 +75,8 @@
    不受影响，已能正常选中。 */
 .sidebar,
 .sidebar *,
+.inspector,
+.inspector *,
 .workspace-head,
 .workspace-head *,
 .doc-toolbar,
@@ -99,6 +101,8 @@
 .sidebar .recent-item-meta,
 .sidebar .outline-text,
 .sidebar .asset-id,
+.inspector .outline-text,
+.inspector .asset-id,
 #reader,
 #reader *,
 .preview,

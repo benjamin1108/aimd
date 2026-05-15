@@ -15,51 +15,18 @@ export const APP_HTML = `
         <nav class="sidebar-body" id="sidebar-body">
           <section class="nav-section workspace-section" id="workspace-section">
             <div class="section-label workspace-label">
-              <span id="workspace-root-label">目录</span>
-              <button id="workspace-collapse" class="section-toggle" type="button" title="折叠目录" aria-expanded="true">⌃</button>
+              <span id="workspace-root-label">项目</span>
+              <button id="workspace-collapse" class="section-toggle" type="button" title="折叠项目" aria-expanded="true">⌃</button>
             </div>
-            <div class="workspace-actions" aria-label="目录操作">
+            <div class="workspace-actions" aria-label="项目操作">
               <button id="workspace-open" class="icon-btn" type="button" title="打开目录">${ICONS.folder}</button>
-              <button id="workspace-refresh" class="icon-btn" type="button" title="刷新目录" disabled>${ICONS.refresh}</button>
-              <button id="workspace-new-doc" class="icon-btn" type="button" title="新建文档" disabled>${ICONS.document}</button>
+              <button id="workspace-refresh" class="icon-btn" type="button" title="刷新项目" disabled>${ICONS.refresh}</button>
+              <button id="workspace-new-doc" class="icon-btn" type="button" title="在项目中新建文档" disabled>${ICONS.document}</button>
               <button id="workspace-new-folder" class="icon-btn" type="button" title="新建文件夹" disabled>${ICONS.plus}</button>
-              <button id="workspace-close" class="icon-btn" type="button" title="关闭当前目录" disabled>${ICONS.close}</button>
+              <button id="workspace-close" class="icon-btn" type="button" title="关闭项目" disabled>${ICONS.close}</button>
             </div>
             <div class="section-content workspace-scroll">
               <div id="workspace-tree" class="workspace-tree"></div>
-            </div>
-          </section>
-
-          <button class="sb-resizer" id="sb-resizer-workspace-doc"
-                  data-above="#workspace-section" data-below="#outline-section"
-                  aria-label="调整目录与大纲高度"></button>
-
-          <section class="nav-section" id="outline-section" hidden>
-            <div class="doc-panel-tabs" id="doc-panel-tabs" role="tablist" aria-label="文档侧栏">
-              <button id="sidebar-tab-outline" class="doc-panel-tab is-active" type="button" role="tab" aria-selected="true" aria-controls="outline-panel">大纲</button>
-              <button id="sidebar-tab-git" class="doc-panel-tab" type="button" role="tab" aria-selected="false" aria-controls="git-panel" hidden>Git</button>
-              <button id="doc-panel-collapse" class="section-toggle" type="button" title="折叠大纲/Git" aria-expanded="true">⌃</button>
-            </div>
-            <div class="section-content">
-              <div id="outline-panel" role="tabpanel">
-                <div id="outline-list" class="outline-list"></div>
-              </div>
-              <div id="git-panel" class="git-panel" role="tabpanel" hidden>
-                <div id="git-content" class="git-content"></div>
-              </div>
-            </div>
-          </section>
-
-          <button class="sb-resizer" id="sb-resizer-outline-asset" hidden
-                  data-above="#outline-section" data-below="#asset-section"
-                  aria-label="调整大纲与资源高度"></button>
-
-          <section class="nav-section" id="asset-section" hidden>
-            <div class="section-label">
-              <span>资源</span>
-            </div>
-            <div class="section-content">
-              <div id="asset-list" class="asset-list"></div>
             </div>
           </section>
         </nav>
@@ -84,7 +51,8 @@ export const APP_HTML = `
         <header class="workspace-head">
           <div class="doc-meta">
             <h1 id="doc-title" class="doc-title">AIMD Desktop</h1>
-            <div id="doc-path" class="doc-path">面向 AI 与人类协作的 Markdown 文档格式，方便保存与分享。</div>
+            <div id="doc-path" class="doc-path">未打开文档</div>
+            <div id="doc-state-badges" class="doc-state-badges" aria-label="当前文档状态" hidden></div>
           </div>
 
           <div class="starter-actions" id="starter-actions">
@@ -104,7 +72,7 @@ export const APP_HTML = `
               <span id="save-label">保存</span>
             </button>
             <div class="more-menu-wrap">
-              <button id="more-menu-toggle" class="ghost-btn icon-only" type="button" title="更多文档操作" aria-haspopup="menu" aria-expanded="false">⋯</button>
+              <button id="more-menu-toggle" class="ghost-btn icon-only" type="button" title="当前文档操作" aria-haspopup="menu" aria-expanded="false">⋯</button>
               <div id="more-menu" class="action-menu" role="menu" hidden>
                 <button id="save-as" class="action-menu-item" type="button" disabled>
                   <span class="action-menu-icon">${ICONS.folder}</span>
@@ -124,15 +92,7 @@ export const APP_HTML = `
                 </button>
                 <button id="health-check" class="action-menu-item" type="button" disabled>
                   <span class="action-menu-icon">${ICONS.info}</span>
-                  <span>资源检查</span>
-                </button>
-                <button id="check-updates" class="action-menu-item" type="button">
-                  <span class="action-menu-icon">${ICONS.refresh}</span>
-                  <span>检查更新</span>
-                </button>
-                <button id="about-aimd" class="action-menu-item" type="button">
-                  <span class="action-menu-icon">${ICONS.info}</span>
-                  <span>关于 AIMD</span>
+                  <span>检查当前文档资源</span>
                 </button>
                 <hr class="action-menu-divider" role="separator">
                 <button id="export-markdown" class="action-menu-item" type="button" disabled>
@@ -148,31 +108,43 @@ export const APP_HTML = `
                   <span>导出 PDF</span>
                 </button>
                 <hr class="action-menu-divider" role="separator">
+                <button id="close" class="action-menu-item" type="button" disabled>
+                  <span class="action-menu-icon">${ICONS.close}</span>
+                  <span>关闭当前标签页</span>
+                </button>
+                <hr class="action-menu-divider" role="separator">
                 <button id="new-window" class="action-menu-item" type="button">
                   <span class="action-menu-icon">${ICONS.plus}</span>
                   <span>新建窗口</span>
                 </button>
-                <hr class="action-menu-sep" role="separator">
-                <button id="close" class="action-menu-item" type="button" disabled>
-                  <span class="action-menu-icon">${ICONS.close}</span>
-                  <span>关闭文档</span>
+                <button id="check-updates" class="action-menu-item" type="button">
+                  <span class="action-menu-icon">${ICONS.refresh}</span>
+                  <span>检查更新</span>
+                </button>
+                <button id="about-aimd" class="action-menu-item" type="button">
+                  <span class="action-menu-icon">${ICONS.info}</span>
+                  <span>关于 AIMD</span>
                 </button>
               </div>
             </div>
           </div>
         </header>
 
+        <div class="tab-bar" id="tab-bar" hidden>
+          <div class="open-tabs" id="open-tabs" role="tablist" aria-label="打开的文档"></div>
+        </div>
+
         <div class="doc-toolbar" id="doc-toolbar" hidden>
           <div class="toolbar-group toolbar-group--mode">
             <div class="mode-switch" role="tablist">
               <button id="mode-read" class="mode-btn" role="tab" aria-selected="true" type="button" disabled>
-                <span>阅读</span>
+                <span>预览</span>
               </button>
               <button id="mode-edit" class="mode-btn" role="tab" aria-selected="false" type="button" disabled>
-                <span>编辑</span>
+                <span>可视编辑</span>
               </button>
               <button id="mode-source" class="mode-btn" role="tab" aria-selected="false" type="button" disabled>
-                <span>源码</span>
+                <span>Markdown</span>
               </button>
             </div>
           </div>
@@ -266,21 +238,6 @@ export const APP_HTML = `
           </div>
         </div>
 
-        <div id="health-panel" class="health-panel" hidden>
-          <div class="health-panel-head">
-            <div>
-              <div class="health-title">资源检查</div>
-              <div id="health-summary" class="health-summary">未检查</div>
-            </div>
-            <button id="health-close" class="ft-btn" type="button" title="关闭">${ICONS.close}</button>
-          </div>
-          <div id="health-list" class="health-list"></div>
-          <div class="health-actions">
-            <button id="health-clean-unused" class="secondary-btn sm" type="button">清理未引用资源</button>
-            <button id="health-package-local" class="secondary-btn sm" type="button">嵌入本地图片</button>
-          </div>
-        </div>
-
         <div id="format-preview-panel" class="format-preview-panel" hidden>
           <div class="format-preview-head">
             <div>
@@ -369,7 +326,7 @@ export const APP_HTML = `
               <div class="empty-mark">${ICONS.document}</div>
               <div class="launch-head-text">
                 <h2>开始</h2>
-                <p>新建文档、打开 .aimd 或导入 Markdown。</p>
+                <p>新建文档、打开 AIMD / Markdown，或打开项目目录。</p>
               </div>
             </header>
 
@@ -380,7 +337,7 @@ export const APP_HTML = `
               </button>
               <button id="empty-open" class="secondary-btn" type="button">
                 <span class="secondary-btn-icon">${ICONS.folder}</span>
-                <span>打开 .aimd</span>
+                <span>打开文档</span>
               </button>
               <button id="empty-open-workspace" class="secondary-btn" type="button">
                 <span class="secondary-btn-icon">${ICONS.folder}</span>
@@ -450,6 +407,54 @@ export const APP_HTML = `
           </span>
         </footer>
       </main>
+
+      <aside class="inspector" id="inspector" aria-label="当前文档检查器">
+        <div class="inspector-hr-resizer" id="inspector-hr-resizer" aria-label="调整检查器宽度"></div>
+        <section class="nav-section nav-section--inspector" id="outline-section" hidden>
+          <div class="inspector-owner" id="inspector-owner">未打开文档</div>
+          <div class="doc-panel-tabs" id="doc-panel-tabs" role="tablist" aria-label="当前文档检查器">
+            <button id="sidebar-tab-outline" class="doc-panel-tab is-active" type="button" role="tab" aria-selected="true" aria-controls="outline-panel">大纲</button>
+            <button id="sidebar-tab-assets" class="doc-panel-tab" type="button" role="tab" aria-selected="false" aria-controls="asset-panel">资源</button>
+            <button id="sidebar-tab-git" class="doc-panel-tab" type="button" role="tab" aria-selected="false" aria-controls="git-panel" hidden>Git</button>
+            <button id="sidebar-tab-health" class="doc-panel-tab" type="button" role="tab" aria-selected="false" aria-controls="health-panel">健康</button>
+            <button id="doc-panel-collapse" class="section-toggle" type="button" title="折叠检查器" aria-expanded="true">⌃</button>
+          </div>
+          <div class="section-content inspector-scroll">
+            <div id="outline-panel" role="tabpanel">
+              <div id="outline-list" class="outline-list"></div>
+            </div>
+            <div id="asset-panel" role="tabpanel" hidden>
+              <section class="asset-inspector-section" id="asset-section" hidden>
+                <div id="asset-list" class="asset-list"></div>
+              </section>
+            </div>
+            <div id="git-panel" class="git-panel" role="tabpanel" hidden>
+              <div id="git-content" class="git-content"></div>
+            </div>
+            <div id="health-panel" class="health-panel health-panel--inspector" role="tabpanel" hidden>
+              <div class="health-panel-head">
+                <div>
+                  <div class="health-title">资源健康</div>
+                  <div id="health-summary" class="health-summary">未检查</div>
+                </div>
+                <button id="health-close" class="ft-btn" type="button" title="关闭">${ICONS.close}</button>
+              </div>
+              <div id="health-list" class="health-list"></div>
+              <div class="health-actions">
+                <button id="health-clean-unused" class="secondary-btn sm" type="button">清理未引用资源</button>
+                <button id="health-package-local" class="secondary-btn sm" type="button">嵌入本地图片</button>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <button class="sb-resizer" id="sb-resizer-workspace-doc" hidden
+                data-above="#workspace-section" data-below="#outline-section"
+                aria-label="调整项目与检查器高度"></button>
+        <button class="sb-resizer" id="sb-resizer-outline-asset" hidden
+                data-above="#outline-section" data-below="#asset-section"
+                aria-label="调整大纲与资源高度"></button>
+      </aside>
     </div>
   </div>
 `;

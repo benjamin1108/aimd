@@ -14,6 +14,7 @@ use aimd_core::writer;
 use aimd_core::{rewrite_asset_uris_to_relative, ExportMarkdownResult};
 use aimd_render::render;
 use chrono::Utc;
+use serde::Serialize;
 use serde_json::Value;
 use std::fs;
 use std::path::Path;
@@ -39,6 +40,10 @@ pub static MAIN_INITIALIZED: AtomicBool = AtomicBool::new(false);
 
 #[derive(Default)]
 pub struct PendingOpenPaths(pub Mutex<Vec<String>>);
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct FileFingerprint { mtime_ms: u128, size: u64 }
 
 pub fn is_supported_doc_extension(path: &Path) -> bool {
     matches!(
@@ -117,6 +122,20 @@ pub fn open_aimd(path: String) -> Result<Value, String> {
     let markdown = String::from_utf8_lossy(&md_bytes).to_string();
     let dto = document_dto_from_reader(file, &reader, &markdown)?;
     serde_json::to_value(dto).map_err(|e| format!("open_aimd json error: {}", e))
+}
+
+#[tauri::command]
+pub fn document_file_fingerprint(path: String) -> Result<FileFingerprint, String> {
+    let metadata = fs::metadata(&path).map_err(|e| format!("读取文件信息失败: {e}"))?;
+    let modified = metadata.modified().map_err(|e| format!("读取修改时间失败: {e}"))?;
+    let mtime_ms = modified
+        .duration_since(std::time::UNIX_EPOCH)
+        .map_err(|e| format!("修改时间早于 UNIX epoch: {e}"))?
+        .as_millis();
+    Ok(FileFingerprint {
+        mtime_ms,
+        size: metadata.len(),
+    })
 }
 
 #[tauri::command]

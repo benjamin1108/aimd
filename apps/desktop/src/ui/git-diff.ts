@@ -13,6 +13,8 @@ import type { GitFileDiff } from "../core/types";
 import { escapeAttr, escapeHTML } from "../util/escape";
 import { updateChrome } from "./chrome";
 import { setMode } from "./mode";
+import { displayTabTitle } from "../document/open-document-state";
+import { captureActiveViewState } from "../document/view-state";
 
 function root(): string | null {
   return state.workspace?.root || null;
@@ -43,7 +45,7 @@ function renderDiffBlock(title: string, text: string): string {
   return `
     <section class="git-diff-block">
       <div class="git-diff-block-title">${escapeHTML(title)}</div>
-      <div class="git-diff-code">${text ? renderLines(text) : `<div class="git-diff-empty">没有 ${escapeHTML(title)} diff</div>`}</div>
+      <div class="git-diff-code">${text ? renderLines(text) : `<div class="git-diff-empty">没有 ${escapeHTML(title)}</div>`}</div>
     </section>`;
 }
 
@@ -56,7 +58,8 @@ export function showDocumentView() {
 export function renderGitDiffView() {
   const view = state.git.diffView;
   const canReturn = Boolean(state.doc);
-  const title = view.path || "Git diff";
+  const activeDocTitle = state.doc ? displayTabTitle(state.doc) : "";
+  const title = view.path || "Git 差异";
   let body = "";
   if (view.loading) {
     body = `<div class="git-diff-message">正在读取 diff</div>`;
@@ -72,13 +75,16 @@ export function renderGitDiffView() {
       : "";
     body = `
       ${truncated}
-      ${renderDiffBlock("staged", view.diff.stagedDiff)}
-      ${renderDiffBlock("unstaged", view.diff.unstagedDiff)}`;
+      ${renderDiffBlock("已暂存差异", view.diff.stagedDiff)}
+      ${renderDiffBlock("未暂存差异", view.diff.unstagedDiff)}`;
   }
   gitDiffContentEl().innerHTML = `
     <header class="git-diff-head">
-      <button id="git-diff-back" class="secondary-btn sm" type="button" ${canReturn ? "" : "disabled"}>返回文档</button>
-      <div class="git-diff-title" title="${escapeAttr(title)}">${escapeHTML(title)}</div>
+      <button id="git-diff-back" class="secondary-btn sm" type="button" ${canReturn ? "" : "disabled"}>${activeDocTitle ? `返回当前文档：${escapeHTML(activeDocTitle)}` : "返回当前文档"}</button>
+      <div>
+        <div class="git-diff-scope">Git review · 项目变更</div>
+        <div class="git-diff-title" title="${escapeAttr(title)}">${escapeHTML(title)}</div>
+      </div>
     </header>
     <div id="git-diff-scroll" class="git-diff-scroll" data-select-all-scope>${body}</div>
   `;
@@ -88,6 +94,7 @@ export function renderGitDiffView() {
 export async function openGitDiffView(path: string) {
   const repoRoot = root();
   if (!repoRoot) return;
+  captureActiveViewState();
   state.mainView = "git-diff";
   state.git.diffView = { path, diff: null, loading: true, error: "" };
   readerEl().hidden = true;

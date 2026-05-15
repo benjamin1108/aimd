@@ -12,6 +12,7 @@ import { persistSessionSnapshot } from "../session/snapshot";
 import { enhanceRenderedDocument } from "../editor/interactive";
 import { renderDocPanelTabs } from "./doc-panel";
 import { annotateSourceBlocks, createSourceModel } from "../editor/source-preserve";
+import { beginTabOperation, isActiveOperationCurrent, syncActiveTabFromFacade } from "../document/open-document-state";
 
 export function scheduleRender() {
   if (state.renderTimer) window.clearTimeout(state.renderTimer);
@@ -20,6 +21,7 @@ export function scheduleRender() {
 
 export async function renderPreview() {
   if (!state.doc) return;
+  const target = beginTabOperation();
   try {
     const out = state.doc.path && !state.doc.isDraft && state.doc.format !== "markdown"
       ? await invoke<RenderResult>("render_markdown", {
@@ -29,8 +31,10 @@ export async function renderPreview() {
       : await invoke<RenderResult>("render_markdown_standalone", {
         markdown: state.doc.markdown,
       });
+    if (!isActiveOperationCurrent(target)) return;
     applyHTML(out.html);
   } catch (err) {
+    if (!isActiveOperationCurrent(target)) return;
     console.error(err);
     setStatus("预览更新失败", "warn");
   }
@@ -69,12 +73,17 @@ export function applyHTML(html: string) {
     enhanceRenderedDocument(previewEl(), { codeCopy: true, taskToggle: true, linkOpen: "plain" });
     enhanceRenderedDocument(inlineEditorEl(), { taskToggle: true, linkOpen: "modifier" });
     if (shouldHydrateMarkdownImages) {
+      const hydrateTabId = state.openDocuments.activeTabId;
+      const hydrateHtmlVersion = state.htmlVersion;
       void Promise.all([
         hydrateMarkdownLocalImages(readerEl()),
         hydrateMarkdownLocalImages(previewEl()),
         hydrateMarkdownLocalImages(inlineEditorEl()),
       ]).then(() => {
-        if (state.doc) state.doc.html = readerEl().innerHTML;
+        if (state.doc && state.openDocuments.activeTabId === hydrateTabId && state.htmlVersion === hydrateHtmlVersion) {
+          state.doc.html = readerEl().innerHTML;
+          syncActiveTabFromFacade();
+        }
       });
     }
   }
@@ -83,6 +92,7 @@ export function applyHTML(html: string) {
     state.doc.html = previewEl().innerHTML;
   }
   renderOutline();
+  syncActiveTabFromFacade();
   persistSessionSnapshot();
 }
 
@@ -175,18 +185,36 @@ export function paintPaneIfStale(mode: Mode) {
     tagAssetImages(inlineEditorEl(), state.doc.assets);
     if (state.sourceModel) annotateSourceBlocks(inlineEditorEl(), state.sourceModel);
     enhanceRenderedDocument(inlineEditorEl(), { taskToggle: true, linkOpen: "modifier" });
-    if (state.doc.format === "markdown") void hydrateMarkdownLocalImages(inlineEditorEl());
+    if (state.doc.format === "markdown") {
+      const tabId = state.openDocuments.activeTabId;
+      const version = state.htmlVersion;
+      void hydrateMarkdownLocalImages(inlineEditorEl()).then(() => {
+        if (state.doc && state.openDocuments.activeTabId === tabId && state.htmlVersion === version) syncActiveTabFromFacade();
+      });
+    }
     state.inlineDirty = false;
   } else if (mode === "read") {
     readerEl().innerHTML = state.doc.html;
     tagAssetImages(readerEl(), state.doc.assets);
     enhanceRenderedDocument(readerEl(), { codeCopy: true, taskToggle: true, linkOpen: "plain" });
-    if (state.doc.format === "markdown") void hydrateMarkdownLocalImages(readerEl());
+    if (state.doc.format === "markdown") {
+      const tabId = state.openDocuments.activeTabId;
+      const version = state.htmlVersion;
+      void hydrateMarkdownLocalImages(readerEl()).then(() => {
+        if (state.doc && state.openDocuments.activeTabId === tabId && state.htmlVersion === version) syncActiveTabFromFacade();
+      });
+    }
   } else {
     previewEl().innerHTML = state.doc.html;
     tagAssetImages(previewEl(), state.doc.assets);
     enhanceRenderedDocument(previewEl(), { codeCopy: true, taskToggle: true, linkOpen: "plain" });
-    if (state.doc.format === "markdown") void hydrateMarkdownLocalImages(previewEl());
+    if (state.doc.format === "markdown") {
+      const tabId = state.openDocuments.activeTabId;
+      const version = state.htmlVersion;
+      void hydrateMarkdownLocalImages(previewEl()).then(() => {
+        if (state.doc && state.openDocuments.activeTabId === tabId && state.htmlVersion === version) syncActiveTabFromFacade();
+      });
+    }
   }
   state.paintedVersion[mode] = state.htmlVersion;
 }

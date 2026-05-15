@@ -30,8 +30,8 @@ export function settingsTemplateHTML() {
             <label class="toggle-field">
               <input type="checkbox" id="ui-show-asset-panel" />
               <span class="toggle-field-text">
-                <span class="field-label">显示资源面板</span>
-                <span class="field-hint">在左侧栏显示当前文档内嵌资源列表。关闭后不影响图片保存、资源检查和导出。</span>
+                <span class="field-label">检查器显示资源列表</span>
+                <span class="field-hint">在当前文档检查器中显示 AIMD 托管资源列表。关闭后不影响图片保存、资源检查和导出。</span>
               </span>
             </label>
 

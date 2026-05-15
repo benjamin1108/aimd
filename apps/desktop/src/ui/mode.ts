@@ -10,6 +10,7 @@ import { paintPaneIfStale } from "./outline";
 import { updateChrome } from "./chrome";
 import { flushInline } from "../editor/inline";
 import { splitFrontmatter } from "../markdown/frontmatter";
+import { captureActiveViewState, restoreActiveViewState } from "../document/view-state";
 
 export function refreshSourceBanner() {
   const banner = sourceBannerEl();
@@ -19,7 +20,7 @@ export function refreshSourceBanner() {
   }
   if (state.doc.hasGitConflicts) {
     sourceBannerTextEl().innerHTML =
-      "<strong>Git 冲突</strong>：文档包含 conflict markers，请在源码中搜索 <<<<<<< 并解决后保存。";
+      "<strong>Git 冲突</strong>：文档包含 conflict markers，请在 Markdown 中搜索 <<<<<<< 并解决后保存。";
     banner.hidden = false;
     return;
   }
@@ -30,11 +31,12 @@ export function refreshSourceBanner() {
   }
   const lineCount = frontmatter.split("\n").length;
   sourceBannerTextEl().innerHTML =
-    `<strong>源码视图</strong>：开头 ${lineCount} 行是 YAML 元信息。阅读 / 编辑模式会保护这些内容；源码模式可直接修改。`;
+    `<strong>Markdown 视图</strong>：开头 ${lineCount} 行是 YAML 元信息。预览 / 可视编辑会保护这些内容；Markdown 模式可直接修改。`;
   banner.hidden = false;
 }
 
-export function setMode(mode: Mode) {
+export function setMode(mode: Mode, options: { skipCapture?: boolean } = {}) {
+  if (!options.skipCapture) captureActiveViewState();
   // Flush from the mode we are leaving.
   if (state.mode === "edit" && mode !== "edit") flushInline();
 
@@ -66,6 +68,7 @@ export function setMode(mode: Mode) {
   if (hasDoc) {
     paintPaneIfStale(mode);
     if (mode === "source") refreshSourceBanner();
+    restoreActiveViewState(mode);
   }
 
   for (const [el, m] of [[modeReadEl(), "read"], [modeEditEl(), "edit"], [modeSourceEl(), "source"]] as const) {

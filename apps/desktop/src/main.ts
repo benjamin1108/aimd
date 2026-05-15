@@ -1,5 +1,6 @@
 import { invoke, isTauri } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
+import { getCurrentWindow } from "@tauri-apps/api/window";
 import "./styles.css";
 
 import { APP_HTML } from "./ui/template";
@@ -11,6 +12,7 @@ import { state } from "./core/state";
 import type { AimdDocument } from "./core/types";
 import {
   markdownEl, inlineEditorEl, modeReadEl, modeEditEl, modeSourceEl,
+  openTabsEl,
   saveEl, saveAsEl, closeEl,
   moreMenuToggleEl, moreMenuEl, webImportEl, formatDocumentEl,
   checkUpdatesEl, aboutAimdEl,
@@ -22,7 +24,7 @@ import { bindFormatToolbar } from "./editor/format-toolbar";
 import { bindSearch, openFindBar } from "./editor/search";
 import { bindSourceHighlight } from "./editor/source-highlight";
 import { bindWidthSwitch, setWidth } from "./ui/width";
-import { bindSidebarResizers, bindSidebarHrResizer } from "./ui/resizers";
+import { bindSidebarResizers, bindSidebarHrResizer, bindInspectorHrResizer } from "./ui/resizers";
 import { bindImageLightbox } from "./ui/lightbox";
 import { showFileContextMenu } from "./ui/context-menu";
 import { onInlineInput, flushInline } from "./editor/inline";
@@ -33,6 +35,7 @@ import { clearRecentDocuments, loadRecentPaths } from "./ui/recents";
 import {
   chooseAndOpen, newDocument, closeDocument,
   routeOpenedPath, openDocument, chooseAndImportMarkdownProject,
+  closeDocumentTab, confirmAllDirtyTabsForWindowClose,
 } from "./document/lifecycle";
 import { saveDocument, saveDocumentAs } from "./document/persist";
 import { hasAimdImageReferences, hasExternalImageReferences } from "./document/assets";
@@ -46,8 +49,7 @@ import {
   onWindowDragOver, onWindowDragLeave, onWindowDrop,
 } from "./drag/window-drop";
 import { persistSessionSnapshot, restoreSession } from "./session/snapshot";
-import { applyDocument } from "./document/apply";
-import { hasGitConflictMarkers } from "./document/apply";
+import { activateDocumentTab, applyDocument, hasGitConflictMarkers } from "./document/apply";
 import { debugLog, installDebugConsole, openDebugConsole, onDebugChange, setDebugMode } from "./debug/console";
 import { bindWorkspacePanel, openWorkspacePicker } from "./ui/workspace";
 import { bindDocPanelTabs } from "./ui/doc-panel";
@@ -57,6 +59,7 @@ import { bindSelectionBoundary } from "./ui/selection";
 import { loadAppSettings, type AppSettings } from "./core/settings";
 import { createSourceModel } from "./editor/source-preserve";
 import { bindUpdater, checkForUpdates, scheduleStartupUpdateCheck, showAboutAimd } from "./updater/client";
+import { syncActiveTabFromFacade } from "./document/open-document-state";
 
 installDebugConsole();
 bindSelectionBoundary("main");
@@ -161,6 +164,19 @@ $<HTMLButtonElement>("#new-window").addEventListener("click", () => {
   void openNewWindow();
 });
 closeEl().addEventListener("click", () => { closeActionMenus(); void closeDocument(); });
+openTabsEl().addEventListener("click", (event) => {
+  const target = event.target as HTMLElement | null;
+  const close = target?.closest<HTMLButtonElement>("[data-tab-close]");
+  if (close?.dataset.tabClose) {
+    event.stopPropagation();
+    void closeDocumentTab(close.dataset.tabClose);
+    return;
+  }
+  const activate = target?.closest<HTMLButtonElement>("[data-tab-activate]");
+  if (activate?.dataset.tabActivate) {
+    void activateDocumentTab(activate.dataset.tabActivate);
+  }
+});
 document.addEventListener("click", (event) => {
   if (!(event.target as HTMLElement).closest(".more-menu-wrap")) closeActionMenus();
 });
@@ -214,6 +230,7 @@ bindWidthSwitch();
 bindImageDeleteGuard(inlineEditorEl());
 bindSidebarResizers();
 bindSidebarHrResizer();
+bindInspectorHrResizer();
 
 document.addEventListener("keydown", (event) => {
   if (event.defaultPrevented) return;
@@ -284,8 +301,28 @@ window.addEventListener("beforeunload", () => {
   if (state.mode === "edit" && state.inlineDirty) {
     flushInline();
   }
+  syncActiveTabFromFacade();
   persistSessionSnapshot();
 });
+
+let closeAlreadyApproved = false;
+async function bindWindowCloseGuard() {
+  if (!isTauri()) return;
+  try {
+    await getCurrentWindow().onCloseRequested(async (event) => {
+      if (closeAlreadyApproved) return;
+      if (state.mode === "edit" && state.inlineDirty) flushInline();
+      syncActiveTabFromFacade();
+      if (!(await confirmAllDirtyTabsForWindowClose())) {
+        event.preventDefault();
+        return;
+      }
+      closeAlreadyApproved = true;
+    });
+  } catch {
+    // Browser/e2e shells do not expose native window lifecycle hooks.
+  }
+}
 
 window.addEventListener("DOMContentLoaded", async () => {
   state.recentPaths = loadRecentPaths();
@@ -354,6 +391,7 @@ window.addEventListener("DOMContentLoaded", async () => {
       return;
     }
     if (initialPath) {
+      await restoreSession();
       await routeOpenedPath(initialPath, { skipConfirm: true });
       return;
     }
@@ -367,6 +405,7 @@ window.addEventListener("DOMContentLoaded", async () => {
 });
 
 bindImageLightbox();
+void bindWindowCloseGuard();
 
 (window as any).__aimd_testInsertImageBytes = async (
   buf: ArrayBuffer,

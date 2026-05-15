@@ -9,13 +9,23 @@ import { setMode } from "../ui/mode";
 import { applyHTML } from "../ui/outline";
 import { rememberOpenedPath } from "../ui/recents";
 import { fileStem } from "../util/path";
-import { applyDocument } from "./apply";
+import { activateDocumentTab, applyDocumentAsNewTab, applyDocumentToTab } from "./apply";
 import { hasExternalImageReferences } from "./assets";
 import { triggerOptimizeOnOpen } from "./optimize";
 import { saveDocument } from "./persist";
 import { deleteDocumentDraft } from "./drafts";
 import { clearSessionSnapshot, clearLastSessionPath } from "../session/snapshot";
-import { createSourceModel } from "../editor/source-preserve";
+import {
+  activeTab,
+  dirtyTabs,
+  displayTabTitle,
+  findTab,
+  findTabByPath,
+  nextTabIdAfterClose,
+  removeTab,
+  syncActiveTabFromFacade,
+} from "./open-document-state";
+import { refreshTabFingerprint } from "./fingerprint";
 
 export type OpenRouteResult = "opened" | "focused" | "current" | "cancelled" | "failed" | "unsupported";
 
@@ -25,7 +35,7 @@ export async function chooseAndOpen() {
 }
 
 export async function openMarkdownDocument(markdownPath: string, opts?: { skipConfirm?: boolean }): Promise<OpenRouteResult> {
-  if (!opts?.skipConfirm && !await ensureCanDiscardChanges("打开另一个文档")) return "cancelled";
+  void opts;
   setStatus("正在打开", "loading");
   try {
     const draft = await invoke<MarkdownDraft>("convert_md_to_draft", { markdownPath });
@@ -43,7 +53,9 @@ export async function openMarkdownDocument(markdownPath: string, opts?: { skipCo
       needsAimdSave: false,
       format: "markdown",
     };
-    applyDocument(doc, "read");
+    await applyDocumentAsNewTab(doc, "read");
+    const tab = activeTab();
+    if (tab?.doc.path) void refreshTabFingerprint(tab.id, tab.doc.path);
     rememberOpenedPath(markdownPath);
     setStatus("已打开（Markdown）", "success");
     try {
@@ -58,22 +70,21 @@ export async function openMarkdownDocument(markdownPath: string, opts?: { skipCo
 }
 
 export async function routeOpenedPath(path: string, opts?: { skipConfirm?: boolean }): Promise<OpenRouteResult> {
+  const existing = findTabByPath(path);
+  if (existing) {
+    await activateDocumentTab(existing.id);
+    try {
+      await invoke("register_window_path", { path: existing.doc.path });
+    } catch {}
+    setStatus("已切换到已打开标签页", "info");
+    return "current";
+  }
   // 若该路径已在另一个窗口打开，聚焦那个窗口并结束
   try {
     const label = await invoke<string | null>("focus_doc_window", { path });
     if (label) return "focused";
   } catch {
     // Rust 命令不可用时（如 e2e mock 未注册）继续走正常流程
-  }
-
-  // 若当前窗口本身就持有该路径：避免重新加载丢失未保存内容，但要给用户反馈，
-  // 并补登记一下窗口路径（会话恢复路径时不会自动登记，补一次让多窗口去重生效）。
-  if (state.doc?.path && normPathsEqual(state.doc.path, path)) {
-    try {
-      await invoke("register_window_path", { path: state.doc.path });
-    } catch { /* 命令不可用时忽略 */ }
-    setStatus("已经是当前文档", "info");
-    return "current";
   }
 
   const lower = path.toLowerCase();
@@ -87,18 +98,13 @@ export async function routeOpenedPath(path: string, opts?: { skipConfirm?: boole
   }
 }
 
-function normPathsEqual(a: string, b: string): boolean {
-  return a.replace(/\\/g, "/").toLowerCase() === b.replace(/\\/g, "/").toLowerCase();
-}
-
 export async function chooseAndImportMarkdown() {
   const markdownPath = await invoke<string | null>("choose_markdown_file");
   if (!markdownPath) return;
-  await openMarkdownDocument(markdownPath);
+  await routeOpenedPath(markdownPath);
 }
 
 export async function chooseAndImportMarkdownProject() {
-  if (!await ensureCanDiscardChanges("导入 Markdown 项目")) return;
   const markdownPath = await invoke<string | null>("choose_markdown_project_path");
   if (!markdownPath) return;
   const suggestedName = `${fileStem(markdownPath) || "markdown-project"}.aimd`;
@@ -107,7 +113,9 @@ export async function chooseAndImportMarkdownProject() {
   setStatus("正在导入 Markdown 项目", "loading");
   try {
     const doc = await invoke<AimdDocument>("import_markdown", { markdownPath, savePath });
-    applyDocument({ ...doc, isDraft: false, format: "aimd", dirty: false }, "read");
+    await applyDocumentAsNewTab({ ...doc, isDraft: false, format: "aimd", dirty: false }, "read");
+    const tab = activeTab();
+    if (tab?.doc.path) void refreshTabFingerprint(tab.id, tab.doc.path);
     rememberOpenedPath(doc.path);
     setStatus("Markdown 项目已导入", "success");
     try {
@@ -120,7 +128,6 @@ export async function chooseAndImportMarkdownProject() {
 }
 
 export async function newDocument() {
-  if (!await ensureCanDiscardChanges("新建文档")) return;
   const markdown = "# 未命名文档\n\n";
   const doc: AimdDocument = {
     path: "",
@@ -132,10 +139,7 @@ export async function newDocument() {
     isDraft: true,
     format: "aimd",
   };
-  state.doc = doc;
-  state.sourceModel = createSourceModel(markdown);
-  state.sourceDirtyRefs.clear();
-  state.sourceStructuralDirty = false;
+  await applyDocumentAsNewTab(doc, "edit", { forceDraft: true });
   markdownEl().value = markdown;
   try {
     const out = await invoke<RenderResult>("render_markdown_standalone", { markdown });
@@ -162,11 +166,13 @@ export async function newDocument() {
 }
 
 export async function openDocument(path: string, options: { skipConfirm?: boolean } = {}): Promise<OpenRouteResult> {
-  if (!options.skipConfirm && !await ensureCanDiscardChanges("打开另一个文档")) return "cancelled";
+  void options;
   setStatus("正在打开", "loading");
   try {
     const doc = await invoke<AimdDocument>("open_aimd", { path });
-    applyDocument({ ...doc, isDraft: false, format: "aimd", dirty: false }, "read");
+    await applyDocumentAsNewTab({ ...doc, isDraft: false, format: "aimd", dirty: false }, "read");
+    const tab = activeTab();
+    if (tab?.doc.path) void refreshTabFingerprint(tab.id, tab.doc.path);
     rememberOpenedPath(doc.path);
     if (state.doc?.hasGitConflicts) {
       setStatus("文档包含 Git 冲突，请解决后保存", "warn");
@@ -186,9 +192,14 @@ export async function openDocument(path: string, options: { skipConfirm?: boolea
 }
 
 export async function closeDocument() {
-  if (!await ensureCanDiscardChanges("关闭当前文档")) return;
-  await deleteDocumentDraft(state.doc);
+  const tab = activeTab();
+  if (!tab) return;
+  await closeDocumentTab(tab.id);
+}
+
+function clearDocumentSurface() {
   state.doc = null;
+  state.openDocuments.activeTabId = null;
   state.outline = [];
   state.inlineDirty = false;
   state.sourceModel = null;
@@ -200,38 +211,101 @@ export async function closeDocument() {
   readerEl().innerHTML = "";
   clearSessionSnapshot();
   clearLastSessionPath();
-  // 必须摘掉 OpenedWindows 表里当前窗口的路径条目，否则下次点 recents "继续" 时
-  // focus_doc_window 会命中残留条目，误判"已有窗口承载"，导致文档再也打不开。
-  try {
-    await invoke("unregister_current_window_path");
-  } catch { /* 命令不可用时静默忽略 */ }
   setMode("read");
   updateChrome();
-  setStatus("已关闭文档", "info");
+}
+
+export async function closeDocumentTab(tabId: string): Promise<boolean> {
+  const tab = findTab(tabId);
+  if (!tab) return true;
+  const wasActive = state.openDocuments.activeTabId === tab.id;
+  const nextId = wasActive ? nextTabIdAfterClose(tab.id) : state.openDocuments.activeTabId;
+  if (!await ensureCanCloseTab(tab.id, "关闭当前标签页")) return false;
+  await deleteDocumentDraft(tab.doc);
+  if (tab.doc.path) {
+    try {
+      await invoke("unregister_window_path", { path: tab.doc.path });
+    } catch {}
+  }
+  removeTab(tab.id);
+  if (nextId) {
+    await activateDocumentTab(nextId);
+  } else {
+    clearDocumentSurface();
+    clearSessionSnapshot();
+    clearLastSessionPath();
+  }
+  updateChrome();
+  setStatus("已关闭标签页", "info");
+  return true;
 }
 
 // Tauri 2 webview 默认吞掉 window.confirm()（无 UI、悄悄返回 false），
 // 所以"丢弃未保存内容前的确认"必须走 Rust 端的原生对话框。
 // 三按钮："保存" → 先 saveDocument 再继续；"不保存" → 直接放弃；"取消" → 留在原文档。
 export async function ensureCanDiscardChanges(action: string): Promise<boolean> {
-  if (!state.doc?.dirty) return true;
+  const tab = activeTab();
+  return tab ? ensureCanCloseTab(tab.id, action) : true;
+}
+
+async function saveTabBeforeLeaving(tabId: string): Promise<boolean> {
+  const tab = findTab(tabId);
+  if (!tab) return true;
+  if (!tab.doc.dirty) return true;
+  if (state.openDocuments.activeTabId === tab.id) {
+    await saveDocument();
+    syncActiveTabFromFacade();
+    return !tab.doc.dirty;
+  }
+  if (tab.doc.isDraft || !tab.doc.path || (tab.doc.format === "markdown" && tab.doc.requiresAimdSave)) {
+    if (!await activateDocumentTab(tab.id)) return false;
+    await saveDocument();
+    syncActiveTabFromFacade();
+    return !tab.doc.dirty;
+  }
+  try {
+    if (tab.doc.format === "markdown") {
+      await invoke("save_markdown", { path: tab.doc.path, markdown: tab.doc.markdown });
+      tab.doc.dirty = false;
+    } else {
+      const doc = await invoke<AimdDocument>("save_aimd", { path: tab.doc.path, markdown: tab.doc.markdown });
+      applyDocumentToTab(tab.id, { ...doc, isDraft: false, format: "aimd", dirty: false }, tab.mode);
+    }
+    return true;
+  } catch (err) {
+    console.error(err);
+    setStatus(`保存失败: ${err instanceof Error ? err.message : String(err)}`, "warn");
+    return false;
+  }
+}
+
+export async function ensureCanCloseTab(tabId: string, action: string): Promise<boolean> {
+  const tab = findTab(tabId);
+  if (!tab?.doc.dirty) return true;
+  const label = displayTabTitle(tab.doc);
   let choice: "save" | "discard" | "cancel";
   try {
     choice = await invoke<"save" | "discard" | "cancel">("confirm_discard_changes", {
-      message: `当前文档有未保存的修改，仍要${action}吗？`,
+      message: `“${label}”有未保存的修改，仍要${action}吗？`,
     });
   } catch {
     // 退化到 window.confirm，仅用于 vite-only 开发态 / e2e 兜底（不希望在 Tauri 实跑里走到这里）
-    choice = window.confirm(`当前文档有未保存的修改，仍要${action}吗？`) ? "discard" : "cancel";
+    choice = window.confirm(`“${label}”有未保存的修改，仍要${action}吗？`) ? "discard" : "cancel";
   }
   if (choice === "save") {
-    await saveDocument();
-    // saveDocument 内部走 saveDocumentAs；若用户在 file picker 里取消、文档仍是 draft / 仍 dirty，则视为放弃此次离开。
-    return !(state.doc?.dirty ?? false);
+    return saveTabBeforeLeaving(tab.id);
   }
   if (choice === "discard") {
-    await deleteDocumentDraft(state.doc);
+    await deleteDocumentDraft(tab.doc);
+    tab.doc.dirty = false;
     return true;
   }
   return false;
+}
+
+export async function confirmAllDirtyTabsForWindowClose(): Promise<boolean> {
+  for (const tab of dirtyTabs()) {
+    if (!await ensureCanCloseTab(tab.id, "关闭窗口")) return false;
+  }
+  return true;
 }

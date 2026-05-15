@@ -256,3 +256,51 @@ Required completion actions:
 Do not archive this file before the phase is truly complete. Do not make a
 standalone commit that only moves this file to `archive/`. Do not report the
 goal complete while the active copy still exists under `docs/todo/`.
+
+## Completion Note - 2026-05-15
+
+Phase 4 is complete.
+
+- Final terminology:
+  - Persistent directory context is labeled `项目`.
+  - View controls are `预览`, `可视编辑`, and `Markdown`.
+  - The close command is scoped as `关闭当前标签页`.
+  - Git review is explicitly presented as `Git review · 项目变更`.
+- Command scope hierarchy:
+  - Project commands stay in the project toolbar: open directory, refresh
+    project, create project document/folder, close project.
+  - Document/tab commands stay in the document action menu: save as, format,
+    package, import, health, export, close current tab.
+  - App commands are separated from document commands: new window, update, and
+    about.
+  - Inspector tabs own outline/assets/Git/health switching.
+- Stable status placement:
+  - The header now renders `#doc-state-badges` for format, dirty state,
+    `requiresAimdSave`, Git conflict, disk-changed recovery, and project
+    membership.
+  - The bottom status pill remains for transient feedback and compact stable
+    summary only.
+- Accessibility and narrow viewport checks:
+  - `apps/desktop/e2e/55-navigation-language.spec.ts` asserts scoped accessible
+    names for tabs and close buttons.
+  - Desktop and narrow viewport screenshots were captured with
+    `AIMD_PHASE4_SCREENSHOT_DIR=/private/tmp/aimd-phase4-screens`; visual
+    review confirmed no overlapping title, tab, mode, or toolbar text.
+  - `apps/desktop/e2e/07-narrow-viewport.spec.ts` still passes after adding the
+    header badges.
+- Demo and developer documentation:
+  - `docs/product/aimd-tab-workflow-redesign-demo.html` was updated to the final
+    project/open-documents/current-document language.
+  - `docs/product/aimd-tab-workflow-state-model.md` was added to document
+    project vs open documents, active-tab facade, inspector ownership, session
+    restore schema, and path registry behavior.
+- Product review checklist:
+  - Covered by the Phase 4 spec and regression suite: project open/close,
+    multi-document tabs, Markdown/AIMD docs, visual/Markdown edits, dirty
+    states, health/asset ownership, Git review identity, Markdown save
+    semantics, and session restore language.
+- Validation results:
+  - `npm --prefix apps/desktop run check`: passed.
+  - `cargo check --workspace`: passed.
+  - `git diff --check`: passed.
+  - `npx playwright test e2e/52-open-documents-tabs.spec.ts e2e/53-tab-session-state.spec.ts e2e/54-document-inspector.spec.ts e2e/55-navigation-language.spec.ts e2e/31-md-open-association.spec.ts e2e/50-source-preserving-editor.spec.ts e2e/49-selection-boundary.spec.ts e2e/07-narrow-viewport.spec.ts e2e/23-discard-confirm-flow.spec.ts e2e/37-more-menu-close-action.spec.ts e2e/38-design-polish.spec.ts e2e/44-workspace-directory-management.spec.ts e2e/45-asset-panel-settings.spec.ts e2e/46-git-workspace-panel.spec.ts`: 83 passed.

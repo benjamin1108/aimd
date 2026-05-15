@@ -8,9 +8,11 @@ import { loadAppSettings } from "../core/settings";
 import { hasAimdImageReferences } from "./assets";
 import { splitFrontmatter } from "../markdown/frontmatter";
 import { hasGitConflictMarkers } from "./apply";
+import { beginTabOperation, isActiveOperationCurrent } from "./open-document-state";
 
 let formatting = false;
 let pendingMarkdown = "";
+let pendingTabId = "";
 
 type FormatMarkdownResult = {
   needed: boolean;
@@ -56,8 +58,9 @@ export function validateFormattedMarkdown(input: string, output: string): string
   return reasons;
 }
 
-function showPreview(markdown: string) {
+function showPreview(markdown: string, tabId: string) {
   pendingMarkdown = markdown;
+  pendingTabId = tabId;
   formatPreviewTextEl().textContent = markdown;
   formatPreviewPanelEl().hidden = false;
   formatApplyEl().focus();
@@ -65,6 +68,7 @@ function showPreview(markdown: string) {
 
 function hidePreview() {
   pendingMarkdown = "";
+  pendingTabId = "";
   formatPreviewPanelEl().hidden = true;
 }
 
@@ -78,7 +82,7 @@ export function bindFormatDocumentPanel() {
     setStatus("已取消格式化", "info");
   });
   formatApplyEl().addEventListener("click", async () => {
-    if (!state.doc || !pendingMarkdown) return;
+    if (!state.doc || !pendingMarkdown || pendingTabId !== state.openDocuments.activeTabId) return;
     const markdown = pendingMarkdown;
     hidePreview();
     state.doc.markdown = markdown;
@@ -108,6 +112,8 @@ export async function formatCurrentDocument() {
     return;
   }
   if (state.mode === "edit") flushInline();
+  const target = beginTabOperation();
+  if (!target) return;
   formatting = true;
   setStatus("正在格式化文档...", "loading");
   try {
@@ -119,6 +125,7 @@ export async function formatCurrentDocument() {
       model: config.model,
       outputLanguage: config.outputLanguage,
     });
+    if (!isActiveOperationCurrent(target)) return;
     if (!result.needed) {
       hidePreview();
       console.info("format_markdown skipped", result.reason || "");
@@ -135,7 +142,7 @@ export async function formatCurrentDocument() {
       setStatus("格式化结果不完整，已保留原文", "warn");
       return;
     }
-    showPreview(result.markdown);
+    showPreview(result.markdown, target.tabId);
     setStatus("格式化完成，请确认应用", "info");
   } catch (err) {
     console.error(err);

@@ -1,5 +1,5 @@
 import { panelEl } from "../core/dom";
-import { openDocument, openMarkdownDocument } from "../document/lifecycle";
+import { routeOpenedPath } from "../document/lifecycle";
 
 export function onWindowDragOver(event: DragEvent) {
   if (!event.dataTransfer?.files?.length) return;
@@ -19,11 +19,5 @@ export async function onWindowDrop(event: DragEvent) {
   event.preventDefault();
   const droppedPath = file.path || "";
   if (!droppedPath) return;
-  if (/\.aimd$/i.test(droppedPath)) {
-    await openDocument(droppedPath);
-    return;
-  }
-  if (/\.(md|markdown|mdx)$/i.test(droppedPath)) {
-    await openMarkdownDocument(droppedPath);
-  }
+  await routeOpenedPath(droppedPath);
 }

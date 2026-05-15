@@ -40,6 +40,14 @@
   white-space: nowrap;
 }
 
+.git-diff-scope {
+  margin-bottom: 2px;
+  color: var(--ink-faint);
+  font: 700 10.5px/1.2 var(--font-mono);
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
 .git-diff-scroll {
   flex: 1 1 auto;
   min-width: 0;

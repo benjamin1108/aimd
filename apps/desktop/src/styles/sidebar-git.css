@@ -2,7 +2,7 @@
 
 .doc-panel-tabs {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
+  grid-template-columns: repeat(3, minmax(0, 1fr)) auto;
   align-items: center;
   gap: 6px;
   padding: 0 6px 6px;
@@ -14,7 +14,7 @@
 }
 
 #outline-section.has-git-tab .doc-panel-tabs {
-  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) auto;
+  grid-template-columns: repeat(4, minmax(0, 1fr)) auto;
   gap: 4px;
 }
 
@@ -31,16 +31,15 @@
 }
 
 #outline-section:not(.has-git-tab) .doc-panel-tab {
-  justify-self: start;
-  pointer-events: none;
+  justify-self: stretch;
 }
 
-#outline-section.has-git-tab .doc-panel-tab:hover {
+.doc-panel-tab:hover {
   background: var(--bg-sidebar-hover);
   color: var(--ink);
 }
 
-#outline-section.has-git-tab .doc-panel-tab.is-active {
+.doc-panel-tab.is-active {
   background: rgba(31, 22, 11, 0.08);
   color: var(--ink);
 }

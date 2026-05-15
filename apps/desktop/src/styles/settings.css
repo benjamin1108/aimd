@@ -29,7 +29,7 @@
 .settings-head h1 {
   margin: 0;
   font: 600 17px/1.2 var(--font-display);
-  letter-spacing: -0.012em;
+  letter-spacing: 0;
   color: var(--ink-strong);
 }
 
@@ -63,7 +63,7 @@
   color: var(--ink-muted);
   font-size: 13px;
   font-weight: 500;
-  letter-spacing: -0.005em;
+  letter-spacing: 0;
   text-align: left;
   transition: background var(--t-fast) var(--ease),
               color var(--t-fast) var(--ease);
@@ -109,7 +109,7 @@
   margin: 0;
   color: var(--ink-strong);
   font: 600 14.5px/1.2 var(--font-display);
-  letter-spacing: -0.01em;
+  letter-spacing: 0;
 }
 
 .settings-section-head p {
@@ -137,7 +137,7 @@
   color: var(--ink-strong);
   font-size: 12.5px;
   font-weight: 600;
-  letter-spacing: -0.005em;
+  letter-spacing: 0;
 }
 
 .field-optional {

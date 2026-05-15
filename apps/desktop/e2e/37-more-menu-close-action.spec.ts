@@ -64,13 +64,13 @@ test.describe("⋯ 菜单关闭文档入口", () => {
     await expect(page.locator("#close")).not.toHaveClass(/action-menu-item--danger/);
   });
 
-  test("菜单中有分隔线 action-menu-sep", async ({ page }) => {
+  test("菜单中有分隔线 action-menu-divider", async ({ page }) => {
     await installTauriMock(page);
     await page.goto("/");
     await page.locator("#empty-open").click();
 
     await page.locator("#more-menu-toggle").click();
-    await expect(page.locator("#more-menu .action-menu-sep")).toBeVisible();
+    await expect(page.locator("#more-menu .action-menu-divider").first()).toBeVisible();
   });
 
   test("展开菜单后点 #close 可以关闭文档", async ({ page }) => {

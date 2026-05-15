@@ -343,3 +343,20 @@ Required completion actions:
 Do not archive this file before the phase is truly complete. Do not make a
 standalone commit that only moves this file to `archive/`. Do not report the
 goal complete while the active copy still exists under `docs/todo/`.
+
+## Completion Note - 2026-05-15
+
+- Tab state model: added explicit `openDocuments.tabs` and `activeTabId`, with each tab owning its document, source model, source dirty refs, inline dirty flag, render versions, operation version, and current mode.
+- Active tab switch transaction: switching flushes pending visual edits, snapshots the outgoing active facade into its tab, binds the target tab back into the legacy `state.doc` facade, repaints only the active document surface, and refreshes chrome/sidebar ownership.
+- Dirty close behavior: close now targets a tab. Dirty active and inactive tabs prompt by document title, cancel leaves the active tab unchanged, and closing the last tab returns to the launch state while project context can remain independent.
+- Multi-window path registry: Rust registration now allows multiple paths per window, adds single-path unregister, keeps all-path unregister for full window teardown, and Save As / workspace rename passes old/new path mapping for the affected tab.
+- Async target-tab guard: markdown render, format, health/resource actions, image hydration, and save result application capture tab/operation ownership before writing back. Stale results are ignored instead of repainting the current tab.
+- Regression hardening: structural toolbar inserts now append Markdown directly for table/code/task blocks, and image alt edits update the source Markdown without falling into whole-document structural flush.
+- Validation results:
+  - `npm --prefix apps/desktop run check`: passed.
+  - `cargo check --workspace`: passed.
+  - `git diff --check`: passed.
+  - `npx playwright test e2e/52-open-documents-tabs.spec.ts`: 4 passed.
+  - `npx playwright test e2e/23-discard-confirm-flow.spec.ts e2e/33-dedup-window.spec.ts e2e/44-workspace-directory-management.spec.ts`: passed after updating directory deletion expectations to the new tab semantics.
+  - `npx playwright test e2e/31-md-open-association.spec.ts e2e/42-editor-core-capabilities.spec.ts e2e/50-source-preserving-editor.spec.ts`: 32 passed.
+  - `npx playwright test e2e/20-rust-handler-registration.spec.ts e2e/46-git-workspace-panel.spec.ts`: 88 passed.

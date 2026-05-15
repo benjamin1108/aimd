@@ -1,7 +1,7 @@
 /* Format toolbar (above inline editor) + inline contenteditable styles */
 
 .format-toolbar {
-  grid-row: 3;
+  grid-row: 4;
   display: flex;
   align-items: center;
   flex-wrap: wrap;

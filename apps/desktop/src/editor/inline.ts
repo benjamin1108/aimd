@@ -124,7 +124,7 @@ export function flushInline() {
         : state.doc.markdown;
     } else {
       state.inlineDirty = true;
-      setStatus("当前可视化结构编辑不能安全保持 Markdown 原文，请切到源码模式完成这次结构修改", "warn");
+      setStatus("当前可视化结构编辑不能安全保持 Markdown 原文，请切到 Markdown 模式完成这次结构修改", "warn");
       updateChrome();
       return;
     }
@@ -134,7 +134,7 @@ export function flushInline() {
     : null;
   if (patched && !patched.ok) {
     state.inlineDirty = true;
-    setStatus(`可视化保存受限: ${patched.reason}，请切到源码模式保存该结构`, "warn");
+    setStatus(`可视化保存受限: ${patched.reason}，请切到 Markdown 模式保存该结构`, "warn");
     updateChrome();
     return;
   }

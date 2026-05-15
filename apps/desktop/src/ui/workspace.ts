@@ -26,6 +26,7 @@ import { confirmWorkspaceAction, promptWorkspaceText } from "./workspace-dialogs
 import { refreshGitStatus, resetGitState } from "./git";
 import { showDocumentView } from "./git-diff";
 import { applyWorkspaceCollapseState, bindWorkspaceCollapse } from "./sidebar-layout";
+import { updateOpenTabPath } from "../document/open-document-state";
 
 function samePath(a: string, b: string): boolean { return a.replace(/\\/g, "/").toLowerCase() === b.replace(/\\/g, "/").toLowerCase(); }
 
@@ -48,6 +49,16 @@ function updateDefaultHeadingAfterRename(oldPath: string, newPath: string) {
   state.doc.markdown = state.doc.markdown.replace(/^# .*(\r?\n|$)/m, `# ${newStem}$1`);
   markdownEl().value = state.doc.markdown;
   state.doc.dirty = true;
+}
+
+function updateOpenPathAfterWorkspaceChange(oldPath: string, newPath: string, title?: string) {
+  if (!updateOpenTabPath(oldPath, newPath, title)) return;
+  if (state.doc?.path && samePath(state.doc.path, newPath)) updateDefaultHeadingAfterRename(oldPath, newPath);
+  state.recentPaths = [newPath, ...state.recentPaths.filter((path) => !samePath(path, oldPath) && !samePath(path, newPath))];
+  saveRecentPaths();
+  rememberOpenedPath(newPath);
+  void invoke("update_window_path", { oldPath, newPath }).catch(() => {});
+  updateChrome();
 }
 
 function findNode(node: WorkspaceTreeNode, path: string): WorkspaceTreeNode | null {
@@ -128,25 +139,25 @@ export function renderWorkspaceTree() {
   workspaceCloseEl().disabled = !state.workspace || state.workspaceLoading;
 
   if (state.workspaceLoading) {
-    workspaceRootLabelEl().textContent = "目录";
-    workspaceTreeEl().innerHTML = `<div class="workspace-empty">正在读取目录</div>`;
+    workspaceRootLabelEl().textContent = "项目";
+    workspaceTreeEl().innerHTML = `<div class="workspace-empty">正在读取项目</div>`;
     return;
   }
 
   if (state.workspaceError) {
-    workspaceRootLabelEl().textContent = "目录";
+    workspaceRootLabelEl().textContent = "项目";
     workspaceTreeEl().innerHTML = `<div class="workspace-error">${escapeHTML(state.workspaceError)}</div>`;
     return;
   }
 
   if (!state.workspace) {
     const lastRoot = window.localStorage.getItem(STORAGE_WORKSPACE_ROOT);
-    workspaceRootLabelEl().textContent = "目录";
+    workspaceRootLabelEl().textContent = "项目";
     workspaceTreeEl().innerHTML = lastRoot
       ? `<button class="workspace-row is-folder" id="workspace-restore-last" type="button" title="${escapeAttr(lastRoot)}">
           <span class="workspace-row-spacer"></span>
           <span class="workspace-node-icon">${ICONS.folder}</span>
-          <span class="workspace-name">继续上次目录</span>
+          <span class="workspace-name">继续上次项目</span>
         </button>`
       : `<div class="workspace-empty">打开目录</div>`;
     document.querySelector<HTMLButtonElement>("#workspace-restore-last")?.addEventListener("click", () => {
@@ -155,7 +166,7 @@ export function renderWorkspaceTree() {
     return;
   }
 
-  workspaceRootLabelEl().textContent = state.workspace.tree.name || "目录";
+  workspaceRootLabelEl().textContent = "项目";
   workspaceRootLabelEl().title = state.workspace.root;
   workspaceTreeEl().innerHTML = renderNode(state.workspace.tree, 0);
   bindWorkspaceRows();
@@ -195,7 +206,7 @@ async function openWorkspaceDocument(path: string) {
     state.workspaceSelectedPath = path;
     renderWorkspaceTree();
   } else if (result === "failed" || result === "unsupported") {
-    await refreshWorkspace("文件不可用，已刷新目录");
+    await refreshWorkspace("文件不可用，已刷新项目");
   }
 }
 
@@ -273,16 +284,7 @@ async function renameEntry(node: WorkspaceTreeNode) {
       newName: nextName,
     });
     state.workspaceSelectedPath = newPath;
-    if (state.doc?.path && samePath(state.doc.path, oldPath)) {
-      updateDefaultHeadingAfterRename(oldPath, newPath);
-      state.doc.path = newPath;
-      state.doc.title = fileStem(newPath) || state.doc.title;
-      state.recentPaths = [newPath, ...state.recentPaths.filter((path) => !samePath(path, oldPath) && !samePath(path, newPath))];
-      saveRecentPaths();
-      rememberOpenedPath(newPath);
-      void invoke("update_window_path", { newPath }).catch(() => {});
-      updateChrome();
-    }
+    updateOpenPathAfterWorkspaceChange(oldPath, newPath, fileStem(newPath) || undefined);
     return workspace;
   }, "已重命名");
 }
@@ -299,14 +301,7 @@ async function moveEntry(node: WorkspaceTreeNode) {
       toParent: target,
     });
     state.workspaceSelectedPath = newPath;
-    if (state.doc?.path && samePath(state.doc.path, node.path)) {
-      state.doc.path = newPath;
-      state.recentPaths = [newPath, ...state.recentPaths.filter((path) => !samePath(path, node.path) && !samePath(path, newPath))];
-      saveRecentPaths();
-      rememberOpenedPath(newPath);
-      void invoke("update_window_path", { newPath }).catch(() => {});
-      updateChrome();
-    }
+    updateOpenPathAfterWorkspaceChange(node.path, newPath);
     return workspace;
   }, "已移动");
 }
@@ -415,7 +410,7 @@ export async function openWorkspacePicker() {
       return;
     }
     applyWorkspace(workspace);
-    setStatus("目录已打开", "success");
+    setStatus("项目已打开", "success");
   } catch (err) {
     console.error(err);
     state.workspaceError = err instanceof Error ? err.message : String(err);
@@ -435,7 +430,7 @@ export async function openStoredWorkspace() {
   try {
     const workspace = await invoke<WorkspaceRoot>("read_workspace_tree", { root });
     applyWorkspace(workspace);
-    setStatus("目录已恢复", "success");
+    setStatus("项目已恢复", "success");
   } catch (err) {
     console.error(err);
     state.workspace = null;
@@ -448,7 +443,7 @@ export async function openStoredWorkspace() {
   }
 }
 
-export async function refreshWorkspace(message = "目录已刷新") {
+export async function refreshWorkspace(message = "项目已刷新") {
   if (!state.workspace) return;
   const root = state.workspace.root;
   state.workspaceLoading = true;
@@ -481,7 +476,7 @@ export function closeWorkspace() {
   showDocumentView();
   updateChrome();
   renderWorkspaceTree();
-  setStatus("目录已关闭", "success");
+  setStatus("项目已关闭", "success");
 }
 
 export function bindWorkspacePanel() {

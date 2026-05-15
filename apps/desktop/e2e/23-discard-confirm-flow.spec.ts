@@ -98,7 +98,7 @@ test.describe("B. ensureCanDiscardChanges 走 Rust 对话框", () => {
     const calls = await page.evaluate(() => (window as any).__discardCalls);
     expect(calls.length).toBe(1);
     expect(calls[0]).toContain("未保存的修改");
-    expect(calls[0]).toContain("关闭当前文档");
+    expect(calls[0]).toContain("关闭当前标签页");
   });
 
   test("选择「取消」：文档保留，doc-actions 仍显示", async ({ page }) => {

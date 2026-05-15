@@ -208,6 +208,19 @@
   overflow: hidden;
 }
 
+.health-panel--inspector {
+  position: static;
+  right: auto;
+  bottom: auto;
+  z-index: auto;
+  width: auto;
+  max-height: none;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+}
+
 .health-panel[hidden] { display: none !important; }
 
 .health-panel-head {

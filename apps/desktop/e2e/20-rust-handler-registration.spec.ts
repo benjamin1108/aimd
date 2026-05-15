@@ -88,6 +88,7 @@ test.describe("Rust invoke_handler 命令注册校验", () => {
     "reveal_in_finder",
     "initial_open_path",
     "open_aimd",
+    "document_file_fingerprint",
     "create_aimd",
     "save_aimd",
     "save_aimd_as",
@@ -149,6 +150,7 @@ test.describe("Rust invoke_handler 命令注册校验", () => {
     "close_current_window",
     "focus_doc_window",
     "register_window_path",
+    "unregister_window_path",
     "unregister_current_window_path",
     "update_window_path",
   ];

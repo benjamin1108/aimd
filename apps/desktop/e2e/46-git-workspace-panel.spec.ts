@@ -141,7 +141,7 @@ test.describe("Git workspace panel", () => {
     await page.goto("/");
 
     await page.locator("#empty-open-workspace").click();
-    await expect(page.locator("#workspace-root-label")).toHaveText("repo");
+    await expect(page.locator("#workspace-root-label")).toHaveText("项目");
     await expect(page.locator("#sidebar-tab-git")).toBeHidden();
   });
 
@@ -230,7 +230,7 @@ test.describe("Git workspace panel", () => {
     await expect(page.locator("#git-diff-view")).toBeHidden();
   });
 
-  test("collapses sidebar sections and resizes workspace versus doc panel", async ({ page }) => {
+  test("collapses project and inspector rails while keeping their widths independent", async ({ page }) => {
     await installGitWorkspaceMock(page, "repo");
     await page.goto("/");
 
@@ -238,32 +238,34 @@ test.describe("Git workspace panel", () => {
     await page.locator("#workspace-collapse").click();
     await expect(page.locator("#workspace-section")).toHaveClass(/is-collapsed/);
     await expect(page.locator("#workspace-tree")).toBeHidden();
-    let handle = await page.locator("#sb-resizer-workspace-doc").boundingBox();
-    expect(handle).toBeTruthy();
-    await page.mouse.move(handle!.x + handle!.width / 2, handle!.y + handle!.height / 2);
-    await page.mouse.down();
-    await page.mouse.move(handle!.x + handle!.width / 2, handle!.y + handle!.height / 2 + 36);
-    await page.mouse.up();
-    await expect(page.locator("#workspace-section")).not.toHaveClass(/is-collapsed/);
-    await expect(page.locator("#workspace-tree")).toBeVisible();
 
     await page.locator("#workspace-collapse").click();
-    await page.locator("#workspace-collapse").click();
     await expect(page.locator("#workspace-section")).not.toHaveClass(/is-collapsed/);
+
+    const projectBefore = await page.locator(".sidebar").boundingBox();
+    const projectHandle = await page.locator("#sidebar-hr-resizer").boundingBox();
+    expect(projectBefore && projectHandle).toBeTruthy();
+    await page.mouse.move(projectHandle!.x + projectHandle!.width / 2, projectHandle!.y + projectHandle!.height / 2);
+    await page.mouse.down();
+    await page.mouse.move(projectHandle!.x + projectHandle!.width / 2 + 38, projectHandle!.y + projectHandle!.height / 2);
+    await page.mouse.up();
+    const projectAfter = await page.locator(".sidebar").boundingBox();
+    expect(projectAfter!.width).toBeGreaterThan(projectBefore!.width + 20);
 
     await page.locator("#doc-panel-collapse").click();
     await expect(page.locator("#outline-section")).toHaveClass(/is-collapsed/);
+    await expect(page.locator("#inspector")).toHaveClass(/is-collapsed/);
     await page.locator("#doc-panel-collapse").click();
     await expect(page.locator("#outline-section")).not.toHaveClass(/is-collapsed/);
 
-    const before = await page.locator("#workspace-section").boundingBox();
-    handle = await page.locator("#sb-resizer-workspace-doc").boundingBox();
-    expect(before && handle).toBeTruthy();
-    await page.mouse.move(handle!.x + handle!.width / 2, handle!.y + handle!.height / 2);
+    const inspectorBefore = await page.locator("#inspector").boundingBox();
+    const inspectorHandle = await page.locator("#inspector-hr-resizer").boundingBox();
+    expect(inspectorBefore && inspectorHandle).toBeTruthy();
+    await page.mouse.move(inspectorHandle!.x + inspectorHandle!.width / 2, inspectorHandle!.y + inspectorHandle!.height / 2);
     await page.mouse.down();
-    await page.mouse.move(handle!.x + handle!.width / 2, handle!.y + handle!.height / 2 + 42);
+    await page.mouse.move(inspectorHandle!.x + inspectorHandle!.width / 2 - 38, inspectorHandle!.y + inspectorHandle!.height / 2);
     await page.mouse.up();
-    const after = await page.locator("#workspace-section").boundingBox();
-    expect(after!.height).toBeGreaterThan(before!.height + 20);
+    const inspectorAfter = await page.locator("#inspector").boundingBox();
+    expect(inspectorAfter!.width).toBeGreaterThan(inspectorBefore!.width + 20);
   });
 });

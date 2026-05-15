@@ -158,6 +158,7 @@ pub fn run() {
             workspace::move_workspace_entry,
             documents::initial_open_path,
             documents::open_aimd,
+            documents::document_file_fingerprint,
             documents::create_aimd,
             documents::save_aimd,
             documents::save_aimd_as,
@@ -215,6 +216,7 @@ pub fn run() {
             windows::close_current_window,
             windows::focus_doc_window,
             windows::register_window_path,
+            windows::unregister_window_path,
             windows::unregister_current_window_path,
             windows::update_window_path
         ])

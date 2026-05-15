@@ -8,11 +8,13 @@ import type { AimdDocument } from "../core/types";
 import { setStatus, displayDocTitle, updateChrome } from "../ui/chrome";
 import { rememberOpenedPath } from "../ui/recents";
 import { fileStem, suggestAimdFilename } from "../util/path";
-import { applyDocument } from "./apply";
+import { applyDocument, applyDocumentToTab } from "./apply";
 import { flushInline } from "../editor/inline";
 import { deleteDraftFile } from "./drafts";
 import { hasAimdImageReferences } from "./assets";
 import { renderPreview } from "../ui/outline";
+import { activeTab, beginTabOperation, findTab, isOperationCurrent, syncActiveTabFromFacade } from "./open-document-state";
+import { refreshTabFingerprint } from "./fingerprint";
 
 type SaveFormat = "markdown" | "aimd";
 
@@ -32,6 +34,10 @@ function messageFromError(err: unknown, fallback: string): string {
 export async function saveDocument() {
   if (!state.doc) return;
   if (state.mode === "edit") flushInline();
+  syncActiveTabFromFacade();
+  const target = beginTabOperation();
+  const tab = target ? findTab(target.tabId) : activeTab();
+  const doc = tab?.doc ?? state.doc;
   if (state.doc.isDraft || !state.doc.path) {
     await saveDocumentAs();
     return;
@@ -51,10 +57,14 @@ export async function saveDocument() {
     setStatus("正在保存", "loading");
     saveEl().disabled = true;
     try {
-      await invoke("save_markdown", { path: state.doc.path, markdown: state.doc.markdown });
-      state.doc.dirty = false;
+      await invoke("save_markdown", { path: doc.path, markdown: doc.markdown });
+      if (!isOperationCurrent(target)) return;
+      const savedTab = target ? findTab(target.tabId) : activeTab();
+      if (savedTab) savedTab.doc.dirty = false;
+      if (savedTab?.id === state.openDocuments.activeTabId && state.doc) state.doc.dirty = false;
+      if (savedTab?.doc.path) void refreshTabFingerprint(savedTab.id, savedTab.doc.path);
       updateChrome();
-      rememberOpenedPath(state.doc.path);
+      rememberOpenedPath(doc.path);
       setStatus("已保存（Markdown）", "success");
       window.dispatchEvent(new CustomEvent("aimd-doc-saved"));
     } catch (err) {
@@ -70,10 +80,18 @@ export async function saveDocument() {
   saveEl().disabled = true;
   try {
     const doc = await invoke<AimdDocument>("save_aimd", {
-      path: state.doc.path,
-      markdown: state.doc.markdown,
+      path: tab?.doc.path ?? state.doc.path,
+      markdown: tab?.doc.markdown ?? state.doc.markdown,
     });
-    applyDocument({ ...doc, isDraft: false, format: "aimd", dirty: false }, state.mode);
+    if (!isOperationCurrent(target)) return;
+    if (target) {
+      applyDocumentToTab(target.tabId, { ...doc, isDraft: false, format: "aimd", dirty: false }, tab?.mode ?? state.mode);
+      void refreshTabFingerprint(target.tabId, doc.path);
+    } else {
+      applyDocument({ ...doc, isDraft: false, format: "aimd", dirty: false }, state.mode);
+      const savedTab = activeTab();
+      if (savedTab?.doc.path) void refreshTabFingerprint(savedTab.id, savedTab.doc.path);
+    }
     rememberOpenedPath(doc.path);
     window.dispatchEvent(new CustomEvent("aimd-doc-saved"));
     setStatus("已保存", "success");
@@ -118,6 +136,8 @@ function aimdSuggestedName(doc: AimdDocument): string {
 
 async function saveDocumentAsMarkdown(sourcePath: string | null, wasDraft: boolean, draftSourcePath: string) {
   if (!state.doc) return;
+  beginTabOperation();
+  const oldPath = state.doc.path || sourcePath || "";
   const savePath = await invoke<string | null>("choose_save_markdown_file", {
     suggestedName: markdownSuggestedName(state.doc),
   });
@@ -141,11 +161,14 @@ async function saveDocumentAsMarkdown(sourcePath: string | null, wasDraft: boole
     state.doc.needsAimdSave = state.doc.requiresAimdSave;
     await renderPreview();
     rememberOpenedPath(result.path);
+    const savedTab = activeTab();
+    if (savedTab?.doc.path) void refreshTabFingerprint(savedTab.id, savedTab.doc.path);
     window.dispatchEvent(new CustomEvent("aimd-doc-saved"));
     if (draftSourcePath && draftSourcePath !== result.path) void deleteDraftFile(draftSourcePath);
     try {
-      await invoke("update_window_path", { newPath: result.path });
+      await invoke("update_window_path", { oldPath: oldPath || null, newPath: result.path });
     } catch {}
+    syncActiveTabFromFacade();
     setStatus(result.assetsDir ? "已保存 Markdown 和资源目录" : "已保存（Markdown）", "success");
   } catch (err) {
     console.error(err);
@@ -157,6 +180,8 @@ async function saveDocumentAsMarkdown(sourcePath: string | null, wasDraft: boole
 
 async function saveDocumentAsAimd(sourcePath: string | null, wasDraft: boolean, draftSourcePath: string) {
   if (!state.doc) return;
+  beginTabOperation();
+  const oldPath = state.doc.path || sourcePath || "";
   const savePath = await invoke<string | null>("choose_save_aimd_file", {
     suggestedName: aimdSuggestedName(state.doc),
   });
@@ -172,14 +197,17 @@ async function saveDocumentAsAimd(sourcePath: string | null, wasDraft: boolean, 
     });
     applyDocument({ ...doc, isDraft: false, format: "aimd", dirty: false, needsAimdSave: false }, state.mode);
     rememberOpenedPath(doc.path);
+    const savedTab = activeTab();
+    if (savedTab?.doc.path) void refreshTabFingerprint(savedTab.id, savedTab.doc.path);
     setStatus(wasDraft ? "文件已创建" : "已另存为 AIMD", "success");
     window.dispatchEvent(new CustomEvent("aimd-doc-saved"));
     if (draftSourcePath && draftSourcePath !== doc.path) {
       void deleteDraftFile(draftSourcePath);
     }
     try {
-      await invoke("update_window_path", { newPath: doc.path });
+      await invoke("update_window_path", { oldPath: oldPath || null, newPath: doc.path });
     } catch { /* 命令不存在时静默忽略 */ }
+    syncActiveTabFromFacade();
   } catch (err) {
     console.error(err);
     setStatus(messageFromError(err, "另存为失败"), "warn");
@@ -228,6 +256,8 @@ export async function upgradeMarkdownToAimd(): Promise<boolean> {
     const draftSourcePath = state.doc.draftSourcePath;
     applyDocument({ ...doc, isDraft: false, format: "aimd", dirty: false, needsAimdSave: false }, state.mode);
     rememberOpenedPath(savePath);
+    const savedTab = activeTab();
+    if (savedTab?.doc.path) void refreshTabFingerprint(savedTab.id, savedTab.doc.path);
     window.dispatchEvent(new CustomEvent("aimd-doc-saved"));
     if (draftSourcePath && draftSourcePath !== savePath) void deleteDraftFile(draftSourcePath);
     setStatus("已升级为 .aimd", "success");

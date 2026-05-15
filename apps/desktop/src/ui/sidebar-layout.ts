@@ -5,7 +5,7 @@ export function applyWorkspaceCollapseState() {
   workspaceSectionEl().classList.toggle("is-collapsed", state.workspaceCollapsed);
   workspaceCollapseEl().setAttribute("aria-expanded", String(!state.workspaceCollapsed));
   workspaceCollapseEl().textContent = state.workspaceCollapsed ? "⌄" : "⌃";
-  workspaceCollapseEl().title = state.workspaceCollapsed ? "展开目录" : "折叠目录";
+  workspaceCollapseEl().title = state.workspaceCollapsed ? "展开项目" : "折叠项目";
 }
 
 export function bindWorkspaceCollapse(render: () => void) {

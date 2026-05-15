@@ -69,6 +69,44 @@ export type SessionSnapshot = {
   mode: Mode;
 };
 
+export type OpenDocumentId = string;
+
+export type OpenDocumentTab = {
+  id: OpenDocumentId;
+  pathKey: string | null;
+  title: string;
+  doc: AimdDocument;
+  sourceModel: MarkdownSourceModel | null;
+  sourceDirtyRefs: Set<string>;
+  sourceStructuralDirty: boolean;
+  inlineDirty: boolean;
+  htmlVersion: number;
+  paintedVersion: Record<Mode, number>;
+  operationVersion: number;
+  mode: Mode;
+  scroll: {
+    read: number;
+    edit: number;
+    source: number;
+  };
+  sourceSelection: {
+    start: number;
+    end: number;
+    direction: "forward" | "backward" | "none";
+  };
+  baseFileFingerprint?: {
+    mtimeMs: number;
+    size: number;
+  } | null;
+  recoveryState?: "disk-changed" | null;
+  healthReport: DocumentHealthReport | null;
+};
+
+export type OpenDocumentsState = {
+  tabs: OpenDocumentTab[];
+  activeTabId: OpenDocumentId | null;
+};
+
 export type AddedAsset = {
   asset: AimdAsset;
   uri: string;
@@ -179,7 +217,7 @@ export type UiSettings = {
   debugMode: boolean;
 };
 
-export type SidebarDocTab = "outline" | "git";
+export type SidebarDocTab = "outline" | "assets" | "git" | "health";
 
 export type GitFileState =
   | "none"

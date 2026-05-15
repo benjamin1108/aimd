@@ -5,6 +5,7 @@ import type {
   MainView,
   MarkdownSourceModel,
   Mode,
+  OpenDocumentsState,
   OutlineNode,
   SidebarDocTab,
   WorkspaceRoot,
@@ -55,6 +56,7 @@ export const ICONS = {
 
 export const state: {
   doc: AimdDocument | null;
+  openDocuments: OpenDocumentsState;
   mainView: MainView;
   mode: Mode;
   renderTimer: number | null;
@@ -99,6 +101,10 @@ export const state: {
   isBootstrappingSession: boolean;
 } = {
   doc: null,
+  openDocuments: {
+    tabs: [],
+    activeTabId: null,
+  },
   mainView: "document",
   mode: "read",
   renderTimer: null,

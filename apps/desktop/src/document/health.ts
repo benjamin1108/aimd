@@ -7,16 +7,27 @@ import {
 } from "../core/dom";
 import { setStatus, updateChrome } from "../ui/chrome";
 import { flushInline } from "../editor/inline";
-import { applyDocument } from "./apply";
+import { applyDocumentToTab } from "./apply";
 import { saveDocumentAs } from "./persist";
 import { escapeHTML } from "../util/escape";
+import {
+  activeTab,
+  beginTabOperation,
+  findTab,
+  isActiveOperationCurrent,
+  isOperationCurrent,
+  syncActiveTabFromFacade,
+} from "./open-document-state";
 
 function currentMarkdown() {
   if (state.mode === "edit") flushInline();
   return state.doc?.markdown ?? "";
 }
 
-let activeReport: DocumentHealthReport | null = null;
+function markdownForTab(tabId: string) {
+  if (state.openDocuments.activeTabId === tabId) return currentMarkdown();
+  return findTab(tabId)?.doc.markdown ?? "";
+}
 
 function currentDocIsAimdWithPath(): boolean {
   return Boolean(state.doc?.path && state.doc.format === "aimd");
@@ -24,24 +35,54 @@ function currentDocIsAimdWithPath(): boolean {
 
 export async function runHealthCheck() {
   if (!state.doc) return;
+  const target = beginTabOperation();
+  if (!target) return;
+  const targetTab = findTab(target.tabId);
+  if (!targetTab) return;
+  const path = targetTab.doc.path || null;
+  const markdown = markdownForTab(target.tabId);
   setStatus("正在检查资源", "loading");
   try {
     const report = await invoke<DocumentHealthReport>("check_document_health", {
-      path: state.doc.path || null,
-      markdown: currentMarkdown(),
+      path,
+      markdown,
     });
-    showHealthReport(report);
-    setStatus(report.summary, report.status === "missing" ? "warn" : report.status === "risk" ? "info" : "success");
+    if (!isOperationCurrent(target)) return;
+    showHealthReport(report, target.tabId);
+    if (isActiveOperationCurrent(target)) {
+      setStatus(report.summary, report.status === "missing" ? "warn" : report.status === "risk" ? "info" : "success");
+    }
   } catch (err) {
+    if (!isOperationCurrent(target)) return;
     console.error(err);
-    setStatus(`资源检查失败: ${String(err)}`, "warn");
+    if (isActiveOperationCurrent(target)) setStatus(`资源检查失败: ${String(err)}`, "warn");
   }
 }
 
-export function showHealthReport(report: DocumentHealthReport) {
-  activeReport = report;
+export function showHealthReport(report: DocumentHealthReport, tabId = state.openDocuments.activeTabId || "") {
+  const tab = findTab(tabId);
+  if (tab) tab.healthReport = report;
+  if (!tab || tab.id !== state.openDocuments.activeTabId) return;
+  state.sidebarDocTab = "health";
+  renderHealthReport(report);
+  window.dispatchEvent(new CustomEvent("aimd-health-report-updated"));
+}
+
+export function renderActiveHealthReport() {
+  const report = activeTab()?.healthReport || null;
+  if (!report) {
+    healthSummaryEl().textContent = "当前文档尚未检查";
+    healthListEl().innerHTML = `<div class="health-empty">点击“资源检查”生成当前文档的健康报告</div>`;
+    healthCleanUnusedEl().disabled = true;
+    healthPackageLocalEl().disabled = true;
+    healthPackageLocalEl().textContent = "嵌入本地图片";
+    return;
+  }
+  renderHealthReport(report);
+}
+
+function renderHealthReport(report: DocumentHealthReport) {
   const panel = healthPanelEl();
-  panel.hidden = false;
   panel.dataset.status = report.status;
   healthSummaryEl().textContent =
     `${report.summary} · ${report.counts.errors} 个错误 / ${report.counts.warnings} 个风险 / ${report.counts.infos} 个提示`;
@@ -85,6 +126,7 @@ function renderIssue(issue: HealthIssue) {
 export function bindHealthPanel() {
   healthCloseEl().addEventListener("click", () => {
     healthPanelEl().hidden = true;
+    state.sidebarDocTab = "outline";
   });
   healthCleanUnusedEl().addEventListener("click", () => {
     void cleanupUnreferencedAssets();
@@ -101,17 +143,24 @@ export async function cleanupUnreferencedAssets() {
     return;
   }
   setStatus("正在清理未引用资源", "loading");
+  const target = beginTabOperation();
+  if (!target) return;
+  const targetTab = findTab(target.tabId);
+  if (!targetTab) return;
   try {
     const doc = await invoke<AimdDocument>("save_aimd", {
-      path: state.doc.path,
-      markdown: currentMarkdown(),
+      path: targetTab.doc.path,
+      markdown: markdownForTab(target.tabId),
     });
-    applyDocument({ ...doc, isDraft: false, format: "aimd", dirty: false }, state.mode);
-    setStatus("未引用资源已清理", "success");
-    await runHealthCheck();
+    if (!isOperationCurrent(target)) return;
+    applyDocumentToTab(target.tabId, { ...doc, isDraft: false, format: "aimd", dirty: false }, targetTab.mode);
+    if (isActiveOperationCurrent(target)) {
+      setStatus("未引用资源已清理", "success");
+      await runHealthCheck();
+    }
   } catch (err) {
     console.error(err);
-    setStatus(`清理失败: ${String(err)}`, "warn");
+    if (isActiveOperationCurrent(target)) setStatus(`清理失败: ${String(err)}`, "warn");
   } finally {
     updateChrome();
   }
@@ -137,17 +186,26 @@ export async function packageLocalImages(options: { refreshHealth?: boolean } = 
   const refreshHealth = options.refreshHealth !== false;
   if (!(await ensureAimdDocumentForEmbedding("本地图片"))) return;
   setStatus("正在嵌入本地图片", "loading");
+  const target = beginTabOperation();
+  if (!target) return;
+  const targetTab = findTab(target.tabId);
+  if (!targetTab) return;
+  const path = targetTab.doc.path;
+  const markdown = markdownForTab(target.tabId);
   try {
     const doc = await invoke<AimdDocument>("package_local_images", {
-      path: state.doc.path,
-      markdown: currentMarkdown(),
+      path,
+      markdown,
     });
-    applyDocument({ ...doc, isDraft: false, format: "aimd", dirty: false, needsAimdSave: false }, state.mode);
-    setStatus("本地图片已嵌入", "success");
-    if (refreshHealth) await runHealthCheck();
+    if (!isOperationCurrent(target)) return;
+    applyDocumentToTab(target.tabId, { ...doc, isDraft: false, format: "aimd", dirty: false, needsAimdSave: false }, targetTab.mode);
+    if (isActiveOperationCurrent(target)) {
+      setStatus("本地图片已嵌入", "success");
+      if (refreshHealth) await runHealthCheck();
+    }
   } catch (err) {
     console.error(err);
-    setStatus(`嵌入本地图片失败: ${String(err)}`, "warn");
+    if (isActiveOperationCurrent(target)) setStatus(`嵌入本地图片失败: ${String(err)}`, "warn");
   }
 }
 
@@ -156,23 +214,33 @@ export async function packageRemoteImages(options: { refreshHealth?: boolean } =
   const refreshHealth = options.refreshHealth !== false;
   if (!(await ensureAimdDocumentForEmbedding("远程图片"))) return;
   setStatus("正在嵌入远程图片", "loading");
+  const target = beginTabOperation();
+  if (!target) return;
+  const targetTab = findTab(target.tabId);
+  if (!targetTab) return;
+  const path = targetTab.doc.path;
+  const markdown = markdownForTab(target.tabId);
   try {
     const doc = await invoke<AimdDocument>("package_remote_images", {
-      path: state.doc.path,
-      markdown: currentMarkdown(),
+      path,
+      markdown,
     });
-    applyDocument({ ...doc, isDraft: false, format: "aimd", dirty: false, needsAimdSave: false }, state.mode);
-    setStatus("远程图片已嵌入", "success");
-    if (refreshHealth) await runHealthCheck();
+    if (!isOperationCurrent(target)) return;
+    applyDocumentToTab(target.tabId, { ...doc, isDraft: false, format: "aimd", dirty: false, needsAimdSave: false }, targetTab.mode);
+    if (isActiveOperationCurrent(target)) {
+      setStatus("远程图片已嵌入", "success");
+      if (refreshHealth) await runHealthCheck();
+    }
   } catch (err) {
     console.error(err);
-    setStatus(`嵌入远程图片失败: ${String(err)}`, "warn");
+    if (isActiveOperationCurrent(target)) setStatus(`嵌入远程图片失败: ${String(err)}`, "warn");
   }
 }
 
 export async function packageImageDependencies() {
   if (!state.doc) return;
-  const issues = activeReport?.issues ?? [];
+  syncActiveTabFromFacade();
+  const issues = activeTab()?.healthReport?.issues ?? [];
   const hasLocal = issues.some((i) => i.kind === "local_image");
   const hasRemote = issues.some((i) => i.kind === "remote_image");
   if (!hasLocal && !hasRemote) return;

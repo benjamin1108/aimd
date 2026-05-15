@@ -284,3 +284,39 @@ Required completion actions:
 Do not archive this file before the phase is truly complete. Do not make a
 standalone commit that only moves this file to `archive/`. Do not report the
 goal complete while the active copy still exists under `docs/todo/`.
+
+## Completion Note - 2026-05-15
+
+Implemented Phase 2 as a versioned multi-tab working session:
+
+- Added `schemaVersion: 2` open-documents session persistence with path tabs,
+  draft tabs, active tab id, per-tab mode, read/edit/source scroll, source
+  selection, and dirty path-backed working copies with base file fingerprints.
+- Legacy single-document snapshots are ignored by the V2 loader and still flow
+  through the old safe restore path when no V2 snapshot exists.
+- Missing or inaccessible clean path tabs are skipped during launch with a
+  status message instead of a modal. Dirty drafts are independent of path
+  failures and remain recoverable.
+- Dirty path-backed recovery restores the persisted working copy as dirty. If
+  the current disk fingerprint differs from the persisted base fingerprint, the
+  tab enters a visible `disk-changed` recovery state and never writes over disk.
+- Opening, closing, switching, view-mode changes, source edits, saves, Save As,
+  rename/move updates, and window close now persist the multi-tab state. Save
+  As after restore updates the persisted path for that tab.
+- Restore is idempotent and routes initial-open paths after session restore so
+  a file already restored from the session is activated rather than duplicated.
+- Tab painting preserves view state across `applyHTML` persistence side effects,
+  and clean path-backed session restore reuses persisted HTML without invoking
+  Markdown rendering for inactive tabs.
+- Find bar state was intentionally not persisted in this phase because the
+  current find UI has no durable per-tab state contract; tests verify switching
+  and restoring do not dirty documents or lose document/session data.
+
+Validation run:
+
+- `npm --prefix apps/desktop run check`
+- `cargo check --workspace`
+- `git diff --check`
+- `npx playwright test e2e/52-open-documents-tabs.spec.ts e2e/53-tab-session-state.spec.ts`
+- `npx playwright test e2e/31-md-open-association.spec.ts e2e/42-editor-core-capabilities.spec.ts e2e/50-source-preserving-editor.spec.ts`
+- `npx playwright test e2e/20-rust-handler-registration.spec.ts e2e/23-discard-confirm-flow.spec.ts e2e/33-dedup-window.spec.ts e2e/44-workspace-directory-management.spec.ts e2e/46-git-workspace-panel.spec.ts`

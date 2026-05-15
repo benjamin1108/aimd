@@ -121,30 +121,30 @@ test.describe("asset panel visibility preference", () => {
     await expect(page.locator("#health-check")).toBeEnabled();
   });
 
-  test("asset panel is visible when showAssetPanel is enabled", async ({ page }) => {
+  test("resource preference keeps the asset tab target-scoped", async ({ page }) => {
     await installMainMock(page, true);
     await page.goto("/");
     await page.locator("#empty-open").click();
 
+    await expect(page.locator("#asset-section")).toBeHidden();
+    await page.locator("#sidebar-tab-assets").click();
     await expect(page.locator("#asset-section")).toBeVisible();
     await expect(page.locator("#asset-count")).toHaveCount(0);
   });
 
-  test("asset panel can be resized against outline", async ({ page }) => {
+  test("asset panel can be selected from the inspector and collapsed", async ({ page }) => {
     await installMainMock(page, true);
     await page.goto("/");
     await page.locator("#empty-open").click();
 
-    await expect(page.locator("#asset-section")).toBeVisible();
-    const before = await page.locator("#asset-section").boundingBox();
-    const handle = await page.locator("#sb-resizer-outline-asset").boundingBox();
-    expect(before && handle).toBeTruthy();
-    await page.mouse.move(handle!.x + handle!.width / 2, handle!.y + handle!.height / 2);
-    await page.mouse.down();
-    await page.mouse.move(handle!.x + handle!.width / 2, handle!.y + handle!.height / 2 - 42);
-    await page.mouse.up();
-    const after = await page.locator("#asset-section").boundingBox();
-    expect(after!.height).toBeGreaterThan(before!.height + 20);
+    await expect(page.locator("#asset-section")).toBeHidden();
+    await page.locator("#sidebar-tab-assets").click();
+    await expect(page.locator("#asset-panel")).toBeVisible();
+    await expect(page.locator("#asset-list")).toContainText("img-001");
+    await page.locator("#doc-panel-collapse").click();
+    await expect(page.locator("#outline-section")).toHaveClass(/is-collapsed/);
+    await page.locator("#doc-panel-collapse").click();
+    await expect(page.locator("#outline-section")).not.toHaveClass(/is-collapsed/);
   });
 
   test("settings page saves the resource panel preference", async ({ page }) => {
@@ -153,7 +153,7 @@ test.describe("asset panel visibility preference", () => {
     await page.goto("/settings.html");
 
     await expect(page.locator(".settings-head h1")).toHaveText("AIMD 设置");
-    await expect(page.locator(".settings-nav-item")).toHaveText(["常规", "AI / 模型", "网页导入", "格式化"]);
+    await expect(page.locator(".settings-nav-item")).toHaveText(["常规", "AI / 模型", "网页导入", "格式化", "Git 集成"]);
     await expect(page.locator("#ui-show-asset-panel")).not.toBeChecked();
     await expect(page.locator("#ui-debug-mode")).not.toBeChecked();
 

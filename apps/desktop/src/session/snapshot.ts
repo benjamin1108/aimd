@@ -1,11 +1,16 @@
 import { invoke } from "@tauri-apps/api/core";
-import {
-  state, STORAGE_LAST, STORAGE_SESSION,
-} from "../core/state";
-import type { AimdDocument, Mode, RenderResult, SessionSnapshot } from "../core/types";
+import { STORAGE_LAST, STORAGE_SESSION } from "../core/state";
+import type { AimdDocument, Mode, SessionSnapshot } from "../core/types";
 import { setStatus, updateChrome } from "../ui/chrome";
 import { rememberOpenedPath } from "../ui/recents";
+import {
+  buildOpenDocumentsSessionSnapshot,
+  loadOpenDocumentsSessionV2,
+  registerRestoredPath,
+  restoreOpenDocumentsSession,
+} from "./open-documents";
 import { applyDocument } from "../document/apply";
+import { renderSnapshotHTML } from "./render";
 
 export function loadLastSessionPath(): string | null {
   return window.localStorage.getItem(STORAGE_LAST);
@@ -17,6 +22,7 @@ export function loadSessionSnapshot(): SessionSnapshot | null {
     if (!raw) return null;
     const parsed = JSON.parse(raw);
     if (!parsed || typeof parsed !== "object") return null;
+    if (parsed.schemaVersion === 2) return null;
     const assets = Array.isArray(parsed.assets) ? parsed.assets : [];
     return {
       path: typeof parsed.path === "string" ? parsed.path : "",
@@ -47,34 +53,27 @@ export function clearSessionSnapshot() {
 }
 
 export function persistSessionSnapshot() {
-  if (!state.doc) {
+  const built = buildOpenDocumentsSessionSnapshot();
+  if (!built) {
     clearSessionSnapshot();
     return;
   }
-  const snapshot: SessionSnapshot = {
-    path: state.doc.path,
-    title: state.doc.title,
-    markdown: state.doc.markdown,
-    html: state.doc.html,
-    assets: state.doc.assets,
-    dirty: state.doc.dirty,
-    isDraft: Boolean(state.doc.isDraft),
-    draftSourcePath: state.doc.draftSourcePath,
-    needsAimdSave: Boolean(state.doc.needsAimdSave),
-    hasExternalImageReferences: Boolean(state.doc.hasExternalImageReferences),
-    requiresAimdSave: Boolean(state.doc.requiresAimdSave),
-    format: state.doc.format,
-    mode: state.mode,
-  };
-  window.localStorage.setItem(STORAGE_SESSION, JSON.stringify(snapshot));
-  if (state.doc.path) {
-    window.localStorage.setItem(STORAGE_LAST, state.doc.path);
+  window.localStorage.setItem(STORAGE_SESSION, JSON.stringify(built.snapshot));
+  if (built.activePath) {
+    window.localStorage.setItem(STORAGE_LAST, built.activePath);
   } else {
     clearLastSessionPath();
   }
 }
 
 export async function restoreSession() {
+  const openDocumentsSession = loadOpenDocumentsSessionV2();
+  if (openDocumentsSession) {
+    const restored = await restoreOpenDocumentsSession(openDocumentsSession);
+    if (restored) return;
+    clearSessionSnapshot();
+  }
+
   const snapshot = loadSessionSnapshot();
   if (snapshot) {
     const restored = await restoreSnapshot(snapshot);
@@ -102,14 +101,6 @@ export async function restoreSession() {
     clearLastSessionPath();
     updateChrome();
   }
-}
-
-async function registerRestoredPath(path: string) {
-  // 会话恢复路径时，Rust 端的 OpenedWindows 表里没这条记录；不补登记的话，
-  // 多窗口同文件去重失效，且 routeOpenedPath 在另一窗口点同一路径时无法聚焦回来。
-  try {
-    await invoke("register_window_path", { path });
-  } catch { /* 命令不可用（旧版本 / e2e mock 未注册）时静默忽略 */ }
 }
 
 export async function restoreSnapshot(snapshot: SessionSnapshot): Promise<{ doc: AimdDocument; mode: Mode; message: string } | null> {
@@ -204,27 +195,4 @@ export async function restoreSnapshot(snapshot: SessionSnapshot): Promise<{ doc:
   };
 }
 
-export async function renderSnapshotHTML(snapshot: SessionSnapshot): Promise<string> {
-  try {
-    const renderPath = snapshot.draftSourcePath
-      || (snapshot.path && !snapshot.isDraft && snapshot.format !== "markdown" ? snapshot.path : "");
-    if (renderPath) {
-      const out = await invoke<RenderResult>("render_markdown", {
-        path: renderPath,
-        markdown: snapshot.markdown,
-      });
-      return out.html;
-    }
-  } catch {
-    // Fall through to standalone rendering.
-  }
-
-  try {
-    const out = await invoke<RenderResult>("render_markdown_standalone", {
-      markdown: snapshot.markdown,
-    });
-    return out.html;
-  } catch {
-    return snapshot.html || "";
-  }
-}
+export { renderSnapshotHTML } from "./render";

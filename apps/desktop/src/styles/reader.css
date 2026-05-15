@@ -150,7 +150,7 @@
 .aimd h1, .aimd h2, .aimd h3, .aimd h4 {
   font-family: var(--font-display);
   color: var(--ink-strong);
-  letter-spacing: -0.018em;
+  letter-spacing: 0;
   line-height: 1.25;
 }
 
@@ -158,7 +158,7 @@
   margin: 0 0 18px;
   font-size: 28px;
   font-weight: 700;
-  letter-spacing: -0.024em;
+  letter-spacing: 0;
 }
 
 .aimd h2 {

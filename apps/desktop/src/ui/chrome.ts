@@ -1,6 +1,7 @@
 import { state } from "../core/state";
 import {
   titleEl, pathEl, statusEl, statusPillEl, panelEl, emptyEl,
+  docStateBadgesEl,
   outlineSectionEl, assetSectionEl, assetListEl,
   sidebarOutlineAssetResizerEl,
   starterActionsEl, docActionsEl, sidebarFootEl,
@@ -16,6 +17,8 @@ import { escapeAttr, escapeHTML } from "../util/escape";
 import { renderRecentList } from "./recents";
 import { persistSessionSnapshot } from "../session/snapshot";
 import { syncDirtyDocumentState } from "../updater/dirty-state";
+import { activeTab, syncActiveTabFromFacade } from "../document/open-document-state";
+import { renderOpenTabs } from "./tabs";
 
 export function displayDocTitle(doc: AimdDocument): string {
   return extractHeadingTitle(doc.markdown) || doc.title || fileStem(doc.path) || "未命名文档";
@@ -46,9 +49,50 @@ function assetItem(asset: AimdAsset) {
   `;
 }
 
-// 底部 status-pill 是唯一的状态显示位：稳定态（就绪 / 未保存的修改 / 草稿提示）
-// + 临时反馈（保存中 / 已保存 / 失败）共用同一槽位。1.8s 后 success/info 会回退到
-// 当前 doc 的稳定态（脏 → 未保存的修改；干净 → 就绪）。不再额外开 head 状态文字。
+function normalizeForScope(path: string): string {
+  return path.replace(/\\/g, "/").replace(/\/+$/, "").toLowerCase();
+}
+
+function isInsideCurrentProject(path: string): boolean {
+  if (!state.workspace?.root || !path) return false;
+  const root = normalizeForScope(state.workspace.root);
+  const current = normalizeForScope(path);
+  return current === root || current.startsWith(`${root}/`);
+}
+
+function documentFormatLabel(doc: AimdDocument): string {
+  if (doc.isDraft) return "草稿";
+  return doc.format === "markdown" ? "Markdown" : "AIMD";
+}
+
+function renderDocumentStateBadges(doc: AimdDocument | null) {
+  const container = docStateBadgesEl();
+  if (!doc) {
+    container.hidden = true;
+    container.innerHTML = "";
+    return;
+  }
+  const badges: Array<{ text: string; tone?: "warn" | "info" | "strong" }> = [
+    { text: documentFormatLabel(doc), tone: "strong" },
+  ];
+  const hasConflict = doc.hasGitConflicts || hasGitConflictMarkers(doc.markdown) || hasGitConflictMarkers(doc.html);
+  if (doc.dirty) badges.push({ text: "未保存", tone: "warn" });
+  if (doc.requiresAimdSave) badges.push({ text: "保存需选格式", tone: "info" });
+  if (hasConflict) badges.push({ text: "Git 冲突", tone: "warn" });
+  const tab = activeTab();
+  if (tab?.recoveryState === "disk-changed") badges.push({ text: "磁盘已变化", tone: "warn" });
+  if (state.workspace?.root && doc.path) {
+    badges.push({ text: isInsideCurrentProject(doc.path) ? "项目内" : "项目外", tone: "info" });
+  }
+  container.hidden = false;
+  container.innerHTML = badges
+    .map((badge) => `<span class="doc-state-badge" data-tone="${badge.tone || "idle"}">${escapeHTML(badge.text)}</span>`)
+    .join("");
+}
+
+// 底部 status-pill 只承载稳定摘要和临时反馈；标题区的 doc-state-badges
+// 负责长期可见的格式、脏状态、冲突和项目归属。1.8s 后 success/info 会回退到
+// 当前 doc 的稳定态（脏 → 未保存的修改；干净 → 就绪）。
 //
 // state.statusTimer 同时充当"当前是否在临时反馈窗口期"的标志：updateChrome 看到
 // 它非 null 时会跳过稳定态写入，避免把"已保存"立刻盖回"就绪"。
@@ -97,9 +141,12 @@ function renderStableStatus() {
     return;
   }
   const doc = state.doc;
+  const tab = activeTab();
   if (doc && (doc.hasGitConflicts || hasGitConflictMarkers(doc.markdown) || hasGitConflictMarkers(doc.html))) {
     doc.hasGitConflicts = true;
     applyStatus("文档包含 Git 冲突，请解决后保存", "warn");
+  } else if (tab?.recoveryState === "disk-changed") {
+    applyStatus("已恢复工作副本，磁盘文件已变化", "warn");
   } else if (doc?.requiresAimdSave) {
     applyStatus("保存时需选择格式", "info");
   } else if (doc?.isDraft && !doc.dirty) {
@@ -112,17 +159,20 @@ function renderStableStatus() {
 }
 
 export function updateChrome() {
+  syncActiveTabFromFacade();
+  renderOpenTabs();
   const doc = state.doc;
   void syncDirtyDocumentState();
   const hasWorkspace = Boolean(state.workspace);
   renderRecentList();
   panelEl().dataset.shell = doc || hasWorkspace ? "document" : "launch";
-  // Sidebar resizer writes an inline `grid-template-columns` (e.g.
-  // "460px minmax(0,1fr)") which beats the launch-shell CSS rule. In launch
-  // mode the sidebar is `display: none`, so the now-only workspace child
-  // collapses into the first column of that two-column track and the right
-  // side renders empty. Drop the inline override before each launch transition.
-  if (!doc && !hasWorkspace) panelEl().style.gridTemplateColumns = "";
+  // Rail resizers write CSS variables. Drop them before each launch transition
+  // so the single-column launch shell cannot inherit a stale desktop rail size.
+  if (!doc && !hasWorkspace) {
+    panelEl().style.gridTemplateColumns = "";
+    panelEl().style.removeProperty("--project-rail-width");
+    panelEl().style.removeProperty("--inspector-rail-width");
+  }
   const inDiffView = state.mainView === "git-diff";
   starterActionsEl().hidden = Boolean(doc) || inDiffView;
   docActionsEl().hidden = !doc || inDiffView;
@@ -134,7 +184,8 @@ export function updateChrome() {
     ? (doc.requiresAimdSave
       ? `${doc.path ? formatPathHint(doc.path) : "Markdown 草稿"} · 保存时需选择格式`
       : (doc.path || "未保存草稿 · 保存时选择 .md / .aimd"))
-    : "面向 AI 与人类协作的 Markdown 文档格式，方便保存与分享。";
+    : "未打开文档";
+  renderDocumentStateBadges(doc);
   // 保存按钮在文档没有变化时禁用：用户的"按钮亮着但其实没活做"会变成第二种困惑。
   // 草稿状态(isDraft)即使 dirty=false 也要保留可点（点击会触发 saveDocumentAs 创建文件）。
   const canSave = Boolean(doc && (doc.dirty || doc.isDraft));
@@ -175,11 +226,11 @@ export function updateChrome() {
   sidebarSaveEl().hidden = !draftWithContent;
 
   outlineSectionEl().hidden = false;
-  // 资源区无内容时折叠：空区域只会降低 sidebar 信息密度。
-  const hasAssets = state.uiSettings.showAssetPanel && doc.assets.length > 0;
-  const assetVisibilityChanged = assetSectionEl().hidden === hasAssets;
-  assetSectionEl().hidden = !hasAssets;
-  sidebarOutlineAssetResizerEl().hidden = !hasAssets;
+  const hasAssets = doc.assets.length > 0;
+  const showActiveAssetPanel = state.sidebarDocTab === "assets";
+  const assetVisibilityChanged = assetSectionEl().hidden === showActiveAssetPanel;
+  assetSectionEl().hidden = !showActiveAssetPanel;
+  sidebarOutlineAssetResizerEl().hidden = true;
   if (assetVisibilityChanged) {
     outlineSectionEl().style.flex = "";
     assetSectionEl().style.flex = "";
@@ -188,7 +239,7 @@ export function updateChrome() {
   if (hasAssets) {
     assetListEl().innerHTML = doc.assets.map(assetItem).join("");
   } else {
-    assetListEl().innerHTML = "";
+    assetListEl().innerHTML = `<div class="empty-list">当前文档没有 AIMD 托管资源</div>`;
   }
 
   // 把当前文档的稳定状态推到底部 status-pill。setStatus 的临时反馈（保存中 /

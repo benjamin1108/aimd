@@ -22,6 +22,15 @@ const BADGES: Record<GitFileKind, [string, string]> = {
   conflicted: ["CONFLICT", "冲突文件"],
 };
 
+const KIND_LABELS: Record<GitFileKind, string> = {
+  modified: "修改",
+  added: "新增",
+  deleted: "删除",
+  renamed: "重命名",
+  untracked: "未跟踪",
+  conflicted: "冲突",
+};
+
 function fileBadge(file: GitChangedFile): [string, string] {
   return BADGES[file.kind] || ["M", "已修改"];
 }
@@ -35,7 +44,7 @@ function summarize(status: GitRepoStatus): string {
   status.files.forEach((file) => counts.set(file.kind, (counts.get(file.kind) || 0) + 1));
   return ["modified", "added", "deleted", "renamed", "untracked", "conflicted"]
     .filter((kind) => counts.has(kind))
-    .map((kind) => `${kind} ${counts.get(kind)}`)
+    .map((kind) => `${KIND_LABELS[kind as GitFileKind]} ${counts.get(kind)}`)
     .join(" · ");
 }
 
@@ -55,8 +64,8 @@ function renderFile(file: GitChangedFile): string {
         <span class="git-file-path">${escapeHTML(file.path)}</span>
       </button>
       <div class="git-file-actions">
-        <button class="git-mini-btn" type="button" data-git-action="stage-file" data-path="${escapeAttr(file.path)}" ${!canStage || state.git.action ? "disabled" : ""}>stage</button>
-        <button class="git-mini-btn" type="button" data-git-action="unstage-file" data-path="${escapeAttr(file.path)}" ${!canUnstage || state.git.action ? "disabled" : ""}>unstage</button>
+        <button class="git-mini-btn" type="button" data-git-action="stage-file" data-path="${escapeAttr(file.path)}" ${!canStage || state.git.action ? "disabled" : ""}>暂存</button>
+        <button class="git-mini-btn" type="button" data-git-action="unstage-file" data-path="${escapeAttr(file.path)}" ${!canUnstage || state.git.action ? "disabled" : ""}>取消暂存</button>
       </div>
     </div>`;
 }
@@ -81,7 +90,7 @@ export function renderGitPanel() {
     <div class="git-toolbar">
       <div class="git-branch">
         <strong>${escapeHTML(status.branch || "HEAD")}</strong>
-        <span>${status.clean ? "clean" : `${status.files.length} changes`}</span>
+        <span>${status.clean ? "干净" : `${status.files.length} 个变更`}</span>
       </div>
       <button class="git-icon-btn" type="button" data-git-action="refresh" ${state.git.loading ? "disabled" : ""}>刷新</button>
     </div>
@@ -90,24 +99,24 @@ export function renderGitPanel() {
     ${state.git.error ? `<div class="git-error">${escapeHTML(state.git.error)}</div>` : ""}
     ${status.conflicted ? `<div class="git-warning">存在冲突文件，请先使用外部 Git 工具或命令行解决。</div>` : ""}
     <div class="git-sync-actions">
-      <button class="git-action-btn" type="button" data-git-action="pull" ${!canSync ? "disabled" : ""}>Pull</button>
-      <button class="git-action-btn" type="button" data-git-action="push" ${!canSync ? "disabled" : ""}>Push</button>
+      <button class="git-action-btn" type="button" data-git-action="pull" ${!canSync ? "disabled" : ""}>拉取</button>
+      <button class="git-action-btn" type="button" data-git-action="push" ${!canSync ? "disabled" : ""}>推送</button>
     </div>
     <div class="git-section-head">
-      <span>Changes</span>
-      <span>${escapeHTML(summarize(status) || "clean")}</span>
+      <span>项目变更</span>
+      <span>${escapeHTML(summarize(status) || "干净")}</span>
     </div>
     <div class="git-bulk-actions">
-      <button class="git-action-btn" type="button" data-git-action="stage-all" ${disabled || status.clean ? "disabled" : ""}>Stage all</button>
-      <button class="git-action-btn" type="button" data-git-action="unstage-all" ${disabled || !hasStagedChanges(status) ? "disabled" : ""}>Unstage all</button>
+      <button class="git-action-btn" type="button" data-git-action="stage-all" ${disabled || status.clean ? "disabled" : ""}>全部暂存</button>
+      <button class="git-action-btn" type="button" data-git-action="unstage-all" ${disabled || !hasStagedChanges(status) ? "disabled" : ""}>全部取消暂存</button>
     </div>
     <div class="git-file-list">
       ${status.files.length ? status.files.map(renderFile).join("") : `<div class="git-empty">没有待提交修改</div>`}
     </div>
-    <div class="git-section-head"><span>Commit</span></div>
+    <div class="git-section-head"><span>提交</span></div>
     <div class="git-commit">
-      <input id="git-commit-message" class="git-commit-input" type="text" placeholder="Commit message" autocomplete="off" ${canCommit ? "" : "disabled"} />
-      <button id="git-commit-submit" class="git-action-btn" type="button" data-git-action="commit" disabled>Commit</button>
+      <input id="git-commit-message" class="git-commit-input" type="text" placeholder="提交说明" autocomplete="off" ${canCommit ? "" : "disabled"} />
+      <button id="git-commit-submit" class="git-action-btn" type="button" data-git-action="commit" disabled>提交</button>
     </div>
   `;
   bindCommitInput(canCommit);
@@ -197,7 +206,7 @@ async function runGitAction(action: () => Promise<unknown>, success?: string) {
 
 function commandRoot(): string {
   const repoRoot = root();
-  if (!repoRoot) throw new Error("未打开目录");
+  if (!repoRoot) throw new Error("未打开项目");
   return repoRoot;
 }
 
@@ -224,12 +233,12 @@ export function bindGitPanel() {
     }
     const args = path ? { root: commandRoot(), path } : { root: commandRoot() };
     const commands: Record<string, [string, string]> = {
-      "stage-file": ["git_stage_file", "已 stage"],
-      "unstage-file": ["git_unstage_file", "已 unstage"],
-      "stage-all": ["git_stage_all", "已全部 stage"],
-      "unstage-all": ["git_unstage_all", "已全部 unstage"],
-      pull: ["git_pull", "Pull 完成"],
-      push: ["git_push", "Push 完成"],
+      "stage-file": ["git_stage_file", "已暂存"],
+      "unstage-file": ["git_unstage_file", "已取消暂存"],
+      "stage-all": ["git_stage_all", "已全部暂存"],
+      "unstage-all": ["git_unstage_all", "已全部取消暂存"],
+      pull: ["git_pull", "拉取完成"],
+      push: ["git_push", "推送完成"],
     };
     const command = commands[action];
     if (command) void runGitAction(() => invoke(command[0], args), command[1]);

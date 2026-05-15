@@ -390,7 +390,9 @@ test.describe("Editor core capabilities", () => {
     await expect(page.locator("#export-pdf")).not.toBeDisabled();
     await expect(page.locator("#format-document")).toContainText("一键格式化");
     await expect(page.locator("#format-document")).not.toBeDisabled();
-    await expect(page.locator("#more-menu .action-menu-item")).toHaveCount(10);
+    await expect(page.locator("#more-menu .action-menu-item")).toHaveCount(12);
+    await expect(page.locator("#check-updates")).toContainText("检查更新");
+    await expect(page.locator("#about-aimd")).toContainText("关于 AIMD");
     await expect(page.locator("#new-window")).toContainText("新建窗口");
     await page.locator("#new-window").click();
     await expect(page.locator("#status")).toContainText("已打开新窗口");

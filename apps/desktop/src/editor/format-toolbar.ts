@@ -1,9 +1,13 @@
 import {
-  inlineEditorEl, formatToolbarEl,
+  inlineEditorEl, formatToolbarEl, markdownEl,
   imageAltPopoverEl, imageAltInputEl, imageAltConfirmEl, imageAltCancelEl,
 } from "../core/dom";
+import { state } from "../core/state";
 import { showLinkPopover } from "./link-popover";
 import { insertImage } from "./images";
+import { updateChrome } from "../ui/chrome";
+import { createSourceModel } from "./source-preserve";
+import { scheduleRender } from "../ui/outline";
 
 export const BLOCK_TAGS = new Set([
   "P", "H1", "H2", "H3", "H4", "H5", "H6",
@@ -187,6 +191,8 @@ function insertHTMLAtSelection(html: string) {
   const tpl = document.createElement("template");
   tpl.innerHTML = html.trim();
   const fragment = tpl.content;
+  const firstElement = fragment.firstElementChild;
+  const standaloneBlock = firstElement && ["TABLE", "PRE", "UL", "OL"].includes(firstElement.tagName);
   const sel = document.getSelection();
   if (!sel || sel.rangeCount === 0) {
     inlineEditorEl().appendChild(fragment);
@@ -194,6 +200,19 @@ function insertHTMLAtSelection(html: string) {
     return;
   }
   const range = sel.getRangeAt(0);
+  const block = closestBlock(range.startContainer);
+  if (standaloneBlock && (!block || /^H[1-6]$/.test(block.tagName))) {
+    const last = fragment.lastChild;
+    inlineEditorEl().appendChild(fragment);
+    if (last) {
+      range.setStartAfter(last);
+      range.collapse(true);
+      sel.removeAllRanges();
+      sel.addRange(range);
+    }
+    inlineEditorEl().dispatchEvent(new Event("input"));
+    return;
+  }
   range.deleteContents();
   const last = fragment.lastChild;
   range.insertNode(fragment);
@@ -207,7 +226,9 @@ function insertHTMLAtSelection(html: string) {
 }
 
 function insertTable() {
-  insertHTMLAtSelection(`
+  appendMarkdownBlock(
+    "| 列 1 | 列 2 | 列 3 |\n| --- | --- | --- |\n| 内容 | 内容 | 内容 |\n| 内容 | 内容 | 内容 |",
+    `
     <table>
       <thead><tr><th>列 1</th><th>列 2</th><th>列 3</th></tr></thead>
       <tbody>
@@ -215,15 +236,16 @@ function insertTable() {
         <tr><td>内容</td><td>内容</td><td>内容</td></tr>
       </tbody>
     </table>
-  `);
+  `,
+  );
 }
 
 function insertCodeBlock() {
-  insertHTMLAtSelection(`<pre><code class="language-text">code</code></pre>`);
+  appendMarkdownBlock("```text\ncode\n```", `<pre><code class="language-text">code</code></pre>`);
 }
 
 function insertTaskItem() {
-  insertHTMLAtSelection(`<ul><li><input type="checkbox"> 任务</li></ul>`);
+  appendMarkdownBlock("- [ ] 任务", `<ul><li><input type="checkbox"> 任务</li></ul>`);
 }
 
 function findImageForAlt(): HTMLImageElement | null {
@@ -246,6 +268,49 @@ function openImageAltPopover() {
   imageAltPopoverEl().hidden = false;
   imageAltInputEl().focus();
   imageAltInputEl().select();
+}
+
+function escapeRegExp(value: string) {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+function updateImageAltMarkdown(img: HTMLImageElement, alt: string) {
+  if (!state.doc) return;
+  const assetId = img.dataset.assetId;
+  const rawSrc = assetId ? `asset://${assetId}` : img.getAttribute("src") || "";
+  if (!rawSrc) return;
+  const re = new RegExp(`!\\[[^\\]]*\\]\\(${escapeRegExp(rawSrc)}\\)`);
+  const next = state.doc.markdown.replace(re, `![${alt.replace(/]/g, "\\]")}](${rawSrc})`);
+  if (next === state.doc.markdown) return;
+  state.doc.markdown = next;
+  state.doc.dirty = true;
+  state.sourceModel = createSourceModel(next);
+  state.sourceDirtyRefs.clear();
+  state.sourceStructuralDirty = false;
+  state.inlineDirty = false;
+  markdownEl().value = next;
+  updateChrome();
+}
+
+function appendMarkdownBlock(markdown: string, html: string) {
+  if (!state.doc) {
+    insertHTMLAtSelection(html);
+    return;
+  }
+  const next = `${state.doc.markdown.replace(/\s*$/, "")}\n\n${markdown.trim()}\n`;
+  state.doc.markdown = next;
+  state.doc.dirty = true;
+  state.sourceModel = createSourceModel(next);
+  state.sourceDirtyRefs.clear();
+  state.sourceStructuralDirty = false;
+  state.inlineDirty = false;
+  markdownEl().value = next;
+  insertHTMLAtSelection(html);
+  state.inlineDirty = false;
+  state.sourceDirtyRefs.clear();
+  state.sourceStructuralDirty = false;
+  updateChrome();
+  scheduleRender();
 }
 
 export function runFormatCommand(cmd: string) {
@@ -294,9 +359,10 @@ export function bindFormatToolbar() {
   });
   imageAltConfirmEl().addEventListener("click", () => {
     if (!selectedImage || !inlineEditorEl().contains(selectedImage)) return;
-    selectedImage.alt = imageAltInputEl().value;
+    const alt = imageAltInputEl().value;
+    selectedImage.alt = alt;
+    updateImageAltMarkdown(selectedImage, alt);
     imageAltPopoverEl().hidden = true;
-    inlineEditorEl().dispatchEvent(new Event("input"));
   });
   imageAltInputEl().addEventListener("keydown", (event) => {
     if (event.key === "Escape") imageAltPopoverEl().hidden = true;

@@ -90,8 +90,6 @@ pub fn register_window_path(app: AppHandle, window: tauri::Window, path: String)
     if let Some(ow) = app.try_state::<OpenedWindows>() {
         if let Ok(mut map) = ow.0.lock() {
             let key = normalize_path(&path);
-            // 先移除该 label 的旧条目（切换文档时旧 path 要退出）
-            map.retain(|_, v| v != window.label());
             map.insert(key, window.label().to_string());
         }
     }
@@ -117,12 +115,35 @@ pub fn unregister_current_window_path(app: AppHandle, window: tauri::Window) {
     }
 }
 
-/// 另存为成功后由前端调用，更新该窗口的路径映射（旧 path 移除，新 path 写入）。
+/// 关闭单个标签页时，只摘掉该标签页对应的路径。
 #[tauri::command]
-pub fn update_window_path(app: AppHandle, window: tauri::Window, new_path: String) {
+pub fn unregister_window_path(app: AppHandle, window: tauri::Window, path: String) {
     if let Some(ow) = app.try_state::<OpenedWindows>() {
         if let Ok(mut map) = ow.0.lock() {
-            map.retain(|_, v| v != window.label());
+            let key = normalize_path(&path);
+            if map.get(&key).is_some_and(|label| label == window.label()) {
+                map.remove(&key);
+            }
+        }
+    }
+}
+
+/// 另存为成功后由前端调用，更新该窗口的路径映射（旧 path 移除，新 path 写入）。
+#[tauri::command]
+pub fn update_window_path(
+    app: AppHandle,
+    window: tauri::Window,
+    old_path: Option<String>,
+    new_path: String,
+) {
+    if let Some(ow) = app.try_state::<OpenedWindows>() {
+        if let Ok(mut map) = ow.0.lock() {
+            if let Some(old_path) = old_path {
+                let old_key = normalize_path(&old_path);
+                if map.get(&old_key).is_some_and(|label| label == window.label()) {
+                    map.remove(&old_key);
+                }
+            }
             map.insert(normalize_path(&new_path), window.label().to_string());
         }
     }
