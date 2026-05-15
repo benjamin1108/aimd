@@ -30,6 +30,28 @@ use tauri::{Emitter, Manager, RunEvent, WindowEvent};
 use documents::MAIN_INITIALIZED;
 use documents::{is_supported_doc_extension, PendingOpenPaths};
 
+fn is_document_window_label(label: &str) -> bool {
+    label == "main" || label.starts_with("doc-")
+}
+
+fn emit_menu_event_to_focused_document_window(app: &tauri::AppHandle, id: &str) {
+    let target_label = app
+        .webview_windows()
+        .into_iter()
+        .find(|(label, window)| {
+            is_document_window_label(label) && window.is_focused().unwrap_or(false)
+        })
+        .map(|(label, _)| label)
+        .or_else(|| {
+            app.get_webview_window("main")
+                .map(|window| window.label().to_string())
+        });
+
+    if let Some(label) = target_label {
+        let _ = app.emit_to(label, "aimd-menu", id);
+    }
+}
+
 pub fn run() {
     dev_log::init();
 
@@ -57,6 +79,7 @@ pub fn run() {
         .manage(windows::WindowPending::default())
         .manage(windows::WindowPendingDrafts::default())
         .manage(windows::OpenedWindows::default())
+        .manage(windows::SettingsWindowState::default())
         .manage(importer::WebClipSessionState::default())
         .manage(web_clip_image_proxy::WebClipImageProxyState::default())
         .setup(|app| {
@@ -83,7 +106,11 @@ pub fn run() {
         .on_menu_event(|app, event| {
             let id = event.id().0.as_str();
             if menu::MENU_EVENT_IDS.contains(&id) {
-                let _ = app.emit("aimd-menu", id);
+                if id == "settings" {
+                    let _ = windows::open_or_focus_settings_window(app);
+                } else {
+                    emit_menu_event_to_focused_document_window(app, id);
+                }
             }
         })
         .invoke_handler(tauri::generate_handler![

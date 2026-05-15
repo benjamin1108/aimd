@@ -13,6 +13,9 @@ pub struct WindowPendingDrafts(pub Mutex<HashMap<String, String>>);
 #[derive(Default)]
 pub struct OpenedWindows(pub Mutex<HashMap<PathBuf, String>>);
 
+#[derive(Default)]
+pub struct SettingsWindowState(pub Mutex<()>);
+
 /// 把路径转成"展示给用户看"的字符串。
 /// Windows 上 `std::fs::canonicalize` 总是返回 verbatim 前缀
 /// (`\\?\C:\Users\...` 或 UNC 形式 `\\?\UNC\server\share\...`)，
@@ -220,8 +223,12 @@ pub fn close_current_window(window: tauri::Window) -> Result<(), String> {
     window.close().map_err(|err| format!("close window: {err}"))
 }
 
-#[tauri::command]
-pub async fn open_settings_window(app: AppHandle) -> Result<(), String> {
+pub fn open_or_focus_settings_window(app: &AppHandle) -> Result<(), String> {
+    let state = app.state::<SettingsWindowState>();
+    let _guard = state
+        .0
+        .lock()
+        .map_err(|_| "设置窗口状态锁已损坏".to_string())?;
     let label = "settings";
     if let Some(target) = app.get_webview_window(label) {
         let _ = target.unminimize();
@@ -231,7 +238,7 @@ pub async fn open_settings_window(app: AppHandle) -> Result<(), String> {
     }
     // macOS 上隐藏 WebView 不一定会及时推进页面初始化；如果等 settings/main.ts
     // 自己 show()，用户会遇到第一次点击只创建隐藏窗口、第二次点击才显示的问题。
-    let result = WebviewWindowBuilder::new(&app, label, WebviewUrl::App("settings.html".into()))
+    let result = WebviewWindowBuilder::new(app, label, WebviewUrl::App("settings.html".into()))
         .title("AIMD 设置")
         // 设置窗口锁尺寸：内容已经被切成两节，不需要变形；用户拉伸只会出现大白屏。
         // 长度超出时由 .settings-content 内的滚动条承担。
@@ -257,6 +264,11 @@ pub async fn open_settings_window(app: AppHandle) -> Result<(), String> {
     let _ = target.show();
     let _ = target.set_focus();
     Ok(())
+}
+
+#[tauri::command]
+pub fn open_settings_window(app: AppHandle) -> Result<(), String> {
+    open_or_focus_settings_window(&app)
 }
 
 #[cfg(test)]
