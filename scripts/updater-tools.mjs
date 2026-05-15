@@ -15,10 +15,10 @@ export const PLATFORM_CONTRACTS = [
     platform: "darwin-aarch64",
     label: "macOS Apple Silicon",
     runner: "macos-14",
-    updaterKind: "app.tar.gz",
+    updaterKind: "pkg",
     userAssetName: (version) => `AIMD-${version}.pkg`,
-    updaterAssetName: (version) => `AIMD-Desktop_${version}_macos_aarch64.app.tar.gz`,
-    notes: "The updater replaces the desktop app bundle. Reinstall the PKG when CLI or Agent skill payloads must be refreshed.",
+    updaterAssetName: (version) => `AIMD-${version}.pkg`,
+    notes: "The updater downloads and verifies the full macOS PKG, then opens Installer so the app bundle, CLI, and Agent skill payload are updated together.",
   },
   {
     platform: "windows-x86_64",

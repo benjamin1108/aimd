@@ -26,8 +26,7 @@ jobs:
             os: macos-14
             upload_globs: |
               dist/AIMD-*.pkg
-              dist/AIMD-Desktop_*_macos_aarch64.app.tar.gz
-              dist/AIMD-Desktop_*_macos_aarch64.app.tar.gz.sig
+              dist/AIMD-*.pkg.sig
           - name: Windows x64
             os: windows-latest
             upload_globs: |

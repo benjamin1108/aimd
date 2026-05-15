@@ -5,6 +5,7 @@ export const AIMD_RELEASE = {
   "releaseUrl": "https://github.com/benjamin1108/aimd/releases",
   "updaterManifestUrl": "https://github.com/benjamin1108/aimd/releases/latest/download/latest.json",
   "updaterManifestAsset": "latest.json",
+  "updaterPubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IDU2ODNBQzI3NUFCQTM1MjMKUldRak5icGFKNnlEVnFOVE9Vc2pXM3NScGEwREJiUVcvMGY1WU53ZUdIRlgyZ3hOTm90UTZFMlQK",
   "updaterSupportedPlatforms": [
     "darwin-aarch64",
     "windows-x86_64"

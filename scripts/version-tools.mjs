@@ -161,6 +161,7 @@ export const AIMD_RELEASE = ${JSON.stringify({
     releaseUrl: config.releaseUrl,
     updaterManifestUrl: config.updaterManifestUrl,
     updaterManifestAsset: config.updater.manifestAsset,
+    updaterPubkey: config.updater.pubkey,
     updaterSupportedPlatforms: config.updater.supportedPlatforms,
   }, null, 2)} as const;
 `;

@@ -28,7 +28,6 @@ function fixtureDist() {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), "aimd-updater-test-"));
   for (const asset of [
     "AIMD-1.2.3.pkg",
-    "AIMD-Desktop_1.2.3_macos_aarch64.app.tar.gz",
     "AIMD-Desktop_1.2.3_windows_x64-setup.exe",
   ]) {
     fs.writeFileSync(path.join(dir, asset), "artifact");
@@ -42,8 +41,7 @@ test("updater plan defines exact production release assets", () => {
   assert.equal(plan.manifestAsset, "latest.json");
   assert.deepEqual(expectedReleaseAssets(config), [
     "AIMD-1.2.3.pkg",
-    "AIMD-Desktop_1.2.3_macos_aarch64.app.tar.gz",
-    "AIMD-Desktop_1.2.3_macos_aarch64.app.tar.gz.sig",
+    "AIMD-1.2.3.pkg.sig",
     "AIMD-Desktop_1.2.3_windows_x64-setup.exe",
     "AIMD-Desktop_1.2.3_windows_x64-setup.exe.sig",
     "latest.json",
@@ -54,7 +52,11 @@ test("manifest generation uses .sig file content and immutable release URLs", ()
   const distDir = fixtureDist();
   const manifest = generateManifestObject({ config, distDir, tag: "v1.2.3", notes: "notes" });
   assert.equal(manifest.version, "1.2.3");
-  assert.equal(manifest.platforms["darwin-aarch64"].signature, "signature-content-for-AIMD-Desktop_1.2.3_macos_aarch64.app.tar.gz");
+  assert.equal(manifest.platforms["darwin-aarch64"].signature, "signature-content-for-AIMD-1.2.3.pkg");
+  assert.equal(
+    manifest.platforms["darwin-aarch64"].url,
+    "https://github.com/benjamin1108/aimd/releases/download/v1.2.3/AIMD-1.2.3.pkg",
+  );
   assert.equal(
     manifest.platforms["windows-x86_64"].url,
     "https://github.com/benjamin1108/aimd/releases/download/v1.2.3/AIMD-Desktop_1.2.3_windows_x64-setup.exe",

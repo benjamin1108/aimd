@@ -58,15 +58,17 @@ Releases 上的 `latest.json`，没有更新时保持静默；发现新版本时
 
 更新包使用 Tauri updater 签名校验：
 
-- macOS Apple Silicon：应用内更新下载
-  `AIMD-Desktop_<version>_macos_aarch64.app.tar.gz`。
+- macOS Apple Silicon：应用内更新下载并校验完整
+  `AIMD-<version>.pkg`，然后打开系统 Installer。PKG 会同时更新
+  `/Applications/AIMD Desktop.app`、`/usr/local/bin/aimd` 和 Agent skill
+  payload。
 - Windows x64：应用内更新下载
   `AIMD-Desktop_<version>_windows_x64-setup.exe`，安装模式为 Tauri
   推荐的 `passive`。
 - Linux 当前未发布桌面安装包，因此未写入 updater manifest。
 
-macOS 应用内更新替换桌面 App bundle。若本次发布还需要刷新
-`/usr/local/bin/aimd` 或 Agent skill payload，请重新安装对应版本 PKG。
+macOS 不发布 DMG，也不把 app-only `.app.tar.gz` 当作生产更新资产。原因是这些
+形态不会安装 CLI 和 Agent skill payload，功能会不完整。
 
 macOS 版本当前尚未完成 Apple 公证。首次打开如被系统拦截，请到：
 
@@ -212,8 +214,7 @@ npm run updater:plan
 
 ```text
 AIMD-<version>.pkg
-AIMD-Desktop_<version>_macos_aarch64.app.tar.gz
-AIMD-Desktop_<version>_macos_aarch64.app.tar.gz.sig
+AIMD-<version>.pkg.sig
 AIMD-Desktop_<version>_windows_x64-setup.exe
 AIMD-Desktop_<version>_windows_x64-setup.exe.sig
 latest.json
@@ -250,7 +251,7 @@ npx tauri signer generate -w ../../secrets/aimd-updater.key --ci -p ""
 release tag 推送后会触发 `Release Desktop` workflow：
 
 1. 校验 tag 与 `release.config.json` 版本一致。
-2. macOS 构建 PKG 和 `.app.tar.gz` updater 资产并签名。
+2. macOS 构建完整 PKG，并对 PKG 本身生成 updater 签名。
 3. Windows 构建 patched NSIS installer，并对最终 exe 签名。
 4. 上传平台安装包和 `.sig`。
 5. manifest job 下载已上传资产，生成并校验 `latest.json`。

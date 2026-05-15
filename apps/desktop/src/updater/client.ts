@@ -45,6 +45,23 @@ type MockUpdate = {
   failInstall?: string;
 };
 
+type ManifestUpdate = {
+  version: string;
+  date?: string;
+  body?: string;
+  platform: string;
+  url: string;
+  signature: string;
+  installerKind: "macos-pkg" | "tauri";
+};
+
+type MacPkgInstallResult = {
+  path: string;
+  bytes: number;
+};
+
+type PendingUpdate = Update | MockUpdate | ManifestUpdate;
+
 type UpdaterMock = {
   check: (manual: boolean) => Promise<MockUpdate | null> | MockUpdate | null;
   install?: (update: MockUpdate) => Promise<void> | void;
@@ -66,7 +83,7 @@ let installBtn: HTMLButtonElement;
 let laterBtn: HTMLButtonElement;
 let retryBtn: HTMLButtonElement;
 
-let pendingUpdate: Update | MockUpdate | null = null;
+let pendingUpdate: PendingUpdate | null = null;
 let checking = false;
 const dismissedVersions = new Set<string>();
 
@@ -111,7 +128,7 @@ function render(view: UpdateView) {
         : view.phase === "error"
           ? view.errorTitle || "更新失败"
           : view.phase === "installed"
-            ? "更新已安装"
+            ? (view.detail?.includes("安装器") ? "安装器已打开" : "更新已安装")
             : "AIMD 更新";
 
   const versions = view.latestVersion
@@ -135,9 +152,24 @@ async function checkWithMock(manual: boolean): Promise<MockUpdate | null> {
   return await mock.check(manual);
 }
 
-async function checkForUpdateObject(manual: boolean): Promise<Update | MockUpdate | null> {
+function isManifestUpdate(update: PendingUpdate): update is ManifestUpdate {
+  return "installerKind" in update;
+}
+
+function isMacPkgUpdate(update: PendingUpdate): update is ManifestUpdate {
+  return isManifestUpdate(update) && update.installerKind === "macos-pkg";
+}
+
+async function checkForUpdateObject(manual: boolean, current: string): Promise<PendingUpdate | null> {
   if (window.__aimd_updater_mock) return await checkWithMock(manual);
   if (!isTauri()) return null;
+  const platform = await invoke<string>("updater_platform");
+  if (platform === "darwin-aarch64") {
+    return await invoke<ManifestUpdate | null>("updater_check_manifest", {
+      manifestUrl: AIMD_RELEASE.updaterManifestUrl,
+      currentVersion: current,
+    });
+  }
   return await check();
 }
 
@@ -193,6 +225,37 @@ async function installPendingUpdate() {
       const mockUpdate = update as MockUpdate;
       if (mockUpdate.failInstall) throw new Error(mockUpdate.failInstall);
       await window.__aimd_updater_mock.install?.(mockUpdate);
+    } else if (isMacPkgUpdate(update)) {
+      render({
+        phase: "downloading",
+        currentVersion: current,
+        latestVersion: latest,
+        progress: "正在下载并验证 PKG 安装包",
+        manual: true,
+      });
+      const result = await invoke<MacPkgInstallResult>("updater_install_macos_pkg", {
+        url: update.url,
+        signature: update.signature,
+        pubkey: AIMD_RELEASE.updaterPubkey,
+        version: update.version,
+      });
+      contentLength = result.bytes || 0;
+      render({
+        phase: "installed",
+        currentVersion: current,
+        latestVersion: latest,
+        detail: "已打开 macOS 安装器，完成安装后重新打开 AIMD",
+        manual: true,
+      });
+      logUpdater("info", "install_finished", {
+        requestId: id,
+        currentVersion: current,
+        latestVersion: latest,
+        installerKind: update.installerKind,
+        downloadSize: contentLength || null,
+      });
+      setStatus("已打开 macOS 安装器", "success");
+      return;
     } else {
       const tauriUpdate = update as Update;
       await tauriUpdate.downloadAndInstall((event: DownloadEvent) => {
@@ -242,7 +305,7 @@ export async function checkForUpdates(opts: { manual?: boolean } = {}) {
       render({ phase: "checking", currentVersion: current, detail: "正在检查更新", manual });
       setStatus("正在检查更新", "loading");
     }
-    const update = await checkForUpdateObject(manual);
+    const update = await checkForUpdateObject(manual, current);
     const elapsedMs = Math.round(performance.now() - started);
     if (!update) {
       logUpdater("info", "check_no_update", { requestId: id, currentVersion: current, elapsedMs });
@@ -257,6 +320,7 @@ export async function checkForUpdates(opts: { manual?: boolean } = {}) {
       requestId: id,
       currentVersion: current,
       latestVersion: update.version,
+      installerKind: isManifestUpdate(update) ? update.installerKind : "tauri",
       elapsedMs,
     });
     if (!manual && dismissedVersions.has(update.version)) return;

@@ -53,9 +53,9 @@ After a successful package build, distributable byproducts such as .app/.dmg
 bundles are removed so dist/ contains the PKG and target/ remains a build cache.
 
 Set AIMD_RELEASE=1 or AIMD_UPDATER_ARTIFACTS=1 to additionally create and sign
-the Tauri updater app archive:
-  dist/AIMD-Desktop_<version>_macos_aarch64.app.tar.gz
-  dist/AIMD-Desktop_<version>_macos_aarch64.app.tar.gz.sig
+the full PKG updater artifact:
+  dist/AIMD-<version>.pkg
+  dist/AIMD-<version>.pkg.sig
 
 By default the script reuses target/ for faster builds. Pass --clean to remove
 the target/ cache first and perform a fresh build.
@@ -184,7 +184,7 @@ sign_updater_artifact() {
   node "$ROOT/scripts/sign-updater-artifact.mjs" "$artifact" --cwd "$DESKTOP"
 }
 
-create_macos_updater_artifact() {
+sign_macos_pkg_updater_artifact() {
   if ! updater_artifacts_required; then
     return
   fi
@@ -192,19 +192,16 @@ create_macos_updater_artifact() {
     echo "error: macOS updater contract currently supports darwin-aarch64 only; runner is $(uname -m)" >&2
     exit 1
   fi
-  local updater="$OUT_DIR/AIMD-Desktop_${VERSION}_macos_aarch64.app.tar.gz"
-  echo "==> creating macOS updater artifact"
-  rm -f "$updater" "$updater.sig"
-  COPYFILE_DISABLE=1 tar -czf "$updater" -C "$BUNDLE_MACOS" "$(basename "$APP_PATH")"
+  local updater="$OUT_DIR/AIMD-${VERSION}.pkg"
+  echo "==> signing macOS PKG updater artifact"
   sign_updater_artifact "$updater"
   echo "updater -> $updater"
-  echo "signature -> $updater.sig"
 }
 
 prepare_output_dir() {
   mkdir -p "$OUT_DIR"
   if [[ "$OUT_DIR" == "$ROOT/dist" ]]; then
-    find "$OUT_DIR" -maxdepth 1 \( -name 'AIMD-*.pkg' -o -name 'AIMD*.dmg' -o -name 'AIMD*.app' -o -name 'AIMD-Desktop_*_macos_*.app.tar.gz' -o -name 'AIMD-Desktop_*_macos_*.app.tar.gz.sig' -o -name '.DS_Store' \) -exec rm -rf {} +
+    find "$OUT_DIR" -maxdepth 1 \( -name 'AIMD-*.pkg' -o -name 'AIMD-*.pkg.sig' -o -name 'AIMD*.dmg' -o -name 'AIMD*.app' -o -name 'AIMD-Desktop_*_macos_*.app.tar.gz' -o -name 'AIMD-Desktop_*_macos_*.app.tar.gz.sig' -o -name '.DS_Store' \) -exec rm -rf {} +
   fi
 }
 
@@ -285,7 +282,7 @@ pkgbuild \
   --install-location "/" \
   "$OUT_DIR/AIMD-${VERSION}.pkg"
 
-create_macos_updater_artifact
+sign_macos_pkg_updater_artifact
 cleanup_packaging_byproducts
 
 echo "pkg -> $OUT_DIR/AIMD-${VERSION}.pkg"

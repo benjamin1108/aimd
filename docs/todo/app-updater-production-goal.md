@@ -46,6 +46,10 @@ Completion requires:
 - A real release integration that builds installers, signs updater artifacts,
   writes signatures, generates the manifest, validates the manifest, uploads all
   assets, and fails closed when any required secret or artifact is missing.
+- macOS production updates must use the complete signed PKG installer. DMG,
+  loose `.app`, or app-only `.app.tar.gz` artifacts are not acceptable
+  production updater assets because they do not update the CLI and Agent skill
+  payload.
 - A real republish/recovery path for the current version tag that can recreate
   updater assets and replace the GitHub Release without bumping version.
 - Cross-platform behavior for macOS and Windows, with Linux either explicitly
@@ -114,6 +118,9 @@ complete and verified end to end.
   - platform-specific `signature`
 - Each platform entry must correspond to the exact artifact format the app can
   install on that platform.
+- The macOS `darwin-aarch64` platform entry must point to the signed
+  `AIMD-<version>.pkg` asset. The app must verify that PKG signature before
+  opening the system Installer.
 - Optional release notes and publication date should be included when available.
 - Manifest URLs must point to immutable release artifacts, not mutable local
   paths.
@@ -250,7 +257,10 @@ The production update flow must be:
 1. Version management goal provides canonical app version and release metadata.
 2. Release CI builds signed desktop installers.
 3. Release CI signs updater artifacts with the private updater key.
-4. Release CI generates a Tauri-compatible `latest.json` manifest.
+4. Release CI generates the signed static `latest.json` manifest consumed by
+   the app. Windows entries are installed through the Tauri updater plugin;
+   macOS entries point to the full signed PKG and are installed through the
+   app's PKG handoff flow after signature verification.
 5. GitHub Release hosts installers, signatures, and manifest.
 6. App starts and performs a background update check.
 7. If no update exists, app stays silent.
@@ -279,6 +289,8 @@ The production update flow must be:
 - Download/install failures produce actionable UI state and structured logs.
 - GitHub Release contains installers, signatures, and update manifest.
 - `latest.json` validates against the Tauri updater schema expected by the app.
+- macOS `latest.json` uses `AIMD-<version>.pkg` plus `AIMD-<version>.pkg.sig`;
+  no DMG or app-only tarball is allowed in the production asset contract.
 - Manifest version, artifact names, and Git tag match the canonical release
   config.
 - Windows install mode is documented and manually verified.
