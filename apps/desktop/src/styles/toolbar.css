@@ -46,9 +46,8 @@
   line-height: 1;
 }
 
-/* Source-mode metadata banner — 出现在 textarea 上方，提示
-   front-matter 行数。不强制折叠（textarea 不支持），但通过明确告知
-   把"刺眼"变成"知情" 。 */
+/* Source-mode exceptional banner. Frontmatter is rendered as document metadata,
+   not as a persistent textarea banner. */
 .source-banner {
   display: flex;
   align-items: center;

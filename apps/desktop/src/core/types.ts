@@ -263,6 +263,8 @@ export type GitFileDiff = {
   unstagedDiff: string;
   isBinary: boolean;
   truncated?: boolean;
+  renderedMarkdown?: string;
+  renderedHtml?: string;
 };
 
 export type GitDiffTab = {

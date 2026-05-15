@@ -1,7 +1,3 @@
-import { state } from "../core/state";
-import { readerEl, inlineEditorEl } from "../core/dom";
-import type { Mode } from "../core/types";
-
 export function openLightbox(src: string) {
   const existing = document.getElementById("aimd-lightbox");
   if (existing) existing.remove();
@@ -38,22 +34,4 @@ export function openLightbox(src: string) {
   });
   closeBtn.addEventListener("click", close);
   document.addEventListener("keydown", onKey, { capture: true });
-}
-
-export function bindImageLightbox() {
-  const open = (e: MouseEvent, mode: Mode) => {
-    if (state.mode !== mode) return;
-    const target = e.target as HTMLElement;
-    if (target.tagName !== "IMG") return;
-    if (target.closest(".aimd-lightbox")) return;
-    const img = target as HTMLImageElement;
-    const src = img.getAttribute("src") || "";
-    if (!src) return;
-    e.preventDefault();
-    openLightbox(src);
-  };
-  readerEl().addEventListener("click", (e) => open(e, "read"));
-  // 编辑模式下点图片也放大；preventDefault 顺手挡住 contenteditable
-  // 把光标定到图片附近的副作用，按 ESC 回编辑器即可继续编辑。
-  inlineEditorEl().addEventListener("click", (e) => open(e, "edit"));
 }

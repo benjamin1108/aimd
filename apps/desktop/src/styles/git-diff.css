@@ -52,6 +52,15 @@
   white-space: pre;
 }
 
+.git-diff-rendered-surface {
+  max-height: 360px;
+  padding: 18px;
+  border: 1px solid var(--hairline);
+  border-radius: 8px;
+  background: var(--surface-document);
+  overflow: auto;
+}
+
 .git-diff-line {
   min-width: max-content;
   padding: 0 12px;

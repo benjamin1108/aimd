@@ -26,7 +26,7 @@ import {
   syncActiveTabFromFacade,
 } from "./open-document-state";
 import { refreshTabFingerprint } from "./fingerprint";
-import { activateGitDiffTab, firstGitDiffTabId, isGitDiffTabId } from "../ui/git-diff";
+import { activateGitDiffTab, closeGitDiffTab, firstGitDiffTabId, isGitDiffTabId } from "../ui/git-diff";
 
 export type OpenRouteResult = "opened" | "focused" | "current" | "cancelled" | "failed" | "unsupported";
 
@@ -196,6 +196,16 @@ export async function closeDocument() {
   const tab = activeTab();
   if (!tab) return;
   await closeDocumentTab(tab.id);
+}
+
+export async function closeCurrentTab() {
+  const activeId = state.openDocuments.activeTabId;
+  if (!activeId) return;
+  if (isGitDiffTabId(activeId)) {
+    await closeGitDiffTab(activeId);
+    return;
+  }
+  await closeDocument();
 }
 
 function clearDocumentSurface() {

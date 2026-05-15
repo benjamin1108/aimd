@@ -11,26 +11,16 @@ import type {
   FormatSettings,
   FormatOutputLanguage,
 } from "../core/types";
-import { MODEL_OPTIONS } from "./model-options";
 import { setupGitIntegration } from "./git-integration";
 import { settingsTemplateHTML } from "./template";
 import { bindSelectionBoundary } from "../ui/selection";
+import { customModelValue, renderModelOptionsFor, type ModelConnectionTestResult } from "./model-controls";
 
 declare global {
   interface Window {
     __AIMD_SETTINGS_FATAL__?: (reason: unknown) => void;
   }
 }
-
-const CUSTOM_MODEL_VALUE = "__custom__";
-type ModelConnectionTestResult = {
-  ok: boolean;
-  latencyMs: number;
-  message: string;
-};
-function modelOptionsForProvider(provider: ModelProvider) { return MODEL_OPTIONS[provider]; }
-function isKnownModel(provider: ModelProvider, model: string) { return MODEL_OPTIONS[provider].some((o) => o.value === model); }
-function customModelValue() { return CUSTOM_MODEL_VALUE; }
 
 const root = document.querySelector<HTMLDivElement>("#settings-app");
 if (!root) throw new Error("设置页缺少 #settings-app 挂载点");
@@ -125,34 +115,6 @@ navItems.forEach((btn) => {
   });
 });
 
-function renderModelOptions(provider: ModelProvider, selectedModel: string) {
-  const customValue = customModelValue();
-  const known = isKnownModel(provider, selectedModel);
-  modelSelectEl.innerHTML = [
-    ...modelOptionsForProvider(provider).map((option) =>
-      `<option value="${option.value}">${option.label}</option>`
-    ),
-    `<option value="${customValue}">自定义模型...</option>`,
-  ].join("");
-  modelSelectEl.value = known ? selectedModel : customValue;
-  modelEl.hidden = known;
-  modelEl.value = selectedModel;
-}
-
-function renderModelOptionsFor(selectEl: HTMLSelectElement, inputEl: HTMLInputElement, provider: ModelProvider, selectedModel: string) {
-  const customValue = customModelValue();
-  const known = isKnownModel(provider, selectedModel);
-  selectEl.innerHTML = [
-    ...modelOptionsForProvider(provider).map((option) =>
-      `<option value="${option.value}">${option.label}</option>`
-    ),
-    `<option value="${customValue}">自定义模型...</option>`,
-  ].join("");
-  selectEl.value = known ? selectedModel : customValue;
-  inputEl.hidden = known;
-  inputEl.value = selectedModel;
-}
-
 function readCredFromForm(): ProviderCredential {
   const model = modelSelectEl.value === customModelValue()
     ? modelEl.value.trim()
@@ -196,7 +158,7 @@ function loadProviderToForm(provider: ModelProvider) {
   activeProvider = provider;
   providerEl.value = provider;
   const cred = draft[provider];
-  renderModelOptions(provider, cred.model || defaultModelForProvider(provider));
+  renderModelOptionsFor(modelSelectEl, modelEl, provider, cred.model || defaultModelForProvider(provider));
   apiKeyEl.value = cred.apiKey;
   apiBaseEl.value = cred.apiBase;
   apiKeyErrorEl.hidden = true;
@@ -439,7 +401,7 @@ formatModelSelectEl.addEventListener("change", () => {
 });
 
 resetModelBtn.addEventListener("click", () => {
-  renderModelOptions(activeProvider, defaultModelForProvider(activeProvider));
+  renderModelOptionsFor(modelSelectEl, modelEl, activeProvider, defaultModelForProvider(activeProvider));
   clearConnectionTestState();
   syncSaveButton();
 });

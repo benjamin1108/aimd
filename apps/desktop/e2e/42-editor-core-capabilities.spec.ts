@@ -403,7 +403,7 @@ test.describe("Editor core capabilities", () => {
     await page.evaluate(() => (window as any).__aimdEditorCoreMock.openMarkdownNext());
     await page.locator("#empty-open").click();
 
-    await expect.poll(async () => page.locator("#reader img[alt='local']").evaluate((img: HTMLImageElement) => ({
+    await expect.poll(async () => page.locator('#reader img[alt="local"][data-aimd-markdown-src="./images/local.png"]').evaluate((img: HTMLImageElement) => ({
       src: img.getAttribute("src") || "",
       localPath: img.dataset.aimdLocalImagePath || "",
       naturalWidth: img.naturalWidth,
@@ -415,7 +415,7 @@ test.describe("Editor core capabilities", () => {
 
     await page.locator("#mode-source").click();
     await page.locator("#markdown").fill("# 传统 Markdown\n\n![local](../shared/pic one.png)\n");
-    await expect.poll(async () => page.locator("#reader img[alt='local']").evaluate((img: HTMLImageElement) => ({
+    await expect.poll(async () => page.locator('#reader img[alt="local"][data-aimd-markdown-src="../shared/pic one.png"]').evaluate((img: HTMLImageElement) => ({
       src: img.getAttribute("src") || "",
       localPath: img.dataset.aimdLocalImagePath || "",
       naturalWidth: img.naturalWidth,
@@ -425,7 +425,7 @@ test.describe("Editor core capabilities", () => {
       naturalWidth: 1,
     });
     await page.locator("#mode-read").click();
-    await expect.poll(async () => page.locator("#reader img[alt='local']").evaluate((img: HTMLImageElement) => ({
+    await expect.poll(async () => page.locator('#reader img[alt="local"][data-aimd-markdown-src="../shared/pic one.png"]').evaluate((img: HTMLImageElement) => ({
       src: img.getAttribute("src") || "",
       localPath: img.dataset.aimdLocalImagePath || "",
       naturalWidth: img.naturalWidth,
@@ -496,17 +496,30 @@ test.describe("Editor core capabilities", () => {
     await expect(page.locator("#health-panel")).toBeHidden();
   });
 
-  test("document links open through the system browser command", async ({ page }) => {
+  test("document links require a modifier before opening through the system browser command", async ({ page }) => {
     await installEditorCoreMock(page);
     await page.goto("/");
     await page.locator("#empty-open").click();
 
     await page.locator("#reader a", { hasText: "Example" }).click();
+    await expect(page.locator("#status")).toContainText("按 Ctrl/⌘ 点击打开链接");
+    await expect.poll(() => page.evaluate(() => (window as any).__aimdEditorCoreMock.getOpenedUrls()))
+      .toEqual([]);
+
+    await page.locator("#reader a", { hasText: "Example" }).click({
+      modifiers: [process.platform === "darwin" ? "Meta" : "Control"],
+    });
     await expect.poll(() => page.evaluate(() => (window as any).__aimdEditorCoreMock.getOpenedUrls()))
       .toEqual(["https://example.com/a"]);
 
     await page.locator("#mode-edit").click();
-    await page.locator("#inline-editor a", { hasText: "Example" }).click({ modifiers: ["Meta"] });
+    await page.locator("#inline-editor a", { hasText: "Example" }).click();
+    await expect(page.locator("#status")).toContainText("按 Ctrl/⌘ 点击打开链接");
+    await expect.poll(() => page.evaluate(() => (window as any).__aimdEditorCoreMock.getOpenedUrls()))
+      .toEqual(["https://example.com/a"]);
+    await page.locator("#inline-editor a", { hasText: "Example" }).click({
+      modifiers: [process.platform === "darwin" ? "Meta" : "Control"],
+    });
     await expect.poll(() => page.evaluate(() => (window as any).__aimdEditorCoreMock.getOpenedUrls()))
       .toEqual(["https://example.com/a", "https://example.com/a"]);
   });

@@ -39,6 +39,7 @@ async function installTabsMock(page: Page) {
     ]);
     const runtime = {
       discardChoice: "cancel" as "save" | "discard" | "cancel",
+      confirms: [] as string[],
       saves: [] as Array<{ path: string; markdown: string }>,
       registered: [] as string[],
       unregistered: [] as string[],
@@ -100,9 +101,13 @@ async function installTabsMock(page: Page) {
         return null;
       },
       update_window_path: () => null,
-      confirm_discard_changes: () => runtime.discardChoice,
+      confirm_discard_changes: (a) => {
+        runtime.confirms.push(String(a?.message ?? ""));
+        return runtime.discardChoice;
+      },
     };
     (window as any).__aimdTabsMock = {
+      confirms: () => runtime.confirms,
       saves: () => runtime.saves,
       registered: () => runtime.registered,
       unregistered: () => runtime.unregistered,
@@ -186,6 +191,22 @@ test.describe("Open Documents tabs", () => {
     await expect(page.locator("#workspace-tree")).toHaveText("打开目录");
     await expect(page.locator(".open-tab")).toHaveCount(2);
     await expect(page.locator("#doc-title")).toHaveText("Beta");
+  });
+
+  test("Cmd+W on a dirty document tab shows close confirmation", async ({ page }) => {
+    await installTabsMock(page);
+    await page.goto("/");
+    await openWorkspaceAndDocs(page);
+
+    await page.locator(".open-tab", { hasText: "Alpha" }).locator(".open-tab-main").click();
+    await page.locator("#mode-source").click();
+    await page.locator("#markdown").fill("# Alpha\n\nDirty A");
+    await page.keyboard.press(process.platform === "darwin" ? "Meta+W" : "Control+W");
+
+    await expect(page.locator(".open-tab")).toHaveCount(2);
+    await expect(page.locator("#doc-title")).toHaveText("Alpha");
+    const confirms = await page.evaluate(() => (window as any).__aimdTabsMock.confirms());
+    expect(confirms.at(-1)).toContain("关闭当前标签页");
   });
 
   test("stale render result from a previous tab does not repaint the active tab", async ({ page }) => {

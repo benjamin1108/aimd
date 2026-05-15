@@ -114,15 +114,16 @@ export function setStatusOverride(
   text: string,
   tone: "idle" | "loading" | "success" | "warn" | "info" = "info",
   action?: string,
+  immediate = false,
 ) {
   state.statusOverride = { text, tone, action };
-  if (state.statusTimer == null) renderStableStatus();
+  if (immediate || state.statusTimer == null) renderStableStatus();
 }
 
-export function clearStatusOverride(action?: string) {
+export function clearStatusOverride(action?: string, immediate = false) {
   if (action && state.statusOverride?.action !== action) return;
   state.statusOverride = null;
-  if (state.statusTimer == null) renderStableStatus();
+  if (immediate || state.statusTimer == null) renderStableStatus();
 }
 
 function applyStatus(text: string, tone: "idle" | "loading" | "success" | "warn" | "info", action?: string) {

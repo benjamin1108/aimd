@@ -291,6 +291,13 @@ test.describe("Git workspace panel", () => {
 
     await page.locator(".git-file-row[data-path='apps/foo.ts']").locator("[data-git-action='select']").click();
     await expect(page.locator(".open-tab.is-active")).toContainText("foo.ts");
+    await page.keyboard.press(process.platform === "darwin" ? "Meta+W" : "Control+W");
+    await expect(page.locator("#reader")).toBeVisible();
+    await expect(page.locator(".open-tab.is-active")).toContainText("Readme");
+    await expect(page.locator(".open-tab", { hasText: "foo.ts" })).toHaveCount(0);
+
+    await page.locator(".git-file-row[data-path='apps/foo.ts']").locator("[data-git-action='select']").click();
+    await expect(page.locator(".open-tab.is-active")).toContainText("foo.ts");
     await page.locator(".open-tab", { hasText: "Readme" }).locator(".open-tab-main").click();
     await expect(page.locator("#reader")).toBeVisible();
     await expect(page.locator("#git-diff-view")).toBeHidden();

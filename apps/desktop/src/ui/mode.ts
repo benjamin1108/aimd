@@ -9,8 +9,8 @@ import type { Mode } from "../core/types";
 import { paintPaneIfStale } from "./outline";
 import { updateChrome } from "./chrome";
 import { flushInline } from "../editor/inline";
-import { splitFrontmatter } from "../markdown/frontmatter";
 import { captureActiveViewState, restoreActiveViewState } from "../document/view-state";
+import { clearRenderedSurfaceInteractionStatus } from "../rendered-surface/interactions";
 
 export function refreshSourceBanner() {
   const banner = sourceBannerEl();
@@ -24,18 +24,11 @@ export function refreshSourceBanner() {
     banner.hidden = false;
     return;
   }
-  const { frontmatter } = splitFrontmatter(state.doc.markdown);
-  if (!frontmatter) {
-    banner.hidden = true;
-    return;
-  }
-  const lineCount = frontmatter.split("\n").length;
-  sourceBannerTextEl().innerHTML =
-    `<strong>Markdown 视图</strong>：开头 ${lineCount} 行是 YAML 元信息。预览 / 可视编辑会保护这些内容；Markdown 模式可直接修改。`;
-  banner.hidden = false;
+  banner.hidden = true;
 }
 
 export function setMode(mode: Mode, options: { skipCapture?: boolean } = {}) {
+  clearRenderedSurfaceInteractionStatus();
   if (!options.skipCapture) captureActiveViewState();
   // Flush from the mode we are leaving.
   if (state.mode === "edit" && mode !== "edit") flushInline();

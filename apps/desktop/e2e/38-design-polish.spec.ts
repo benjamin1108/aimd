@@ -6,7 +6,7 @@
  * - 模式切换段控件改纯文字（不再渲染 .mode-btn-icon SVG）
  * - ⋯ 菜单不再用"危险"分组（关闭文档不是破坏性操作）
  * - 旧导览菜单 / 状态点 / 按钮不再出现。
- * - 进入 source 模式且文档含 frontmatter 时 #source-banner 可见，否则 hidden
+ * - source 模式不为 frontmatter 常驻显示 #source-banner，避免源码/预览标题栏错位
  */
 import { test, expect, Page } from "@playwright/test";
 
@@ -139,7 +139,7 @@ test.describe("已移除的导览入口", () => {
   });
 });
 
-test.describe("源码模式 metadata banner", () => {
+test.describe("源码模式提示条", () => {
   test("无 frontmatter 时进入源码模式不显示 banner", async ({ page }) => {
     await installTauriMock(page, { withTour: false });
     await page.goto("/");
@@ -148,12 +148,16 @@ test.describe("源码模式 metadata banner", () => {
     await expect(page.locator("#source-banner")).toBeHidden();
   });
 
-  test("从源码模式切回阅读模式后 banner 自动隐藏", async ({ page }) => {
+  test("frontmatter 不再在源码模式显示常驻保护 banner", async ({ page }) => {
     await installTauriMock(page, { withTour: true });
     await page.goto("/");
     await page.locator("#empty-open").click();
     await page.locator("#mode-source").click();
-    await expect(page.locator("#source-banner")).toBeVisible();
+    await expect(page.locator("#source-banner")).toBeHidden();
+    const editorTag = await page.locator(".editor-pane .pane-tag").boundingBox();
+    const previewTag = await page.locator(".preview-pane .pane-tag").boundingBox();
+    expect(editorTag && previewTag).toBeTruthy();
+    expect(Math.abs(editorTag!.y - previewTag!.y)).toBeLessThanOrEqual(1);
     await page.locator("#mode-read").click();
     await expect(page.locator("#source-banner")).toBeHidden();
   });

@@ -1,18 +1,27 @@
 import { invoke } from "@tauri-apps/api/core";
 import { state } from "../core/state";
 import {
-  readerEl, inlineEditorEl, previewEl,
+  readerEl, inlineEditorEl, previewEl, markdownEl,
   outlineSectionEl, outlineListEl,
 } from "../core/dom";
-import type { AimdAsset, Mode, OutlineNode, RenderResult } from "../core/types";
-import { hydrateMarkdownLocalImages, rewriteAssetURLs, rewriteMarkdownLocalImageURLs } from "../document/assets";
+import type { Mode, OutlineNode, RenderResult } from "../core/types";
 import { escapeAttr, escapeHTML } from "../util/escape";
-import { setStatus } from "./chrome";
+import { clearStatusOverride, setStatus, setStatusOverride, updateChrome } from "./chrome";
 import { persistSessionSnapshot } from "../session/snapshot";
-import { enhanceRenderedDocument } from "../editor/interactive";
 import { renderDocPanelTabs } from "./doc-panel";
-import { annotateSourceBlocks, createSourceModel } from "../editor/source-preserve";
+import { createSourceModel } from "../editor/source-preserve";
 import { beginTabOperation, isActiveOperationCurrent, syncActiveTabFromFacade } from "../document/open-document-state";
+import { openLightbox } from "./lightbox";
+import { rewriteRenderedSurfaceAssets } from "../rendered-surface/assets";
+import { paintRenderedSurface, normalizeRenderedHTML } from "../rendered-surface/pipeline";
+import {
+  previewSurfaceProfile,
+  readerSurfaceProfile,
+  visualEditorSurfaceProfile,
+} from "../rendered-surface/profiles";
+import type { PaintRenderedSurfaceContext, RenderedSurfaceCallbacks, RenderedSurfaceProfile } from "../rendered-surface/types";
+
+const LINK_HINT_STATUS_ACTION = "link-hover-hint";
 
 export function scheduleRender() {
   if (state.renderTimer) window.clearTimeout(state.renderTimer);
@@ -41,102 +50,30 @@ export async function renderPreview() {
 }
 
 export function applyHTML(html: string) {
-  if (state.doc && state.sourceModel?.markdown !== state.doc.markdown) {
+  if (!state.doc) return;
+  if (!state.sourceModel || state.sourceModel.markdown !== state.doc.markdown) {
     state.sourceModel = createSourceModel(state.doc.markdown);
     state.sourceDirtyRefs.clear();
     state.sourceStructuralDirty = false;
   }
-  const shouldHydrateMarkdownImages = state.doc?.format === "markdown" && Boolean(state.doc.path);
-  const withMarkdownImages = state.doc?.format === "markdown" && state.doc.path
-    ? rewriteMarkdownLocalImageURLs(html, state.doc.path)
-    : html;
-  const renderedHTML = state.doc ? rewriteAssetURLs(withMarkdownImages, state.doc.assets) : withMarkdownImages;
+  const rendered = rewriteRenderedSurfaceAssets(html, {
+    assets: state.doc.assets,
+    markdownPath: activeMarkdownPath(),
+  });
+  const canonical = normalizeRenderedHTML(rendered);
   state.htmlVersion += 1;
-  previewEl().innerHTML = renderedHTML;
-  readerEl().innerHTML = renderedHTML;
-  state.paintedVersion.read = state.htmlVersion;
-  state.paintedVersion.source = state.htmlVersion;
-  if (state.mode === "edit" && state.doc) {
-    const tmp = document.createElement("div");
-    tmp.innerHTML = renderedHTML;
-    tmp.querySelectorAll(".aimd-frontmatter").forEach((el) => el.remove());
-    inlineEditorEl().innerHTML = tmp.innerHTML;
-    tagAssetImages(inlineEditorEl(), state.doc.assets);
-    if (state.sourceModel) annotateSourceBlocks(inlineEditorEl(), state.sourceModel);
-    state.paintedVersion.edit = state.htmlVersion;
-    state.inlineDirty = false;
-  }
-  if (state.doc) {
-    tagAssetImages(readerEl(), state.doc.assets);
-    tagAssetImages(previewEl(), state.doc.assets);
-    enhanceRenderedDocument(readerEl(), { codeCopy: true, taskToggle: true, linkOpen: "plain" });
-    enhanceRenderedDocument(previewEl(), { codeCopy: true, taskToggle: true, linkOpen: "plain" });
-    enhanceRenderedDocument(inlineEditorEl(), { taskToggle: true, linkOpen: "modifier" });
-    if (shouldHydrateMarkdownImages) {
-      const hydrateTabId = state.openDocuments.activeTabId;
-      const hydrateHtmlVersion = state.htmlVersion;
-      void Promise.all([
-        hydrateMarkdownLocalImages(readerEl()),
-        hydrateMarkdownLocalImages(previewEl()),
-        hydrateMarkdownLocalImages(inlineEditorEl()),
-      ]).then(() => {
-        if (state.doc && state.openDocuments.activeTabId === hydrateTabId && state.htmlVersion === hydrateHtmlVersion) {
-          state.doc.html = readerEl().innerHTML;
-          syncActiveTabFromFacade();
-        }
-      });
-    }
-  }
-  state.outline = extractOutlineFromHTML(renderedHTML);
-  if (state.doc) {
-    state.doc.html = previewEl().innerHTML;
-  }
+  state.doc.html = canonical.html;
+  state.outline = canonical.outline;
+  paintDocumentSurface(readerSurfaceProfile(), state.htmlVersion);
+  paintDocumentSurface(previewSurfaceProfile(), state.htmlVersion);
+  if (state.mode === "edit") paintDocumentSurface(visualEditorSurfaceProfile(), state.htmlVersion);
   renderOutline();
   syncActiveTabFromFacade();
   persistSessionSnapshot();
 }
 
-export function tagAssetImages(container: HTMLElement, assets: AimdAsset[]) {
-  if (!assets.length) return;
-  const map = new Map<string, string>();
-  for (const a of assets) {
-    if (a.url) map.set(a.url, a.id);
-  }
-  container.querySelectorAll<HTMLImageElement>("img").forEach((img) => {
-    const src = img.getAttribute("src") || "";
-    const id = map.get(src);
-    if (id) img.dataset.assetId = id;
-  });
-}
-
 export function extractOutlineFromHTML(html: string): OutlineNode[] {
-  const tmp = document.createElement("div");
-  tmp.innerHTML = html;
-  const nodes: OutlineNode[] = [];
-  const headings = tmp.querySelectorAll("h1, h2, h3, h4");
-  let counter = 0;
-  headings.forEach((h) => {
-    const tag = h.tagName.toLowerCase();
-    const level = Number(tag.slice(1));
-    const text = (h.textContent || "").trim();
-    if (!text) return;
-    const id = h.id || `aimd-heading-${counter++}`;
-    if (!h.id) h.id = id;
-    nodes.push({ id, text, level });
-  });
-  syncHeadingIds(readerEl(), tmp);
-  syncHeadingIds(previewEl(), tmp);
-  syncHeadingIds(inlineEditorEl(), tmp);
-  return nodes;
-}
-
-export function syncHeadingIds(target: HTMLElement, source: HTMLElement) {
-  const targetH = target.querySelectorAll("h1, h2, h3, h4");
-  const sourceH = source.querySelectorAll("h1, h2, h3, h4");
-  targetH.forEach((node, i) => {
-    const id = sourceH[i]?.id;
-    if (id) (node as HTMLElement).id = id;
-  });
+  return normalizeRenderedHTML(html).outline;
 }
 
 export function renderOutline() {
@@ -177,44 +114,79 @@ export function currentScrollPane(): HTMLElement {
 export function paintPaneIfStale(mode: Mode) {
   if (!state.doc) return;
   if (state.paintedVersion[mode] === state.htmlVersion) return;
-  if (mode === "edit") {
-    const tmpEdit = document.createElement("div");
-    tmpEdit.innerHTML = state.doc.html;
-    tmpEdit.querySelectorAll(".aimd-frontmatter").forEach((el) => el.remove());
-    inlineEditorEl().innerHTML = tmpEdit.innerHTML;
-    tagAssetImages(inlineEditorEl(), state.doc.assets);
-    if (state.sourceModel) annotateSourceBlocks(inlineEditorEl(), state.sourceModel);
-    enhanceRenderedDocument(inlineEditorEl(), { taskToggle: true, linkOpen: "modifier" });
-    if (state.doc.format === "markdown") {
-      const tabId = state.openDocuments.activeTabId;
-      const version = state.htmlVersion;
-      void hydrateMarkdownLocalImages(inlineEditorEl()).then(() => {
-        if (state.doc && state.openDocuments.activeTabId === tabId && state.htmlVersion === version) syncActiveTabFromFacade();
-      });
-    }
-    state.inlineDirty = false;
-  } else if (mode === "read") {
-    readerEl().innerHTML = state.doc.html;
-    tagAssetImages(readerEl(), state.doc.assets);
-    enhanceRenderedDocument(readerEl(), { codeCopy: true, taskToggle: true, linkOpen: "plain" });
-    if (state.doc.format === "markdown") {
-      const tabId = state.openDocuments.activeTabId;
-      const version = state.htmlVersion;
-      void hydrateMarkdownLocalImages(readerEl()).then(() => {
-        if (state.doc && state.openDocuments.activeTabId === tabId && state.htmlVersion === version) syncActiveTabFromFacade();
-      });
-    }
-  } else {
-    previewEl().innerHTML = state.doc.html;
-    tagAssetImages(previewEl(), state.doc.assets);
-    enhanceRenderedDocument(previewEl(), { codeCopy: true, taskToggle: true, linkOpen: "plain" });
-    if (state.doc.format === "markdown") {
-      const tabId = state.openDocuments.activeTabId;
-      const version = state.htmlVersion;
-      void hydrateMarkdownLocalImages(previewEl()).then(() => {
-        if (state.doc && state.openDocuments.activeTabId === tabId && state.htmlVersion === version) syncActiveTabFromFacade();
-      });
-    }
+  const profile = mode === "edit"
+    ? visualEditorSurfaceProfile()
+    : (mode === "source" ? previewSurfaceProfile() : readerSurfaceProfile());
+  paintDocumentSurface(profile, state.htmlVersion);
+}
+
+function paintDocumentSurface(profile: RenderedSurfaceProfile, version: number) {
+  if (!state.doc) return;
+  paintRenderedSurface(profile, state.doc.html, renderedSurfaceContext(version));
+}
+
+function renderedSurfaceContext(version: number): PaintRenderedSurfaceContext {
+  const tabId = state.openDocuments.activeTabId;
+  return {
+    assets: state.doc?.assets ?? [],
+    callbacks: documentSurfaceCallbacks(),
+    htmlVersion: version,
+    markdownPath: activeMarkdownPath(),
+    sourceModel: state.sourceModel,
+    tabId,
+    onPainted: (profile) => {
+      if (profile.paintVersionKey) state.paintedVersion[profile.paintVersionKey] = version;
+      if (profile.kind === "visual-editor") state.inlineDirty = false;
+    },
+    onHydrated: () => {
+      if (state.doc && state.openDocuments.activeTabId === tabId && state.htmlVersion === version) {
+        syncActiveTabFromFacade();
+      }
+    },
+    isHydrationCurrent: () => Boolean(
+      state.doc
+      && state.openDocuments.activeTabId === tabId
+      && state.htmlVersion === version,
+    ),
+  };
+}
+
+function activeMarkdownPath(): string | undefined {
+  return state.doc?.format === "markdown" && state.doc.path ? state.doc.path : undefined;
+}
+
+function documentSurfaceCallbacks(): RenderedSurfaceCallbacks {
+  return {
+    openExternalUrl,
+    openImage: openLightbox,
+    toggleTask: toggleTaskMarkdown,
+    showLinkHint: () => setStatusOverride("按 Ctrl/⌘ 点击打开链接", "info", LINK_HINT_STATUS_ACTION, true),
+    clearLinkHint: () => clearStatusOverride(LINK_HINT_STATUS_ACTION, true),
+    setStatus,
+  };
+}
+
+async function openExternalUrl(url: string) {
+  try {
+    await invoke("open_external_url", { url });
+  } catch (err) {
+    setStatus(`打开链接失败: ${String(err)}`, "warn");
   }
-  state.paintedVersion[mode] = state.htmlVersion;
+}
+
+function toggleTaskMarkdown(index: number) {
+  if (!state.doc || index < 0) return;
+  const re = /^(\s*[-*+]\s+\[)( |x|X)(\]\s+.*)$/gm;
+  let seen = -1;
+  const next = state.doc.markdown.replace(re, (full, start: string, mark: string, end: string) => {
+    seen += 1;
+    if (seen !== index) return full;
+    return `${start}${mark.toLowerCase() === "x" ? " " : "x"}${end}`;
+  });
+  if (next === state.doc.markdown) return;
+  state.doc.markdown = next;
+  state.doc.dirty = true;
+  markdownEl().value = next;
+  updateChrome();
+  scheduleRender();
 }

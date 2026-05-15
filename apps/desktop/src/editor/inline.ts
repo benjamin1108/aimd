@@ -2,7 +2,7 @@ import { state, ASSET_URI_PREFIX } from "../core/state";
 import { inlineEditorEl, markdownEl } from "../core/dom";
 import { setStatus, updateChrome } from "../ui/chrome";
 import {
-  extractOutlineFromHTML, renderOutline,
+  extractOutlineFromHTML, renderOutline, scheduleRender,
 } from "../ui/outline";
 import { persistSessionSnapshot } from "../session/snapshot";
 import { htmlToMarkdown } from "./markdown";
@@ -162,6 +162,7 @@ export function flushInline() {
     renderOutline();
     gcInlineAssets(md);
     persistSessionSnapshot();
+    scheduleRender();
   }
 }
 

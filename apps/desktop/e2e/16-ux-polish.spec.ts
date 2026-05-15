@@ -484,16 +484,14 @@ test.describe("5. Image lightbox in read mode", () => {
     expect(lightboxImgSrc).not.toMatch(/^data:/);
   });
 
-  test("lightbox does not open in edit mode", async ({ page }) => {
+  test("hidden reader images do not open lightbox while edit mode is active", async ({ page }) => {
     await installTauriMock(page);
     await page.goto("/");
     await page.locator("#empty-open").click();
     await page.locator("#mode-edit").click();
 
-    // In edit mode, #reader is hidden and #inline-editor is visible.
-    // The lightbox handler checks state.mode === "read" before opening.
-    // Simulate a click on an img inside #reader (even though hidden)
-    // via evaluate to verify no lightbox opens.
+    // Simulate a click on an img inside hidden #reader; the active visual-editor
+    // surface has its own lightbox behavior, but hidden surfaces must stay inert.
     await page.evaluate(() => {
       const img = document.createElement("img");
       img.src = "asset://localhost/mock/edit.png";
@@ -504,7 +502,6 @@ test.describe("5. Image lightbox in read mode", () => {
       img.dispatchEvent(new MouseEvent("click", { bubbles: true, cancelable: true }));
     });
 
-    // Lightbox should NOT open in edit mode
     const lightbox = page.locator("[data-lightbox='true']");
     await expect(lightbox).not.toBeAttached();
   });

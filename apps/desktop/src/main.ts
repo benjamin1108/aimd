@@ -25,7 +25,6 @@ import { bindSearch, openFindBar } from "./editor/search";
 import { bindSourceHighlight } from "./editor/source-highlight";
 import { bindWidthSwitch, setWidth } from "./ui/width";
 import { bindSidebarResizers, bindSidebarHrResizer, bindInspectorHrResizer } from "./ui/resizers";
-import { bindImageLightbox } from "./ui/lightbox";
 import { showFileContextMenu } from "./ui/context-menu";
 import { onInlineInput, flushInline } from "./editor/inline";
 import { bindImageDeleteGuard } from "./editor/image-delete";
@@ -33,7 +32,7 @@ import { onInlinePaste, onInlineKeydown, collectClipboardImages, pasteImageFiles
 import { scheduleRender } from "./ui/outline";
 import { clearRecentDocuments, loadRecentPaths } from "./ui/recents";
 import {
-  chooseAndOpen, newDocument, closeDocument,
+  chooseAndOpen, newDocument, closeCurrentTab,
   routeOpenedPath, openDocument, chooseAndImportMarkdownProject,
   closeDocumentTab, confirmAllDirtyTabsForWindowClose,
 } from "./document/lifecycle";
@@ -170,7 +169,7 @@ $<HTMLButtonElement>("#new-window").addEventListener("click", () => {
   closeActionMenus();
   void openNewWindow();
 });
-closeEl().addEventListener("click", () => { closeActionMenus(); void closeDocument(); });
+closeEl().addEventListener("click", () => { closeActionMenus(); void closeCurrentTab(); });
 openTabsEl().addEventListener("click", (event) => {
   const target = event.target as HTMLElement | null;
   const close = target?.closest<HTMLButtonElement>("[data-tab-close]");
@@ -267,7 +266,7 @@ document.addEventListener("keydown", (event) => {
   }
   if (mod && key === "w") {
     event.preventDefault();
-    void closeDocument();
+    void closeCurrentTab();
   }
   if (mod && key === "s" && event.shiftKey) {
     event.preventDefault();
@@ -404,7 +403,7 @@ window.addEventListener("DOMContentLoaded", async () => {
       "save-document":     () => { void saveDocument(); },
       "save-document-as":  () => { void saveDocumentAs(); },
       "new-window":        () => { void openNewWindow(); },
-      "close-document":    () => { void closeDocument(); },
+      "close-document":    () => { void closeCurrentTab(); },
       "mode-read":         () => { setMode("read"); },
       "mode-edit":         () => { setMode("edit"); },
       "mode-source":       () => { setMode("source"); },
@@ -456,12 +455,11 @@ window.addEventListener("DOMContentLoaded", async () => {
   } finally {
     state.isBootstrappingSession = false;
     void cleanupOldDrafts(state.doc?.draftSourcePath ? [state.doc.draftSourcePath] : []);
-    if (!state.doc) updateChrome();
+    if (!state.doc && !initialPath && !initialDraftPath) updateChrome();
     scheduleStartupUpdateCheck();
   }
 });
 
-bindImageLightbox();
 void bindWindowCloseGuard();
 
 (window as any).__aimd_testInsertImageBytes = async (
