@@ -4,7 +4,6 @@ type MockMode = "none" | "available" | "fail-check" | "fail-install" | "progress
 
 type MockOptions = {
   autoDelayMs?: number;
-  autoIntervalMs?: number;
 };
 
 async function installUpdaterMock(page: Page, mode: MockMode = "none", opts: MockOptions = {}) {
@@ -20,8 +19,6 @@ async function installUpdaterMock(page: Page, mode: MockMode = "none", opts: Moc
     w.__clipboardText = "";
     w.__nativeOpenCalls = [] as Array<{ cmd: string; args?: any }>;
     w.__aimdUpdaterAutoCheckDelayMs = options.autoDelayMs ?? 60_000;
-    w.__aimdUpdaterAutoCheckIntervalMs = options.autoIntervalMs ?? 24 * 60 * 60 * 1000;
-    w.__aimdUpdaterAutoCheckJitterMs = 0;
     Object.defineProperty(navigator, "clipboard", {
       configurable: true,
       value: {
@@ -176,12 +173,33 @@ test.describe("low-interruption updater UX", () => {
     await page.goto("/");
     await waitForUpdater(page);
     await page.waitForTimeout(120);
+    await expect.poll(() => page.evaluate(() => (window as any).__checkCount)).toBe(1);
     await expect(page.locator("#update-panel")).toBeHidden();
     await expect(page.locator("#status")).toHaveText("就绪");
 
     await page.evaluate(() => (window as any).__aimd_checkForUpdates({ manual: true }));
     await expect(page.locator("#update-panel")).toBeVisible();
     await expect(page.locator("#update-title")).toHaveText("AIMD 已是最新版本");
+  });
+
+  test("startup check runs after delay even when previous automatic check is recent", async ({ page }) => {
+    const updaterLogs: string[] = [];
+    page.on("console", (message) => {
+      const text = message.text();
+      if (text.includes("[updater]")) updaterLogs.push(text);
+    });
+    await installUpdaterMock(page, "available", { autoDelayMs: 20 });
+    await page.addInitScript(() => {
+      localStorage.setItem("aimd.desktop.updater.meta", JSON.stringify({ lastAutoCheckAt: Date.now() }));
+    });
+    await page.goto("/");
+    await waitForUpdater(page);
+
+    await expect.poll(() => page.evaluate(() => (window as any).__checkCount)).toBe(1);
+    await expect(page.locator("#update-panel")).toBeHidden();
+    await expect(page.locator("#status")).toHaveText("有新版本 1.0.2");
+    expect(updaterLogs.some((entry) => entry.includes("startup_auto_check_scheduled"))).toBeTruthy();
+    expect(updaterLogs.some((entry) => entry.includes("check_update_available"))).toBeTruthy();
   });
 
   test("scheduled update found only writes status first, then status click restores panel", async ({ page }) => {

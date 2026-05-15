@@ -116,7 +116,5 @@ declare global {
     __aimd_showAboutAimd?: () => Promise<void>;
     __aimd_runScheduledUpdateCheck?: (opts?: { force?: boolean }) => Promise<void>;
     __aimdUpdaterAutoCheckDelayMs?: number;
-    __aimdUpdaterAutoCheckIntervalMs?: number;
-    __aimdUpdaterAutoCheckJitterMs?: number;
   }
 }

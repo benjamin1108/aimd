@@ -1,7 +1,6 @@
 import { invoke, isTauri } from "@tauri-apps/api/core";
 import { check } from "@tauri-apps/plugin-updater";
 import { statusPillEl } from "../core/dom";
-import { debugLog } from "../debug/console";
 import { setStatus } from "../ui/chrome";
 import {
   errorDiagnostics,
@@ -19,10 +18,7 @@ import {
   updaterPlatformKey,
 } from "./runtime";
 import {
-  DEFAULT_AUTO_CHECK_INTERVAL_MS,
-  DEFAULT_AUTO_CHECK_JITTER_MS,
-  nextAutomaticCheckDelayMs,
-  shouldRunAutomaticUpdateCheck,
+  STARTUP_AUTO_CHECK_DELAY_MS,
   type UpdaterMeta,
 } from "./schedule";
 import type {
@@ -47,7 +43,7 @@ let pendingUpdate: PendingUpdate | null = null;
 let checking = false;
 let installingUpdate = false;
 let lastFailureMessage = "";
-let autoCheckTimer: number | null = null;
+let startupAutoCheckTimer: number | null = null;
 
 let uiState: UpdateUiState = {
   surface: "closed",
@@ -77,25 +73,9 @@ function writeMeta(patch: Partial<UpdaterMeta>) {
   return next;
 }
 
-function autoCheckIntervalMs() {
-  const override = Number(window.__aimdUpdaterAutoCheckIntervalMs);
-  return Number.isFinite(override) && override > 0 ? override : DEFAULT_AUTO_CHECK_INTERVAL_MS;
-}
-
-function autoCheckJitterMs() {
-  const override = Number(window.__aimdUpdaterAutoCheckJitterMs);
-  return Number.isFinite(override) && override >= 0 ? override : DEFAULT_AUTO_CHECK_JITTER_MS;
-}
-
 function startupAutoCheckDelayMs() {
   const override = Number(window.__aimdUpdaterAutoCheckDelayMs);
-  return Number.isFinite(override) && override >= 0
-    ? override
-    : 30_000 + Math.round(Math.random() * 30_000);
-}
-
-function shouldRunAutoCheck(now = Date.now()) {
-  return shouldRunAutomaticUpdateCheck(readMeta(), now, autoCheckIntervalMs());
+  return Number.isFinite(override) && override >= 0 ? override : STARTUP_AUTO_CHECK_DELAY_MS;
 }
 
 function summarizeReleaseNotes(notes?: string) {
@@ -117,8 +97,13 @@ function logUpdater(level: "debug" | "info" | "warn" | "error", event: string, d
     platform: getCachedPlatformKey(),
     ...data,
   };
-  debugLog(level, `[updater] ${JSON.stringify(payload)}`);
-  const method = level === "error" ? "error" : level === "warn" ? "warn" : "info";
+  const method = level === "error"
+    ? "error"
+    : level === "warn"
+      ? "warn"
+      : level === "debug"
+        ? "debug"
+        : "info";
   console[method]("[updater]", payload);
 }
 
@@ -179,14 +164,19 @@ export async function checkForUpdates(opts: CheckOptions = {}) {
   const manual = Boolean(opts.manual);
   const automatic = Boolean(opts.automatic || !manual);
   if (installingUpdate) {
+    logUpdater("info", "check_skipped_installing", { manual, automatic });
     commitState({ surface: "update" });
     return;
   }
   if (checking) {
+    logUpdater("info", "check_skipped_already_running", { manual, automatic });
     if (manual) commitState({ surface: "update" });
     return;
   }
-  if (!manual && !isTauri() && !window.__aimd_updater_mock) return;
+  if (!manual && !isTauri() && !window.__aimd_updater_mock) {
+    logUpdater("debug", "check_skipped_non_tauri", { manual, automatic });
+    return;
+  }
 
   checking = true;
   const id = requestId();
@@ -194,6 +184,7 @@ export async function checkForUpdates(opts: CheckOptions = {}) {
   const current = await currentVersion();
   try {
     await updaterPlatformKey();
+    logUpdater("info", "check_started", { requestId: id, currentVersion: current, manual, automatic });
     if (manual) {
       writeMeta({ lastManualCheckAt: Date.now() });
       commitState({
@@ -273,18 +264,9 @@ export async function checkForUpdates(opts: CheckOptions = {}) {
   }
 }
 
-async function runAutomaticUpdateCheck(force = false) {
-  if (!force && !shouldRunAutoCheck()) return;
+async function runAutomaticUpdateCheck() {
   writeMeta({ lastAutoCheckAt: Date.now() });
   await checkForUpdates({ manual: false, automatic: true });
-}
-
-function scheduleNextAutomaticCheck() {
-  if (autoCheckTimer !== null) window.clearTimeout(autoCheckTimer);
-  autoCheckTimer = window.setTimeout(() => {
-    void runAutomaticUpdateCheck(false);
-    scheduleNextAutomaticCheck();
-  }, nextAutomaticCheckDelayMs(autoCheckIntervalMs(), autoCheckJitterMs()));
 }
 
 function hideSurface() {
@@ -390,8 +372,8 @@ export function bindUpdater() {
 
   window.__aimd_checkForUpdates = checkForUpdates;
   window.__aimd_showAboutAimd = showAboutAimd;
-  window.__aimd_runScheduledUpdateCheck = async (opts = {}) => {
-    await runAutomaticUpdateCheck(Boolean(opts.force));
+  window.__aimd_runScheduledUpdateCheck = async () => {
+    await runAutomaticUpdateCheck();
   };
   void getVersionInfo().then((info) => {
     commitState({ currentVersion: info.version });
@@ -399,12 +381,11 @@ export function bindUpdater() {
 }
 
 export function scheduleStartupUpdateCheck() {
-  window.setTimeout(() => {
-    void runAutomaticUpdateCheck(false);
-    scheduleNextAutomaticCheck();
-  }, startupAutoCheckDelayMs());
-  window.addEventListener("online", () => { void runAutomaticUpdateCheck(false); });
-  document.addEventListener("visibilitychange", () => {
-    if (document.visibilityState === "visible") void runAutomaticUpdateCheck(false);
-  });
+  if (startupAutoCheckTimer !== null) window.clearTimeout(startupAutoCheckTimer);
+  const delayMs = startupAutoCheckDelayMs();
+  logUpdater("info", "startup_auto_check_scheduled", { delayMs });
+  startupAutoCheckTimer = window.setTimeout(() => {
+    startupAutoCheckTimer = null;
+    void runAutomaticUpdateCheck();
+  }, delayMs);
 }
