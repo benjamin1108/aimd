@@ -10,6 +10,7 @@
     "windows": {
       "nsis": {
         "installMode": "currentUser",
+        "compression": "zlib",
         "template": "./windows/installer.nsi",
         "installerHooks": "./windows/hooks.nsh"
       }
