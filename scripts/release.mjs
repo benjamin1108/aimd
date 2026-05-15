@@ -17,6 +17,7 @@ const RELEASE_FILES = new Set([
   "Cargo.toml",
   "Cargo.lock",
   "apps/desktop/package.json",
+  "apps/desktop/package-lock.json",
   "apps/desktop/src-tauri/tauri.conf.json",
   "apps/desktop/src/updater/release.ts",
   "README.md",
@@ -176,7 +177,7 @@ try {
   runCommand("cargo", ["check", "--workspace"], { cwd: REPO_ROOT });
   runCommand("git", ["diff", "--check"], { cwd: REPO_ROOT });
 
-  runCommand("git", ["add", "release.config.json", "Cargo.toml", "Cargo.lock", "apps/desktop/package.json", "apps/desktop/src-tauri/tauri.conf.json", "apps/desktop/src/updater/release.ts", "README.md"], { cwd: REPO_ROOT });
+  runCommand("git", ["add", "release.config.json", "Cargo.toml", "Cargo.lock", "apps/desktop/package.json", "apps/desktop/package-lock.json", "apps/desktop/src-tauri/tauri.conf.json", "apps/desktop/src/updater/release.ts", "README.md"], { cwd: REPO_ROOT });
   if (hasStagedChanges()) {
     runCommand("git", ["commit", "-m", `Release ${tag}`], { cwd: REPO_ROOT });
   } else {
