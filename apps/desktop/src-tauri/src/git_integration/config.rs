@@ -333,11 +333,10 @@ pub(super) fn is_executable(path: &Path) -> bool {
     path.is_file()
 }
 
-#[cfg(test)]
+#[cfg(all(test, windows))]
 mod tests {
     use super::*;
 
-    #[cfg(windows)]
     #[test]
     fn windows_stable_driver_command_quotes_cli_path() {
         let cli = Path::new(r"C:\Program Files\AIMD Desktop\bin\aimd.exe");
@@ -352,7 +351,6 @@ mod tests {
         );
     }
 
-    #[cfg(windows)]
     #[test]
     fn windows_find_in_path_uses_pathext_for_exe() {
         let tmp = tempfile::tempdir().unwrap();

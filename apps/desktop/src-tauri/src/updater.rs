@@ -1,8 +1,12 @@
+#[cfg(target_os = "macos")]
 use base64::Engine;
+#[cfg(target_os = "macos")]
 use minisign_verify::{PublicKey, Signature};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
+#[cfg(target_os = "macos")]
 use std::fs;
+#[cfg(target_os = "macos")]
 use std::process::Command;
 use std::sync::Mutex;
 use std::time::Duration;
@@ -301,6 +305,7 @@ fn is_newer_version(remote: &str, current: &str) -> Result<bool, String> {
     Ok(parse_version_triplet(remote)? > parse_version_triplet(current)?)
 }
 
+#[cfg(target_os = "macos")]
 fn base64_to_string(value: &str, label: &str) -> Result<String, String> {
     let decoded = base64::engine::general_purpose::STANDARD
         .decode(value)
@@ -308,6 +313,7 @@ fn base64_to_string(value: &str, label: &str) -> Result<String, String> {
     String::from_utf8(decoded).map_err(|err| format!("{label} 不是有效 UTF-8: {err}"))
 }
 
+#[cfg(target_os = "macos")]
 fn verify_tauri_signature(
     data: &[u8],
     release_signature: &str,
