@@ -45,10 +45,11 @@ try {
   }
   fs.rmSync(signaturePath, { force: true });
 
-  const command = process.platform === "win32" ? "npx.cmd" : "npx";
-  const result = spawnSync(command, ["tauri", "signer", "sign", artifactPath], {
+  const isWindows = process.platform === "win32";
+  const result = spawnSync("npx", ["tauri", "signer", "sign", artifactPath], {
     cwd,
     env: normalizedUpdaterSigningEnv(process.env),
+    shell: isWindows,
     stdio: "inherit",
   });
   if (result.error) throw result.error;
