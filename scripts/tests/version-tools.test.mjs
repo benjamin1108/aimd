@@ -38,6 +38,21 @@ function fixture() {
     JSON.stringify({ name: "@aimd/desktop-tauri", version: "0.9.0", private: true }, null, 2) + "\n",
   );
   fs.writeFileSync(
+    path.join(root, "apps", "desktop", "package-lock.json"),
+    JSON.stringify({
+      name: "@aimd/desktop-tauri",
+      version: "0.9.0",
+      lockfileVersion: 3,
+      requires: true,
+      packages: {
+        "": {
+          name: "@aimd/desktop-tauri",
+          version: "0.9.0",
+        },
+      },
+    }, null, 2) + "\n",
+  );
+  fs.writeFileSync(
     path.join(root, "apps", "desktop", "src-tauri", "tauri.conf.json"),
     JSON.stringify({ productName: "AIMD Desktop", version: "0.9.0" }, null, 2) + "\n",
   );
@@ -92,6 +107,7 @@ test("syncVersion updates all derived version fields and is idempotent", () => {
   assert.deepEqual(result.stale, [
     "Cargo.toml",
     "apps/desktop/package.json",
+    "apps/desktop/package-lock.json",
     "apps/desktop/src-tauri/tauri.conf.json",
     "apps/desktop/src/updater/release.ts",
   ]);

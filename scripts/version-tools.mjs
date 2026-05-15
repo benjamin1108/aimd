@@ -134,6 +134,25 @@ function updateJsonVersion(filePath, version) {
   return text.replace(/("version"\s*:\s*)"[^"]*"/, `$1"${version}"`);
 }
 
+function updatePackageLockVersion(filePath, version) {
+  const json = readJson(filePath);
+  if (typeof json.version !== "string") {
+    throw new Error(`${filePath} missing root version string`);
+  }
+  if (!json.packages || typeof json.packages !== "object" || Array.isArray(json.packages)) {
+    throw new Error(`${filePath} missing packages object`);
+  }
+  if (!json.packages[""] || typeof json.packages[""] !== "object") {
+    throw new Error(`${filePath} missing root package entry`);
+  }
+  if (typeof json.packages[""].version !== "string") {
+    throw new Error(`${filePath} missing root package entry version string`);
+  }
+  json.version = version;
+  json.packages[""].version = version;
+  return `${JSON.stringify(json, null, 2)}\n`;
+}
+
 function updateTauriConfig(filePath, config) {
   const json = readJson(filePath);
   if (typeof json.version !== "string") {
@@ -171,6 +190,7 @@ export function computeSyncedFiles(root = REPO_ROOT, config = loadReleaseConfig(
   const version = config.version;
   const cargoPath = repoPath(root, "Cargo.toml");
   const packagePath = repoPath(root, "apps", "desktop", "package.json");
+  const packageLockPath = repoPath(root, "apps", "desktop", "package-lock.json");
   const tauriPath = repoPath(root, "apps", "desktop", "src-tauri", "tauri.conf.json");
   const releaseMetadataPath = repoPath(root, "apps", "desktop", "src", "updater", "release.ts");
 
@@ -184,6 +204,11 @@ export function computeSyncedFiles(root = REPO_ROOT, config = loadReleaseConfig(
       path: packagePath,
       label: "apps/desktop/package.json",
       content: updateJsonVersion(packagePath, version),
+    },
+    {
+      path: packageLockPath,
+      label: "apps/desktop/package-lock.json",
+      content: updatePackageLockVersion(packageLockPath, version),
     },
     {
       path: tauriPath,
