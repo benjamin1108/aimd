@@ -19,7 +19,7 @@ dependencies = [
 
 [[package]]
 name = "aimd-cli"
-version = "1.0.1"
+version = "1.0.2"
 dependencies = [
  "aimd-core",
  "clap",
@@ -30,7 +30,7 @@ dependencies = [
 
 [[package]]
 name = "aimd-core"
-version = "1.0.1"
+version = "1.0.2"
 dependencies = [
  "aimd-mdx",
  "aimd-render",
@@ -46,7 +46,7 @@ dependencies = [
 
 [[package]]
 name = "aimd-desktop"
-version = "1.0.1"
+version = "1.0.2"
 dependencies = [
  "aimd-core",
  "aimd-mdx",
@@ -71,14 +71,14 @@ dependencies = [
 
 [[package]]
 name = "aimd-mdx"
-version = "1.0.1"
+version = "1.0.2"
 dependencies = [
  "regex",
 ]
 
 [[package]]
 name = "aimd-render"
-version = "1.0.1"
+version = "1.0.2"
 dependencies = [
  "aimd-core",
  "aimd-mdx",
