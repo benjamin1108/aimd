@@ -37,8 +37,8 @@ Options:
 Output:
   dist\AIMD-Desktop_<version>_windows_x64-setup.exe
 
-Set AIMD_RELEASE=1 or AIMD_UPDATER_ARTIFACTS=1 to sign the final patched NSIS
-installer for Tauri updater distribution:
+Set AIMD_RELEASE=1 or AIMD_UPDATER_ARTIFACTS=1 to sign the final NSIS installer
+for Tauri updater distribution:
   dist\AIMD-Desktop_<version>_windows_x64-setup.exe.sig
 "@
     exit 0
@@ -89,100 +89,6 @@ function Copy-CleanDirectory($Source, $Destination) {
     }
     New-Item -ItemType Directory -Path (Split-Path -Parent $Destination) -Force | Out-Null
     Copy-Item -LiteralPath $Source -Destination $Destination -Recurse -Force
-}
-
-function Get-NsisCompiler {
-    $cmd = Get-Command makensis -ErrorAction SilentlyContinue
-    if ($cmd) {
-        return $cmd.Source
-    }
-
-    $candidates = @(
-        (Join-Path $env:LOCALAPPDATA "tauri\NSIS\makensis.exe"),
-        (Join-Path $env:LOCALAPPDATA "tauri\NSIS\Bin\makensis.exe")
-    )
-    foreach ($candidate in $candidates) {
-        if (Test-Path -LiteralPath $candidate -PathType Leaf) {
-            return $candidate
-        }
-    }
-
-    throw "makensis.exe was not found. Run the Tauri NSIS build once or install NSIS."
-}
-
-function Patch-NsisMaintenanceUninstallFlow($NsisScript) {
-    if (-not (Test-Path -LiteralPath $NsisScript -PathType Leaf)) {
-        throw "Generated NSIS script not found: $NsisScript"
-    }
-
-    $content = [System.IO.File]::ReadAllText($NsisScript)
-    $patch = @'
-    ; AIMD patch: On the same-version maintenance page, choosing Uninstall
-    ; must stop after the old uninstaller succeeds. The upstream Tauri NSIS
-    ; template otherwise falls through into the install pages and reinstalls.
-    ${If} $PassiveMode <> 1
-      ${IfNot} ${Silent}
-        ${If} $R0 = 0
-        ${AndIf} $R1 = 0
-        ${AndIf} $WixMode <> 1
-          Delete /REBOOTOK "$INSTDIR\uninstall.exe"
-          RMDir "$INSTDIR"
-          Quit
-        ${EndIf}
-      ${EndIf}
-    ${EndIf}
-
-'@
-
-    if ($content.Contains($patch)) {
-        Write-Host "==> NSIS maintenance uninstall patch already present"
-        return
-    }
-
-    $marker = "  reinst_done:`r`nFunctionEnd"
-    if (-not $content.Contains($marker)) {
-        $marker = "  reinst_done:`nFunctionEnd"
-    }
-    if (-not $content.Contains($marker)) {
-        throw "Could not find NSIS maintenance flow marker in $NsisScript"
-    }
-
-    $content = $content.Replace($marker, "$patch$marker")
-    $utf8NoBom = New-Object System.Text.UTF8Encoding $false
-    [System.IO.File]::WriteAllText($NsisScript, $content, $utf8NoBom)
-    Write-Host "==> patched NSIS maintenance uninstall flow"
-}
-
-function Rebuild-PatchedNsisInstaller($NsisScript, $BundleDir) {
-    $makensis = Get-NsisCompiler
-    $nsisDir = Split-Path -Parent $NsisScript
-    $output = Join-Path $nsisDir "nsis-output.exe"
-
-    if (Test-Path -LiteralPath $output -PathType Leaf) {
-        Remove-Item -LiteralPath $output -Force
-    }
-
-    Push-Location $nsisDir
-    try {
-        & $makensis (Split-Path -Leaf $NsisScript)
-        if ($LASTEXITCODE -ne 0) { throw "makensis failed" }
-    } finally {
-        Pop-Location
-    }
-
-    if (-not (Test-Path -LiteralPath $output -PathType Leaf)) {
-        throw "Patched NSIS output was not produced: $output"
-    }
-
-    $setup = Get-ChildItem -LiteralPath $BundleDir -Filter "*.exe" -File -ErrorAction SilentlyContinue |
-        Sort-Object LastWriteTime -Descending |
-        Select-Object -First 1
-    if (-not $setup) {
-        throw "No NSIS setup executable found under $BundleDir"
-    }
-
-    Copy-Item -LiteralPath $output -Destination $setup.FullName -Force
-    Write-Host "==> rebuilt patched NSIS installer"
 }
 
 Write-Host "==> AIMD Windows installer build"
@@ -292,10 +198,6 @@ try {
 } finally {
     Pop-Location
 }
-
-$nsisScript = Join-Path $target "release\nsis\x64\installer.nsi"
-Patch-NsisMaintenanceUninstallFlow $nsisScript
-Rebuild-PatchedNsisInstaller $nsisScript $bundle
 
 New-Item -ItemType Directory -Path $OutDir -Force | Out-Null
 $version = (Get-Content -LiteralPath $releaseConfig -Raw | ConvertFrom-Json).version

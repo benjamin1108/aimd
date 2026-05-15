@@ -47,6 +47,22 @@ jobs:
       - name: Setup Rust
         uses: dtolnay/rust-toolchain@stable
 
+      - name: Rust cache
+        uses: Swatinem/rust-cache@v2
+        with:
+          cache-on-failure: true
+
+      - name: Windows build tool cache
+        if: runner.os == 'Windows'
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~\AppData\Local\tauri
+            ~\AppData\Local\ms-playwright
+          key: windows-build-tools-${{ runner.arch }}-${{ hashFiles('Cargo.lock', 'apps/desktop/src-tauri/Cargo.lock', 'apps/desktop/package-lock.json') }}
+          restore-keys: |
+            windows-build-tools-${{ runner.arch }}-
+
       - name: Install frontend dependencies
         if: runner.os != 'Windows'
         working-directory: apps/desktop
