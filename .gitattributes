@@ -1,1 +1,2 @@
-*.aimd diff=aimd merge=aimd
+* text=auto eol=lf
+*.aimd -text diff=aimd merge=aimd

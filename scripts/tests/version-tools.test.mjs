@@ -73,6 +73,23 @@ test("syncVersion updates all derived version fields and is idempotent", () => {
   }
 });
 
+test("syncVersion check ignores Windows CRLF checkout when versions match", () => {
+  const root = fixture();
+  fs.writeFileSync(
+    path.join(root, "Cargo.toml"),
+    `[workspace]\r\nresolver = "2"\r\n\r\n[workspace.package]\r\nversion = "1.0.0"\r\nedition = "2021"\r\n`,
+  );
+  fs.writeFileSync(
+    path.join(root, "apps", "desktop", "package.json"),
+    `{\r\n  "name": "@aimd/desktop-tauri",\r\n  "version": "1.0.0",\r\n  "private": true\r\n}\r\n`,
+  );
+  fs.writeFileSync(
+    path.join(root, "apps", "desktop", "src-tauri", "tauri.conf.json"),
+    `{\r\n  "productName": "AIMD Desktop",\r\n  "version": "1.0.0"\r\n}\r\n`,
+  );
+  assert.doesNotThrow(() => syncVersion({ root, check: true }));
+});
+
 test("tag validation rejects mismatched tags", () => {
   assert.doesNotThrow(() => assertTagMatchesVersion("1.2.3", "v1.2.3"));
   assert.throws(() => assertTagMatchesVersion("1.2.3", "v1.2.4"), /does not match/);

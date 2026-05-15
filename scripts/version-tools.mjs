@@ -92,10 +92,10 @@ function replaceWorkspacePackageVersion(cargoToml, version) {
   const nextSection = cargoToml.slice(bodyStart).search(/^\[/m);
   const bodyEnd = nextSection === -1 ? cargoToml.length : bodyStart + nextSection;
   const body = cargoToml.slice(bodyStart, bodyEnd);
-  if (!/^version\s*=\s*"[^"]*"\s*$/m.test(body)) {
+  if (!/^version[ \t]*=[ \t]*"[^"]*"[ \t]*$/m.test(body)) {
     throw new Error("Cargo.toml [workspace.package] missing version field");
   }
-  const nextBody = body.replace(/^version\s*=\s*"[^"]*"\s*$/m, `version = "${version}"`);
+  const nextBody = body.replace(/^([ \t]*version[ \t]*=[ \t]*)"[^"]*"([ \t]*)$/m, `$1"${version}"$2`);
   return cargoToml.slice(0, bodyStart) + nextBody + cargoToml.slice(bodyEnd);
 }
 
