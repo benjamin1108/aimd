@@ -172,6 +172,7 @@ pub fn run() {
             documents::export_html,
             documents::export_pdf,
             external::open_external_url,
+            external::open_aimd_release_url,
             documents::convert_md_to_draft,
             documents::save_markdown,
             documents::save_markdown_as,

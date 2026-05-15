@@ -10,6 +10,8 @@ use std::fs;
 use std::process::Command;
 use std::sync::Mutex;
 use std::time::Duration;
+#[cfg(target_os = "macos")]
+use tauri::Emitter;
 use tauri::{AppHandle, Manager, Window};
 
 #[derive(Clone, Serialize)]
@@ -55,6 +57,35 @@ pub struct ManifestUpdate {
 pub struct MacPkgInstallResult {
     path: String,
     bytes: u64,
+}
+
+#[cfg(any(target_os = "macos", test))]
+#[derive(Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+struct MacPkgDownloadProgress {
+    request_id: String,
+    version: String,
+    downloaded_bytes: u64,
+    total_bytes: Option<u64>,
+}
+
+#[cfg(target_os = "macos")]
+#[derive(Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+struct MacPkgPhaseEvent {
+    request_id: String,
+    version: String,
+    phase: String,
+}
+
+#[cfg(target_os = "macos")]
+#[derive(Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+struct MacPkgFailedEvent {
+    request_id: String,
+    version: String,
+    phase: String,
+    error_message: String,
 }
 
 #[tauri::command]
@@ -183,6 +214,8 @@ pub async fn updater_check_manifest(
 
 #[tauri::command]
 pub async fn updater_install_macos_pkg(
+    window: Window,
+    request_id: String,
     url: String,
     signature: String,
     pubkey: String,
@@ -190,63 +223,173 @@ pub async fn updater_install_macos_pkg(
 ) -> Result<MacPkgInstallResult, String> {
     #[cfg(not(target_os = "macos"))]
     {
-        let _ = (url, signature, pubkey, version);
+        let _ = (window, request_id, url, signature, pubkey, version);
         Err("macOS PKG updater is only available on macOS".to_string())
     }
 
     #[cfg(target_os = "macos")]
     {
-        validate_https_url(&url)?;
-        let expected_name = format!("AIMD-{}.pkg", version.trim_start_matches('v'));
-        let parsed = reqwest::Url::parse(&url).map_err(|err| format!("更新 URL 无效: {err}"))?;
-        let asset_name = parsed
-            .path_segments()
-            .and_then(|mut segments| segments.next_back())
-            .unwrap_or_default();
-        if asset_name != expected_name {
-            return Err(format!("macOS 更新资产必须是 {expected_name}，实际是 {asset_name}"));
-        }
+        let result = async {
+            validate_https_url(&url)?;
+            let expected_name = format!("AIMD-{}.pkg", version.trim_start_matches('v'));
+            let parsed =
+                reqwest::Url::parse(&url).map_err(|err| format!("更新 URL 无效: {err}"))?;
+            let asset_name = parsed
+                .path_segments()
+                .and_then(|mut segments| segments.next_back())
+                .unwrap_or_default();
+            if asset_name != expected_name {
+                return Err(format!(
+                    "macOS 更新资产必须是 {expected_name}，实际是 {asset_name}"
+                ));
+            }
 
-        let client = reqwest::Client::builder()
-            .timeout(Duration::from_secs(300))
-            .build()
-            .map_err(|err| format!("创建更新下载客户端失败: {err}"))?;
-        let response = client
-            .get(&url)
-            .send()
-            .await
-            .map_err(|err| format!("下载 macOS PKG 失败: {err}"))?;
-        let status = response.status();
-        if !status.is_success() {
-            return Err(format!("下载 macOS PKG 失败: HTTP {status}"));
-        }
-        let bytes = response
-            .bytes()
-            .await
-            .map_err(|err| format!("读取 macOS PKG 失败: {err}"))?;
-        if bytes.len() < 4 || &bytes[..4] != b"xar!" {
-            return Err("下载的 macOS 更新不是有效 PKG".to_string());
-        }
-        verify_tauri_signature(&bytes, &signature, &pubkey, &expected_name)?;
+            let client = reqwest::Client::builder()
+                .timeout(Duration::from_secs(300))
+                .build()
+                .map_err(|err| format!("创建更新下载客户端失败: {err}"))?;
+            let mut response = client
+                .get(&url)
+                .send()
+                .await
+                .map_err(|err| format!("下载 macOS PKG 失败: {err}"))?;
+            let status = response.status();
+            if !status.is_success() {
+                return Err(format!("下载 macOS PKG 失败: HTTP {status}"));
+            }
 
-        let dir = std::env::temp_dir().join("aimd-updater");
-        fs::create_dir_all(&dir).map_err(|err| format!("创建更新缓存目录失败: {err}"))?;
-        let pkg_path = dir.join(&expected_name);
-        fs::write(&pkg_path, &bytes).map_err(|err| format!("写入 macOS PKG 失败: {err}"))?;
+            let total_bytes = response.content_length();
+            emit_macos_pkg_download_started(&window, &request_id, &version, total_bytes);
+            let mut downloaded_bytes = 0_u64;
+            let mut bytes =
+                Vec::with_capacity(total_bytes.unwrap_or(0).min(usize::MAX as u64) as usize);
+            while let Some(chunk) = response
+                .chunk()
+                .await
+                .map_err(|err| format!("读取 macOS PKG 失败: {err}"))?
+            {
+                downloaded_bytes += chunk.len() as u64;
+                bytes.extend_from_slice(&chunk);
+                emit_macos_pkg_download_progress(
+                    &window,
+                    &request_id,
+                    &version,
+                    downloaded_bytes,
+                    total_bytes,
+                );
+            }
 
-        let status = Command::new("/usr/bin/open")
-            .arg(&pkg_path)
-            .status()
-            .map_err(|err| format!("打开 macOS Installer 失败: {err}"))?;
-        if !status.success() {
-            return Err(format!("打开 macOS Installer 失败: {status}"));
+            if bytes.len() < 4 || &bytes[..4] != b"xar!" {
+                return Err("下载的 macOS 更新不是有效 PKG".to_string());
+            }
+            emit_macos_pkg_phase(
+                &window,
+                "aimd-updater-verifying",
+                &request_id,
+                &version,
+                "verifying",
+            );
+            verify_tauri_signature(&bytes, &signature, &pubkey, &expected_name)?;
+
+            let dir = std::env::temp_dir().join("aimd-updater");
+            fs::create_dir_all(&dir).map_err(|err| format!("创建更新缓存目录失败: {err}"))?;
+            let pkg_path = dir.join(&expected_name);
+            fs::write(&pkg_path, &bytes).map_err(|err| format!("写入 macOS PKG 失败: {err}"))?;
+
+            emit_macos_pkg_phase(
+                &window,
+                "aimd-updater-installing",
+                &request_id,
+                &version,
+                "installing",
+            );
+            let status = Command::new("/usr/bin/open")
+                .arg(&pkg_path)
+                .status()
+                .map_err(|err| format!("打开 macOS Installer 失败: {err}"))?;
+            if !status.success() {
+                return Err(format!("打开 macOS Installer 失败: {status}"));
+            }
+
+            Ok(MacPkgInstallResult {
+                path: pkg_path.to_string_lossy().to_string(),
+                bytes: bytes.len() as u64,
+            })
         }
-
-        Ok(MacPkgInstallResult {
-            path: pkg_path.to_string_lossy().to_string(),
-            bytes: bytes.len() as u64,
-        })
+        .await;
+        if let Err(err) = &result {
+            emit_macos_pkg_failed(&window, &request_id, &version, err);
+        }
+        result
     }
+}
+
+#[cfg(target_os = "macos")]
+fn emit_macos_pkg_download_started(
+    window: &Window,
+    request_id: &str,
+    version: &str,
+    total_bytes: Option<u64>,
+) {
+    let _ = window.emit(
+        "aimd-updater-download-started",
+        MacPkgDownloadProgress {
+            request_id: request_id.to_string(),
+            version: version.to_string(),
+            downloaded_bytes: 0,
+            total_bytes,
+        },
+    );
+}
+
+#[cfg(target_os = "macos")]
+fn emit_macos_pkg_download_progress(
+    window: &Window,
+    request_id: &str,
+    version: &str,
+    downloaded_bytes: u64,
+    total_bytes: Option<u64>,
+) {
+    let _ = window.emit(
+        "aimd-updater-download-progress",
+        MacPkgDownloadProgress {
+            request_id: request_id.to_string(),
+            version: version.to_string(),
+            downloaded_bytes,
+            total_bytes,
+        },
+    );
+}
+
+#[cfg(target_os = "macos")]
+fn emit_macos_pkg_phase(
+    window: &Window,
+    event: &str,
+    request_id: &str,
+    version: &str,
+    phase: &str,
+) {
+    let _ = window.emit(
+        event,
+        MacPkgPhaseEvent {
+            request_id: request_id.to_string(),
+            version: version.to_string(),
+            phase: phase.to_string(),
+        },
+    );
+}
+
+#[cfg(target_os = "macos")]
+fn emit_macos_pkg_failed(window: &Window, request_id: &str, version: &str, error_message: &str) {
+    let _ = window.emit(
+        "aimd-updater-failed",
+        MacPkgFailedEvent {
+            request_id: request_id.to_string(),
+            version: version.to_string(),
+            phase: "failed".to_string(),
+            error_message: error_message.to_string(),
+        },
+    );
 }
 
 pub fn unregister_window_label(app: &AppHandle, label: &str) {
@@ -353,5 +496,21 @@ mod tests {
         assert!(validate_https_url("https://github.com/benjamin1108/aimd/releases").is_ok());
         assert!(validate_https_url("http://github.com/benjamin1108/aimd/releases").is_err());
         assert!(validate_https_url("file:///tmp/AIMD.pkg").is_err());
+    }
+
+    #[test]
+    fn mac_pkg_progress_payload_matches_frontend_contract() {
+        let payload = serde_json::to_value(MacPkgDownloadProgress {
+            request_id: "upd-test".to_string(),
+            version: "1.0.6".to_string(),
+            downloaded_bytes: 4096,
+            total_bytes: Some(8192),
+        })
+        .unwrap();
+
+        assert_eq!(payload["requestId"], "upd-test");
+        assert_eq!(payload["downloadedBytes"], 4096);
+        assert_eq!(payload["totalBytes"], 8192);
+        assert!(payload.get("request_id").is_none());
     }
 }

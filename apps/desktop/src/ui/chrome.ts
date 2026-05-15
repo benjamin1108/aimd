@@ -53,8 +53,7 @@ function assetItem(asset: AimdAsset) {
 // state.statusTimer 同时充当"当前是否在临时反馈窗口期"的标志：updateChrome 看到
 // 它非 null 时会跳过稳定态写入，避免把"已保存"立刻盖回"就绪"。
 export function setStatus(text: string, tone: "idle" | "loading" | "success" | "warn" | "info" = "idle") {
-  statusEl().textContent = text;
-  statusPillEl().dataset.tone = tone;
+  applyStatus(text, tone);
   if (state.statusTimer) {
     window.clearTimeout(state.statusTimer);
     state.statusTimer = null;
@@ -62,19 +61,53 @@ export function setStatus(text: string, tone: "idle" | "loading" | "success" | "
   if (tone === "success" || tone === "info") {
     state.statusTimer = window.setTimeout(() => {
       state.statusTimer = null;
-      const doc = state.doc;
-      if (doc && (doc.hasGitConflicts || hasGitConflictMarkers(doc.markdown) || hasGitConflictMarkers(doc.html))) {
-        doc.hasGitConflicts = true;
-        statusEl().textContent = "文档包含 Git 冲突，请解决后保存";
-        statusPillEl().dataset.tone = "warn";
-      } else if (doc?.dirty) {
-        statusEl().textContent = "未保存的修改";
-        statusPillEl().dataset.tone = "warn";
-      } else {
-        statusEl().textContent = "就绪";
-        statusPillEl().dataset.tone = "idle";
-      }
+      renderStableStatus();
     }, 1800);
+  }
+}
+
+export function setStatusOverride(
+  text: string,
+  tone: "idle" | "loading" | "success" | "warn" | "info" = "info",
+  action?: string,
+) {
+  state.statusOverride = { text, tone, action };
+  if (state.statusTimer == null) renderStableStatus();
+}
+
+export function clearStatusOverride(action?: string) {
+  if (action && state.statusOverride?.action !== action) return;
+  state.statusOverride = null;
+  if (state.statusTimer == null) renderStableStatus();
+}
+
+function applyStatus(text: string, tone: "idle" | "loading" | "success" | "warn" | "info", action?: string) {
+  statusEl().textContent = text;
+  statusPillEl().dataset.tone = tone;
+  if (action) {
+    statusPillEl().dataset.action = action;
+  } else {
+    delete statusPillEl().dataset.action;
+  }
+}
+
+function renderStableStatus() {
+  if (state.statusOverride) {
+    applyStatus(state.statusOverride.text, state.statusOverride.tone, state.statusOverride.action);
+    return;
+  }
+  const doc = state.doc;
+  if (doc && (doc.hasGitConflicts || hasGitConflictMarkers(doc.markdown) || hasGitConflictMarkers(doc.html))) {
+    doc.hasGitConflicts = true;
+    applyStatus("文档包含 Git 冲突，请解决后保存", "warn");
+  } else if (doc?.requiresAimdSave) {
+    applyStatus("保存时需选择格式", "info");
+  } else if (doc?.isDraft && !doc.dirty) {
+    applyStatus("这是未保存草稿，保存后才会生成 .aimd 文件", "info");
+  } else if (doc?.dirty) {
+    applyStatus("未保存的修改", "warn");
+  } else {
+    applyStatus("就绪", "idle");
   }
 }
 
@@ -160,24 +193,9 @@ export function updateChrome() {
 
   // 把当前文档的稳定状态推到底部 status-pill。setStatus 的临时反馈（保存中 /
   // 已保存 / 失败）窗口期内 statusTimer 非 null，这里不抢；timer 回调结束后
-  // 会自己根据 dirty 回退到稳定态。
+  // 会自己根据 dirty 或 statusOverride 回退到稳定态。
   if (state.statusTimer == null) {
-    if (doc.hasGitConflicts || hasGitConflictMarkers(doc.markdown) || hasGitConflictMarkers(doc.html)) {
-      doc.hasGitConflicts = true;
-      statusEl().textContent = "文档包含 Git 冲突，请解决后保存";
-      statusPillEl().dataset.tone = "warn";
-    } else if (doc.requiresAimdSave) {
-      statusEl().textContent = "保存时需选择格式";
-      statusPillEl().dataset.tone = "info";
-    } else if (doc.isDraft && !doc.dirty) {
-      setStatus("这是未保存草稿，保存后才会生成 .aimd 文件", "info");
-    } else if (doc.dirty) {
-      statusEl().textContent = "未保存的修改";
-      statusPillEl().dataset.tone = "warn";
-    } else {
-      statusEl().textContent = "就绪";
-      statusPillEl().dataset.tone = "idle";
-    }
+    renderStableStatus();
   }
   persistSessionSnapshot();
 }

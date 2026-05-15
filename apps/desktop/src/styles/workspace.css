@@ -349,15 +349,15 @@
   white-space: nowrap;
 }
 
-.status-pill[data-action="web-clip-worker"] {
+.status-pill[data-action] {
   cursor: pointer;
 }
 
-.status-pill[data-action="web-clip-worker"]:hover {
+.status-pill[data-action]:hover {
   background: rgba(42, 96, 160, 0.08);
 }
 
-.status-pill[data-action="web-clip-worker"]:focus-visible {
+.status-pill[data-action]:focus-visible {
   outline: 2px solid rgba(42, 96, 160, 0.38);
   outline-offset: 2px;
 }

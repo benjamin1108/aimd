@@ -60,6 +60,11 @@ export const state: {
   renderTimer: number | null;
   flushTimer: number | null;
   statusTimer: number | null;
+  statusOverride: {
+    text: string;
+    tone: "idle" | "loading" | "success" | "warn" | "info";
+    action?: string;
+  } | null;
   outline: OutlineNode[];
   htmlVersion: number;
   paintedVersion: Record<Mode, number>;
@@ -99,6 +104,7 @@ export const state: {
   renderTimer: null,
   flushTimer: null,
   statusTimer: null,
+  statusOverride: null,
   outline: [],
   // Bumped every time state.doc.html changes (applyHTML, flushInline-with-md-change).
   // paintedVersion tracks which version each pane's DOM currently shows; setMode

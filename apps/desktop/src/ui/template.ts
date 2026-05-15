@@ -129,6 +129,10 @@ export const APP_HTML = `
                   <span class="action-menu-icon">${ICONS.refresh}</span>
                   <span>检查更新</span>
                 </button>
+                <button id="about-aimd" class="action-menu-item" type="button">
+                  <span class="action-menu-icon">${ICONS.info}</span>
+                  <span>关于 AIMD</span>
+                </button>
                 <hr class="action-menu-divider" role="separator">
                 <button id="export-markdown" class="action-menu-item" type="button" disabled>
                   <span class="action-menu-icon">${ICONS.source}</span>
@@ -311,19 +315,50 @@ export const APP_HTML = `
           </div>
         </div>
 
-        <div id="update-panel" class="update-panel" data-phase="idle" hidden aria-live="polite">
+        <div id="update-panel" class="update-panel" data-surface="update" data-phase="idle" hidden aria-live="polite" aria-labelledby="update-title">
           <div class="update-panel-head">
             <div>
               <div id="update-title" class="update-title">AIMD 更新</div>
               <div id="update-message" class="update-message"></div>
             </div>
-            <button id="update-later" class="ft-btn" type="button" title="稍后">${ICONS.close}</button>
+            <button id="update-later" class="ghost-btn icon-only update-close" type="button" title="关闭" aria-label="关闭">${ICONS.close}</button>
           </div>
-          <div id="update-notes" class="update-notes" hidden></div>
-          <div id="update-progress" class="update-progress" hidden></div>
-          <div class="update-actions">
-            <button id="update-retry" class="secondary-btn sm" type="button" hidden>重新检查</button>
-            <button id="update-install" class="primary-btn sm" type="button" hidden>下载并安装</button>
+
+          <div id="about-body" class="updater-about-body" hidden>
+            <div class="about-version-lines">
+              <div id="about-version" class="about-version">版本</div>
+              <div id="about-platform" class="about-platform">平台</div>
+            </div>
+            <div id="about-update-summary" class="about-update-summary">更新状态：未检查</div>
+            <div id="about-copy-status" class="about-copy-status" hidden></div>
+            <div class="about-actions">
+              <button id="about-check-updates" class="secondary-btn sm" type="button">检查更新</button>
+              <button id="about-install" class="primary-btn sm" type="button" hidden>下载并安装</button>
+              <button id="about-copy-version" class="secondary-btn sm" type="button">复制版本信息</button>
+              <button id="about-release" class="secondary-btn sm" type="button">发布页面</button>
+            </div>
+          </div>
+
+          <div id="update-body" class="updater-update-body">
+            <div id="update-notes" class="update-notes" hidden></div>
+            <div id="update-progress-wrap" class="update-progress-wrap" hidden>
+              <div id="update-progress-bar" class="update-progress-bar" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-label="更新下载进度">
+                <div id="update-progress-fill" class="update-progress-fill"></div>
+              </div>
+              <div class="update-progress-meta">
+                <span id="update-progress" class="update-progress"></span>
+                <span id="update-progress-detail" class="update-progress-detail"></span>
+              </div>
+            </div>
+            <div class="update-actions">
+              <button id="update-release" class="secondary-btn sm" type="button" hidden>发布说明</button>
+              <button id="update-copy-diagnostics" class="secondary-btn sm" type="button" hidden>复制诊断</button>
+              <button id="update-focus-dirty" class="secondary-btn sm" type="button" hidden>定位文档</button>
+              <button id="update-background" class="secondary-btn sm" type="button" hidden>后台继续</button>
+              <button id="update-remind-later" class="secondary-btn sm" type="button" hidden>稍后提醒</button>
+              <button id="update-retry" class="secondary-btn sm" type="button" hidden>重新检查</button>
+              <button id="update-install" class="primary-btn sm" type="button" hidden>下载并安装</button>
+            </div>
           </div>
         </div>
 

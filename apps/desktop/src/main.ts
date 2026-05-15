@@ -13,7 +13,7 @@ import {
   markdownEl, inlineEditorEl, modeReadEl, modeEditEl, modeSourceEl,
   saveEl, saveAsEl, closeEl,
   moreMenuToggleEl, moreMenuEl, webImportEl, formatDocumentEl,
-  checkUpdatesEl,
+  checkUpdatesEl, aboutAimdEl,
   debugIndicatorEl, debugIndicatorCountEl,
 } from "./core/dom";
 import { setMode, refreshSourceBanner } from "./ui/mode";
@@ -56,7 +56,7 @@ import { bindGitDiffView } from "./ui/git-diff";
 import { bindSelectionBoundary } from "./ui/selection";
 import { loadAppSettings, type AppSettings } from "./core/settings";
 import { createSourceModel } from "./editor/source-preserve";
-import { bindUpdater, checkForUpdates, scheduleStartupUpdateCheck } from "./updater/client";
+import { bindUpdater, checkForUpdates, scheduleStartupUpdateCheck, showAboutAimd } from "./updater/client";
 
 installDebugConsole();
 bindSelectionBoundary("main");
@@ -151,6 +151,7 @@ $("#package-local-images").addEventListener("click", () => { closeActionMenus();
 webImportEl().addEventListener("click", () => { closeActionMenus(); void importWebClip(); });
 $("#health-check").addEventListener("click", () => { closeActionMenus(); void runHealthCheck(); });
 checkUpdatesEl().addEventListener("click", () => { closeActionMenus(); void checkForUpdates({ manual: true }); });
+aboutAimdEl().addEventListener("click", () => { closeActionMenus(); void showAboutAimd(); });
 $("#export-markdown").addEventListener("click", () => { closeActionMenus(); void exportMarkdownAssets(); });
 $("#export-html").addEventListener("click", () => { closeActionMenus(); void exportHTML(); });
 $("#export-pdf").addEventListener("click", () => { closeActionMenus(); void exportPDF(); });
@@ -300,6 +301,7 @@ window.addEventListener("DOMContentLoaded", async () => {
       void routeOpenedPath(event.payload, { skipConfirm: false });
     });
     const menuHandlers: Record<string, () => void> = {
+      "about-aimd":        () => { void showAboutAimd(); },
       "settings":          () => { void invoke("open_settings_window"); },
       "check-updates":     () => { void checkForUpdates({ manual: true }); },
       "debug-console":     () => { if (state.uiSettings.debugMode) openDebugConsole(); },

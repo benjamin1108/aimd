@@ -17,6 +17,15 @@ pub fn open_external_url(url: String) -> Result<(), String> {
     open_system_url(&parsed)
 }
 
+#[tauri::command]
+pub fn open_aimd_release_url(url: String) -> Result<(), String> {
+    let parsed = Url::parse(url.trim()).map_err(|_| "发布页面地址无效".to_string())?;
+    if !is_aimd_release_url(&parsed) {
+        return Err("仅支持打开 AIMD GitHub 发布页面".to_string());
+    }
+    open_system_url(&parsed)
+}
+
 fn guard_document_navigation(label: &str, url: &Url) -> bool {
     if !is_document_webview(label) || is_app_internal_url(url) {
         return true;
@@ -52,6 +61,12 @@ fn is_app_internal_url(url: &Url) -> bool {
 
 fn is_system_openable_url(url: &Url) -> bool {
     matches!(url.scheme(), "http" | "https" | "mailto")
+}
+
+fn is_aimd_release_url(url: &Url) -> bool {
+    url.scheme() == "https"
+        && url.host_str() == Some("github.com")
+        && url.path().starts_with("/benjamin1108/aimd/releases")
 }
 
 fn open_system_url(url: &Url) -> Result<(), String> {
@@ -121,6 +136,25 @@ mod tests {
             &Url::parse("file:///tmp/a.md").unwrap()
         ));
         assert!(!is_system_openable_url(
+            &Url::parse("javascript:alert(1)").unwrap()
+        ));
+    }
+
+    #[test]
+    fn release_url_validation_is_https_and_allowlisted() {
+        assert!(is_aimd_release_url(
+            &Url::parse("https://github.com/benjamin1108/aimd/releases").unwrap()
+        ));
+        assert!(is_aimd_release_url(
+            &Url::parse("https://github.com/benjamin1108/aimd/releases/tag/v1.0.6").unwrap()
+        ));
+        assert!(!is_aimd_release_url(
+            &Url::parse("http://github.com/benjamin1108/aimd/releases").unwrap()
+        ));
+        assert!(!is_aimd_release_url(
+            &Url::parse("https://github.com/other/aimd/releases").unwrap()
+        ));
+        assert!(!is_aimd_release_url(
             &Url::parse("javascript:alert(1)").unwrap()
         ));
     }
