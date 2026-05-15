@@ -249,7 +249,7 @@ export function loadManifest(filePath) {
 }
 
 export function checkSigningSecrets(env = process.env, { require = false } = {}) {
-  const hasPrivateKey = Boolean(env.TAURI_SIGNING_PRIVATE_KEY || env.TAURI_SIGNING_PRIVATE_KEY_PATH);
+  const hasPrivateKey = Boolean(cleanEnvValue(env.TAURI_SIGNING_PRIVATE_KEY) || cleanEnvValue(env.TAURI_SIGNING_PRIVATE_KEY_PATH));
   const passwordConfigured = Object.prototype.hasOwnProperty.call(env, "TAURI_SIGNING_PRIVATE_KEY_PASSWORD");
   if (require && !hasPrivateKey) {
     throw new Error("Missing updater signing secret: set TAURI_SIGNING_PRIVATE_KEY or TAURI_SIGNING_PRIVATE_KEY_PATH");
@@ -259,6 +259,32 @@ export function checkSigningSecrets(env = process.env, { require = false } = {})
     passwordConfigured,
     passwordMode: passwordConfigured ? "explicit" : "default-empty",
   };
+}
+
+function cleanEnvValue(value) {
+  return typeof value === "string" && value.trim() ? value : "";
+}
+
+export function normalizedUpdaterSigningEnv(env = process.env) {
+  const normalized = { ...env };
+  const privateKey = cleanEnvValue(env.TAURI_SIGNING_PRIVATE_KEY);
+  const privateKeyPath = cleanEnvValue(env.TAURI_SIGNING_PRIVATE_KEY_PATH);
+
+  delete normalized.TAURI_SIGNING_PRIVATE_KEY;
+  delete normalized.TAURI_SIGNING_PRIVATE_KEY_PATH;
+
+  if (privateKeyPath) {
+    normalized.TAURI_SIGNING_PRIVATE_KEY_PATH = privateKeyPath;
+  } else if (privateKey) {
+    normalized.TAURI_SIGNING_PRIVATE_KEY = privateKey;
+  } else {
+    throw new Error("Missing updater signing secret: set TAURI_SIGNING_PRIVATE_KEY or TAURI_SIGNING_PRIVATE_KEY_PATH");
+  }
+
+  normalized.TAURI_SIGNING_PRIVATE_KEY_PASSWORD = typeof env.TAURI_SIGNING_PRIVATE_KEY_PASSWORD === "string"
+    ? env.TAURI_SIGNING_PRIVATE_KEY_PASSWORD
+    : "";
+  return normalized;
 }
 
 export function verifyReleaseAssets({

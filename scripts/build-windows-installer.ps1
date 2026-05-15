@@ -59,17 +59,9 @@ function Ensure-UpdaterSigningEnv {
 
 function Sign-UpdaterArtifact($ArtifactPath) {
     Ensure-UpdaterSigningEnv
+    node (Join-Path $root "scripts\sign-updater-artifact.mjs") $ArtifactPath --cwd $desktop
+    if ($LASTEXITCODE -ne 0) { throw "updater artifact signing failed" }
     $sig = "$ArtifactPath.sig"
-    if (Test-Path -LiteralPath $sig -PathType Leaf) {
-        Remove-Item -LiteralPath $sig -Force
-    }
-    Push-Location $desktop
-    try {
-        npx tauri signer sign $ArtifactPath
-        if ($LASTEXITCODE -ne 0) { throw "npx tauri signer sign failed" }
-    } finally {
-        Pop-Location
-    }
     if (-not (Test-Path -LiteralPath $sig -PathType Leaf)) {
         throw "updater signature was not produced: $sig"
     }

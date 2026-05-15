@@ -6,6 +6,7 @@ import test from "node:test";
 import {
   expectedReleaseAssets,
   generateManifestObject,
+  normalizedUpdaterSigningEnv,
   updaterPlan,
   validateManifestObject,
 } from "../updater-tools.mjs";
@@ -90,4 +91,26 @@ test("manifest validation rejects version/tag drift and signature paths", () => 
       "windows-x86_64": { ...valid.platforms["windows-x86_64"], signature: "AIMD.sig" },
     },
   }, { config, tag: "v1.2.3" }), /must contain .sig file content/);
+});
+
+test("signing environment removes empty GitHub secret placeholders", () => {
+  const env = normalizedUpdaterSigningEnv({
+    PATH: "/usr/bin",
+    TAURI_SIGNING_PRIVATE_KEY: "private-key",
+    TAURI_SIGNING_PRIVATE_KEY_PATH: "",
+  });
+  assert.equal(env.TAURI_SIGNING_PRIVATE_KEY, "private-key");
+  assert.equal(Object.hasOwn(env, "TAURI_SIGNING_PRIVATE_KEY_PATH"), false);
+  assert.equal(env.TAURI_SIGNING_PRIVATE_KEY_PASSWORD, "");
+});
+
+test("signing environment prefers non-empty key path and keeps password explicit", () => {
+  const env = normalizedUpdaterSigningEnv({
+    TAURI_SIGNING_PRIVATE_KEY: "private-key",
+    TAURI_SIGNING_PRIVATE_KEY_PATH: "/tmp/key",
+    TAURI_SIGNING_PRIVATE_KEY_PASSWORD: "secret",
+  });
+  assert.equal(env.TAURI_SIGNING_PRIVATE_KEY_PATH, "/tmp/key");
+  assert.equal(Object.hasOwn(env, "TAURI_SIGNING_PRIVATE_KEY"), false);
+  assert.equal(env.TAURI_SIGNING_PRIVATE_KEY_PASSWORD, "secret");
 });

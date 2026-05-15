@@ -181,12 +181,7 @@ ensure_updater_signing_env() {
 sign_updater_artifact() {
   local artifact="$1"
   ensure_updater_signing_env
-  rm -f "$artifact.sig"
-  (cd "$DESKTOP" && npx tauri signer sign "$artifact")
-  if [[ ! -s "$artifact.sig" ]]; then
-    echo "error: updater signature was not produced: $artifact.sig" >&2
-    exit 1
-  fi
+  node "$ROOT/scripts/sign-updater-artifact.mjs" "$artifact" --cwd "$DESKTOP"
 }
 
 create_macos_updater_artifact() {
