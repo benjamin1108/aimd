@@ -304,7 +304,8 @@ test.describe("low-interruption updater UX", () => {
 
     await page.evaluate(() => (window as any).__aimd_checkForUpdates({ manual: true }));
     await expect(page.locator("#update-title")).toHaveText("更新失败");
-    await expect(page.locator("#update-message")).toContainText("network offline");
+    await expect(page.locator("#update-message")).toContainText("无法连接更新服务");
+    await expect(page.locator("#update-message")).not.toContainText("github.com");
     await page.locator("#update-copy-diagnostics").click();
     await expect.poll(() => page.evaluate(() => (window as any).__clipboardText as string)).toContain("network offline");
     await expect.poll(() => page.evaluate(() => (window as any).__clipboardText as string)).not.toContain("PRIVATE");

@@ -37,6 +37,7 @@ try {
   const {
     versionDiagnostics,
     errorDiagnostics,
+    userFacingUpdaterError,
   } = await importBuilt("src/updater/diagnostics.ts", "diagnostics");
 
   assert.equal(formatBytes(0), "0 KB");
@@ -95,6 +96,14 @@ try {
   assert.match(errorText, /upd-test/);
   assert.match(errorText, /network offline/);
   assert.doesNotMatch(errorText, /PRIVATE|SIGNING|KEY/);
+  assert.equal(
+    userFacingUpdaterError("下载更新清单失败: error sending request for url (https://github.com/benjamin1108/aimd/releases/latest/download/latest.json)"),
+    "无法连接更新服务，请检查网络或代理",
+  );
+  assert.doesNotMatch(
+    userFacingUpdaterError(`下载失败 ${"https://example.com/".repeat(20)}`),
+    /https:\/\/example\.com/,
+  );
 } finally {
   fs.rmSync(tmpDir, { recursive: true, force: true });
 }

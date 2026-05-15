@@ -45,6 +45,7 @@
 
 .update-message {
   margin-top: 3px;
+  overflow-wrap: anywhere;
 }
 
 .update-close {
