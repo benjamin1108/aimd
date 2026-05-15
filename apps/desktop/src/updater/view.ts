@@ -146,10 +146,10 @@ function applyProgressBar(refs: UpdaterViewRefs, view: UpdateUiState, meta: Upda
   refs.progressBar.classList.toggle("is-indeterminate", !determinate);
   if (determinate) {
     refs.progressBar.setAttribute("aria-valuenow", String(value));
-    refs.progressFill.style.width = `${value}%`;
+    refs.progressFill.style.setProperty("--update-progress-scale", String(value / 100));
   } else {
     refs.progressBar.removeAttribute("aria-valuenow");
-    refs.progressFill.style.width = "";
+    refs.progressFill.style.removeProperty("--update-progress-scale");
   }
   refs.progressBar.setAttribute("aria-valuetext", view.progressText || updaterStatusSummary(view, meta));
 }

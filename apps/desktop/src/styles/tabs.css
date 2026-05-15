@@ -3,7 +3,8 @@
   min-width: 0;
   padding: 6px 12px 0;
   border-bottom: 1px solid var(--hairline);
-  background: rgba(250, 247, 241, 0.9);
+  background: var(--surface-toolbar);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.44);
 }
 
 .tab-bar[hidden] { display: none !important; }
@@ -22,18 +23,22 @@
   align-items: center;
   min-width: 112px;
   max-width: 220px;
-  height: 32px;
+  height: 34px;
   border: 1px solid transparent;
   border-bottom: 0;
-  border-radius: 8px 8px 0 0;
+  border-radius: var(--radius-control) var(--radius-control) 0 0;
   background: rgba(31, 22, 11, 0.045);
   color: var(--ink-muted);
+  transition: background var(--t-fast) var(--ease),
+              border-color var(--t-fast) var(--ease),
+              color var(--t-fast) var(--ease);
 }
 
 .open-tab.is-active {
-  background: var(--bg-panel);
+  background: var(--surface-panel);
   border-color: var(--hairline);
   color: var(--ink-strong);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.68);
 }
 
 .open-tab-main {
@@ -78,11 +83,11 @@
   display: inline-grid;
   place-items: center;
   flex: 0 0 auto;
-  width: 26px;
-  height: 26px;
+  width: var(--size-control-sm);
+  height: var(--size-control-sm);
   margin-right: 3px;
   border: 0;
-  border-radius: 6px;
+  border-radius: var(--radius-control-sm);
   background: transparent;
   color: var(--ink-faint);
 }

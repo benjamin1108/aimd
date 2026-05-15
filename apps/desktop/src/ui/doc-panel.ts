@@ -41,9 +41,14 @@ export function renderDocPanelTabs() {
   sidebarWorkspaceDocResizerEl().hidden = true;
   outlineSectionEl().classList.toggle("is-collapsed", state.docPanelCollapsed);
   inspectorEl().classList.toggle("is-collapsed", state.docPanelCollapsed);
-  inspectorEl().closest<HTMLElement>(".panel")?.setAttribute(
+  const panel = inspectorEl().closest<HTMLElement>(".panel");
+  panel?.setAttribute(
     "data-inspector",
     state.docPanelCollapsed ? "collapsed" : "expanded",
+  );
+  panel?.setAttribute(
+    "data-source-pressure",
+    state.mode === "source" && state.sidebarDocTab === "outline" ? "true" : "false",
   );
   docPanelCollapseEl().setAttribute("aria-expanded", String(!state.docPanelCollapsed));
   docPanelCollapseEl().textContent = state.docPanelCollapsed ? "‹" : "›";

@@ -4,7 +4,7 @@
   display: flex;
   width: 100%;
   height: 100dvh;
-  padding: 14px;
+  padding: 16px;
 }
 
 .panel {
@@ -24,8 +24,11 @@
   grid-template-rows: minmax(0, 1fr);
   width: 100%;
   height: 100%;
-  border-radius: 14px;
-  background: var(--bg-panel);
+  border: 1px solid rgba(255, 255, 255, 0.72);
+  border-radius: var(--radius-shell);
+  background:
+    linear-gradient(135deg, rgba(255, 255, 255, 0.42), transparent 36%),
+    var(--surface-app-tray);
   box-shadow: var(--shadow-panel);
   overflow: hidden;
   isolation: isolate;
@@ -35,7 +38,7 @@
   grid-template-columns:
     var(--project-rail-width)
     minmax(var(--workspace-min-width), 1fr)
-    44px;
+    var(--rail-collapsed-width);
 }
 
 .panel > * {
@@ -64,5 +67,5 @@
   color: var(--ink);
   font: 600 15px/1.2 var(--font-display);
   letter-spacing: 0;
-  z-index: 10;
+  z-index: var(--z-popover);
 }

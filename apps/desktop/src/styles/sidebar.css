@@ -7,7 +7,9 @@
   grid-template-rows: auto 1fr auto;
   min-width: 0;
   min-height: 0;
-  background: var(--bg-sidebar);
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.36), transparent 34%),
+    var(--surface-rail);
   border-right: 1px solid var(--hairline);
 }
 
@@ -17,7 +19,7 @@
   width: 8px;
   height: 100%;
   cursor: ew-resize;
-  z-index: 10;
+  z-index: var(--z-rail-resizer);
   right: -4px;
 }
 
@@ -64,11 +66,15 @@ body.resizing-h * {
   place-items: center;
   width: 22px;
   height: 22px;
-  border-radius: 6px;
-  background: var(--accent);
+  border-radius: 7px;
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.12), transparent 45%),
+    var(--accent);
   color: var(--ink-on-accent);
   font: 600 12px/1 var(--font-display);
   letter-spacing: 0;
+  box-shadow: 0 1px 0 rgba(255, 255, 255, 0.18) inset,
+              0 8px 18px -14px rgba(31, 22, 11, 0.55);
 }
 
 .brand-name {
@@ -79,9 +85,9 @@ body.resizing-h * {
 .icon-btn {
   display: grid;
   place-items: center;
-  width: 28px;
-  height: 28px;
-  border-radius: 7px;
+  width: var(--size-icon);
+  height: var(--size-icon);
+  border-radius: var(--radius-control-sm);
   color: var(--ink-muted);
   transition: background var(--t-fast) var(--ease), color var(--t-fast) var(--ease), transform var(--t-fast) var(--ease);
 }
@@ -157,7 +163,7 @@ body.resizing-h * {
   margin: 6px 14px;
   border: 0;
   padding: 0;
-  background: var(--hairline);
+  background: rgba(31, 22, 11, 0.08);
   cursor: ns-resize;
   transition: background var(--t-fast) var(--ease);
 }
@@ -217,8 +223,8 @@ body.resizing-v * {
 
 .workspace-actions {
   display: grid;
-  grid-template-columns: repeat(5, 28px);
-  gap: 4px;
+  grid-template-columns: repeat(5, var(--size-icon));
+  gap: 5px;
   padding: 0 6px 8px;
 }
 
@@ -250,9 +256,9 @@ body.resizing-v * {
   align-items: center;
   gap: 5px;
   width: 100%;
-  min-height: 28px;
+  min-height: 30px;
   padding: 4px 8px;
-  border-radius: 6px;
+  border-radius: var(--radius-control-sm);
   color: var(--ink-muted);
   text-align: left;
   font-size: 12.5px;
@@ -261,12 +267,13 @@ body.resizing-v * {
 }
 
 .workspace-row:hover {
-  background: var(--bg-sidebar-hover);
+  background: rgba(255, 253, 248, 0.58);
   color: var(--ink);
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.42);
 }
 
 .workspace-row.is-active {
-  background: rgba(31, 22, 11, 0.08);
+  background: rgba(31, 22, 11, 0.09);
   color: var(--ink);
 }
 

@@ -4,7 +4,7 @@
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr)) auto;
   align-items: center;
-  gap: 6px;
+  gap: 5px;
   padding: 0 6px 6px;
   color: var(--ink-muted);
   font-size: 11px;
@@ -19,15 +19,18 @@
 }
 
 .doc-panel-tab {
-  height: 20px;
+  min-height: var(--size-control-sm);
   min-width: 0;
-  border-radius: 5px;
+  border-radius: var(--radius-control-sm);
   color: var(--ink-muted);
   font-size: 11px;
   font-weight: 600;
   letter-spacing: 0.04em;
   text-transform: uppercase;
-  transition: background var(--t-fast) var(--ease), color var(--t-fast) var(--ease);
+  transition: background var(--t-fast) var(--ease),
+              color var(--t-fast) var(--ease),
+              transform var(--t-fast) var(--ease),
+              box-shadow var(--t-fast) var(--ease);
 }
 
 #outline-section:not(.has-git-tab) .doc-panel-tab {
@@ -35,13 +38,18 @@
 }
 
 .doc-panel-tab:hover {
-  background: var(--bg-sidebar-hover);
+  background: rgba(255, 253, 248, 0.62);
   color: var(--ink);
 }
 
 .doc-panel-tab.is-active {
-  background: rgba(31, 22, 11, 0.08);
+  background: var(--surface-control);
   color: var(--ink);
+  box-shadow: var(--shadow-control);
+}
+
+.doc-panel-tab:active {
+  transform: scale(0.97);
 }
 .git-panel,
 .git-content {
@@ -102,17 +110,18 @@
 .git-action-btn,
 .git-icon-btn,
 .git-mini-btn {
-  height: 26px;
-  border-radius: 6px;
-  background: rgba(31, 22, 11, 0.06);
+  min-height: var(--size-control-sm);
+  border-radius: var(--radius-control-sm);
+  background: var(--surface-control);
   color: var(--ink);
   font-size: 11px;
   font-weight: 600;
   padding: 0 8px;
+  box-shadow: var(--shadow-control);
 }
 
 .git-mini-btn {
-  height: 22px;
+  min-height: var(--size-control-xs);
   padding: 0 6px;
 }
 
@@ -191,7 +200,7 @@
   height: 28px;
   border: 1px solid var(--hairline);
   border-radius: 6px;
-  background: var(--bg);
+  background: var(--surface-control);
   color: var(--ink);
   font-size: 12px;
   padding: 0 8px;

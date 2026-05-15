@@ -3,16 +3,23 @@
 .section-toggle {
   display: grid;
   place-items: center;
-  width: 20px;
-  height: 20px;
-  border-radius: 5px;
+  width: var(--size-control-sm);
+  height: var(--size-control-sm);
+  border-radius: var(--radius-control-sm);
   color: var(--ink-muted);
   font-size: 12px;
+  transition: background var(--t-fast) var(--ease),
+              color var(--t-fast) var(--ease),
+              transform var(--t-fast) var(--ease);
 }
 
 .section-toggle:hover {
-  background: var(--bg-sidebar-hover);
+  background: rgba(255, 253, 248, 0.62);
   color: var(--ink);
+}
+
+.section-toggle:active {
+  transform: scale(0.96);
 }
 
 .workspace-section.is-collapsed,

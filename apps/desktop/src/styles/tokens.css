@@ -8,12 +8,32 @@
   --bg-window-1: #d8e3ef;
   --bg-window-2: #eef0ec;
   --bg-window-3: #f6f1e6;
-  --bg-panel: #ffffff;
-  --bg-sidebar: #f4efe6;
-  --bg-sidebar-hover: #ece4d2;
-  --bg-sidebar-active: #ddd2bc;
-  --bg-soft: #faf7f1;
-  --bg-code: #f3efe6;
+  --bg-panel: #fffdf9;
+  --bg-sidebar: #f1eadf;
+  --bg-sidebar-hover: #e9dfce;
+  --bg-sidebar-active: #d9ccb7;
+  --bg-soft: #faf5ec;
+  --bg-code: #f2ede3;
+
+  /* Premium surface system */
+  --surface-window: #eef0ec;
+  --surface-app-tray: rgba(255, 253, 248, 0.72);
+  --surface-panel: #fffdf9;
+  --surface-panel-raised: #fffefa;
+  --surface-panel-recessed: #f6efe4;
+  --surface-rail: #f1eadf;
+  --surface-rail-strong: #ebe0cf;
+  --surface-toolbar: rgba(250, 245, 236, 0.88);
+  --surface-toolbar-core: rgba(255, 253, 248, 0.84);
+  --surface-control: rgba(255, 253, 248, 0.82);
+  --surface-control-hover: rgba(255, 255, 255, 0.96);
+  --surface-control-active: rgba(31, 22, 11, 0.08);
+  --surface-popover-shell: rgba(250, 245, 236, 0.96);
+  --surface-popover-core: #fffdf9;
+  --surface-document: #fffdf9;
+  --surface-document-soft: #fbf6ee;
+  --surface-source: #fcf7ef;
+  --surface-chip: rgba(255, 253, 248, 0.72);
 
   /* Ink */
   --ink: #1d1a14;
@@ -35,19 +55,50 @@
   --tone-danger: #c0392b;
 
   /* Lines & shadows */
-  --hairline: rgba(31, 22, 11, 0.07);
-  --hairline-strong: rgba(31, 22, 11, 0.13);
-  --shadow-panel: 0 30px 60px -25px rgba(35, 28, 14, 0.32),
-                  0 12px 28px -18px rgba(35, 28, 14, 0.18),
-                  inset 0 1px 0 rgba(255, 255, 255, 0.5);
-  --shadow-card: 0 1px 0 rgba(255, 255, 255, 0.6) inset,
-                 0 6px 14px -10px rgba(31, 22, 11, 0.15);
+  --hairline: rgba(31, 22, 11, 0.075);
+  --hairline-strong: rgba(31, 22, 11, 0.14);
+  --hairline-highlight: rgba(255, 255, 255, 0.78);
+  --shadow-panel: 0 38px 82px -38px rgba(35, 28, 14, 0.38),
+                  0 18px 38px -28px rgba(35, 28, 14, 0.22),
+                  inset 0 1px 0 rgba(255, 255, 255, 0.82);
+  --shadow-card: 0 1px 0 rgba(255, 255, 255, 0.72) inset,
+                 0 10px 22px -18px rgba(31, 22, 11, 0.28);
+  --shadow-popover: 0 28px 70px -34px rgba(35, 28, 14, 0.42),
+                    0 12px 26px -20px rgba(35, 28, 14, 0.24),
+                    inset 0 1px 0 rgba(255, 255, 255, 0.76);
+  --shadow-control: 0 1px 0 rgba(255, 255, 255, 0.78) inset,
+                    0 1px 2px rgba(31, 22, 11, 0.08),
+                    0 8px 18px -16px rgba(31, 22, 11, 0.24);
+
+  /* Radius and sizing */
+  --radius-shell: 20px;
+  --radius-panel: 16px;
+  --radius-control: 10px;
+  --radius-control-sm: 8px;
+  --size-control: 32px;
+  --size-control-sm: 28px;
+  --size-control-xs: 24px;
+  --size-icon: 30px;
+  --size-icon-lg: 32px;
+  --rail-collapsed-width: 46px;
 
   /* Motion */
   --ease: cubic-bezier(0.16, 1, 0.3, 1);
+  --ease-out-mass: cubic-bezier(0.32, 0.72, 0, 1);
+  --ease-press: cubic-bezier(0.2, 0, 0, 1);
   --t-fast: 140ms;
   --t-med: 220ms;
   --t-slow: 360ms;
+
+  /* Layer system */
+  --z-rail-resizer: 20;
+  --z-menu: 80;
+  --z-popover: 100;
+  --z-drawer: 120;
+  --z-modal: 160;
+  --z-toast: 180;
+  --z-lightbox: 220;
+  --z-debug: 240;
 
   /* Type */
   --font-sans: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Helvetica Neue",

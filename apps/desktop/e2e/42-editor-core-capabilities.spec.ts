@@ -382,7 +382,7 @@ test.describe("Editor core capabilities", () => {
     await expect(page.locator("#package-local-images")).toBeDisabled();
     await expect(page.locator("#more-menu #web-import")).toContainText("从网页导入");
     await expect(page.locator("#more-menu #web-import")).not.toBeDisabled();
-    await expect(page.locator("#more-menu #health-check")).toContainText("资源检查");
+    await expect(page.locator("#more-menu #health-check")).toContainText("检查当前文档资源");
     await expect(page.locator("#more-menu #health-check")).not.toBeDisabled();
     await expect(page.locator("#export-markdown")).toContainText("导出 Markdown");
     await expect(page.locator("#export-markdown")).not.toBeDisabled();

@@ -166,6 +166,9 @@ export function updateChrome() {
   const hasWorkspace = Boolean(state.workspace);
   renderRecentList();
   panelEl().dataset.shell = doc || hasWorkspace ? "document" : "launch";
+  panelEl().dataset.mode = state.mode;
+  panelEl().dataset.mainView = state.mainView;
+  panelEl().dataset.sourcePressure = state.mode === "source" && state.sidebarDocTab === "outline" ? "true" : "false";
   // Rail resizers write CSS variables. Drop them before each launch transition
   // so the single-column launch shell cannot inherit a stale desktop rail size.
   if (!doc && !hasWorkspace) {

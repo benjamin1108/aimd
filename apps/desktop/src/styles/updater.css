@@ -2,15 +2,15 @@
   position: absolute;
   right: 20px;
   bottom: 58px;
-  z-index: 35;
+  z-index: var(--z-toast);
   display: grid;
   width: min(380px, calc(100vw - 40px));
   gap: 12px;
   padding: 14px;
-  background: var(--bg-panel);
+  background: var(--surface-popover-core);
   border: 1px solid var(--hairline-strong);
-  border-radius: 8px;
-  box-shadow: var(--shadow-panel);
+  border-radius: var(--radius-panel);
+  box-shadow: var(--shadow-popover);
 }
 
 .update-panel[hidden] {
@@ -105,21 +105,22 @@
 }
 
 .update-progress-fill {
-  width: 0%;
+  width: 100%;
   height: 100%;
   background: var(--accent);
   border-radius: inherit;
-  transition: width 180ms var(--ease);
+  transform: scaleX(var(--update-progress-scale, 0));
+  transform-origin: left center;
+  transition: transform 180ms var(--ease-out-mass);
 }
 
 .update-progress-bar.is-indeterminate .update-progress-fill {
-  width: 42%;
-  animation: update-progress-slide 1.1s infinite var(--ease);
+  animation: update-progress-slide 1.1s infinite var(--ease-out-mass);
 }
 
 @keyframes update-progress-slide {
-  0% { transform: translateX(-120%); }
-  100% { transform: translateX(260%); }
+  0% { transform: translateX(-78%) scaleX(0.42); }
+  100% { transform: translateX(138%) scaleX(0.42); }
 }
 
 .update-progress-meta {

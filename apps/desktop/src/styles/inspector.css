@@ -6,7 +6,9 @@
   grid-template-rows: minmax(0, 1fr);
   min-width: 0;
   min-height: 0;
-  background: linear-gradient(180deg, #f8f5ee 0%, var(--bg-sidebar) 100%);
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.42) 0%, transparent 34%),
+    var(--surface-rail);
   border-left: 1px solid var(--hairline);
 }
 
@@ -17,7 +19,7 @@
   width: 8px;
   height: 100%;
   cursor: ew-resize;
-  z-index: 10;
+  z-index: var(--z-rail-resizer);
 }
 
 .inspector-hr-resizer::after {
@@ -74,10 +76,40 @@
 }
 
 .inspector.is-collapsed #doc-panel-collapse {
-  width: 30px;
-  height: 30px;
-  border-radius: 8px;
+  width: var(--size-control);
+  height: var(--size-control);
+  border-radius: var(--radius-control);
   background: rgba(31, 22, 11, 0.06);
+}
+
+@media (max-width: 1320px) and (min-width: 901px) {
+  .panel[data-source-pressure="true"] .inspector {
+    overflow: hidden;
+  }
+
+  .panel[data-source-pressure="true"] .inspector .nav-section {
+    align-items: center;
+    padding: 10px 6px;
+  }
+
+  .panel[data-source-pressure="true"] .inspector .inspector-owner,
+  .panel[data-source-pressure="true"] .inspector .doc-panel-tab,
+  .panel[data-source-pressure="true"] .inspector .section-content {
+    display: none;
+  }
+
+  .panel[data-source-pressure="true"] .inspector .doc-panel-tabs {
+    display: flex;
+    justify-content: center;
+    padding: 0;
+  }
+
+  .panel[data-source-pressure="true"] .inspector #doc-panel-collapse {
+    width: var(--size-control);
+    height: var(--size-control);
+    border-radius: var(--radius-control);
+    background: rgba(31, 22, 11, 0.06);
+  }
 }
 
 .inspector-owner {
@@ -103,7 +135,7 @@
   align-items: center;
   gap: 6px;
   padding: 5px 8px 5px 10px;
-  border-radius: 6px;
+  border-radius: var(--radius-control-sm);
   color: var(--ink-muted);
   text-align: left;
   font-size: 12.5px;
@@ -151,7 +183,7 @@
   gap: 9px;
   align-items: center;
   padding: 5px 8px;
-  border-radius: 7px;
+  border-radius: var(--radius-control-sm);
   transition: background var(--t-fast) var(--ease);
 }
 
