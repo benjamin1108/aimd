@@ -15,7 +15,7 @@ $tauri = Join-Path $desktop "src-tauri"
 $target = Join-Path $root "target"
 $bundle = Join-Path $target "release\bundle\nsis"
 $resources = Join-Path $tauri "windows\resources"
-$cargoToml = Join-Path $root "Cargo.toml"
+$releaseConfig = Join-Path $root "release.config.json"
 
 if (-not $OutDir) {
     $OutDir = Join-Path $root "dist"
@@ -192,6 +192,15 @@ if ($LASTEXITCODE -ne 0) { throw "npm -v failed" }
 cargo --version
 if ($LASTEXITCODE -ne 0) { throw "cargo --version failed" }
 
+Write-Host "==> synchronizing release version"
+Push-Location $root
+try {
+    node scripts/sync-version.mjs
+    if ($LASTEXITCODE -ne 0) { throw "version sync failed" }
+} finally {
+    Pop-Location
+}
+
 Write-Host "==> building AIMD CLI"
 Push-Location $root
 try {
@@ -261,11 +270,10 @@ Patch-NsisMaintenanceUninstallFlow $nsisScript
 Rebuild-PatchedNsisInstaller $nsisScript $bundle
 
 New-Item -ItemType Directory -Path $OutDir -Force | Out-Null
-$versionLine = Select-String -Path $cargoToml -Pattern '^version = "([^"]+)"' | Select-Object -First 1
-if (-not $versionLine) {
-    throw "Could not read workspace version from $cargoToml"
+$version = (Get-Content -LiteralPath $releaseConfig -Raw | ConvertFrom-Json).version
+if (-not $version) {
+    throw "Could not read release version from $releaseConfig"
 }
-$version = $versionLine.Matches[0].Groups[1].Value
 $normalized = Join-Path $OutDir "AIMD-Desktop_$($version)_windows_x64-setup.exe"
 
 $setup = Get-ChildItem -LiteralPath $bundle -Filter "*.exe" -File -ErrorAction SilentlyContinue |

@@ -7,7 +7,7 @@ ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 DESKTOP="$ROOT/apps/desktop"
 OUT_DIR="$ROOT/dist"
 IDENTIFIER="org.aimd.desktop.pkg"
-VERSION="$(awk -F\" '/^version\\.workspace/ { next } /^version = / { print $2; exit }' "$ROOT/Cargo.toml")"
+VERSION=""
 SKIP_ENV="${AIMD_SKIP_ENV:-0}"
 SKIP_BUILD=0
 CLEAN_BUILD=0
@@ -114,6 +114,13 @@ prepare_env() {
   ensure_brew_package cargo rust
 }
 
+sync_version() {
+  echo "==> synchronizing release version"
+  cd "$ROOT"
+  node scripts/sync-version.mjs
+  VERSION="$(node -e "process.stdout.write(require('./release.config.json').version)")"
+}
+
 build_release_artifacts() {
   echo "==> building AIMD Desktop ($(uname -sm))"
   cd "$DESKTOP"
@@ -188,6 +195,7 @@ prepare_build_paths
 
 start_ts=$(date +%s)
 prepare_env
+sync_version
 if [[ "$SKIP_BUILD" != "1" ]]; then
   if [[ "$CLEAN_BUILD" == "1" ]]; then
     cleanup_build_cache

@@ -43,17 +43,14 @@ AIMD Desktop 是用于打开、阅读和编辑 `.aimd` 文件的桌面应用。
 
 ## 下载
 
-当前版本：`v0.1.0`
-
 请到 GitHub Releases 下载最新安装包：
 
 https://github.com/benjamin1108/aimd/releases
 
 | 平台 | 安装包 |
 |---|---|
-| macOS Apple Silicon | `AIMD-0.1.0.pkg` |
-| Windows x64 | `AIMD.Desktop_0.1.0_x64-setup.exe` |
-| Windows x64 MSI | `AIMD.Desktop_0.1.0_x64_en-US.msi` |
+| macOS Apple Silicon | `AIMD-<version>.pkg` |
+| Windows x64 | `AIMD-Desktop_<version>_windows_x64-setup.exe` |
 
 macOS 版本当前尚未完成 Apple 公证。首次打开如被系统拦截，请到：
 
@@ -127,12 +124,52 @@ npm install
 npm run dev
 ```
 
-类型检查和测试：
+类型检查和测试（在仓库根目录运行）：
 
 ```bash
-npm run typecheck
-npm run test:e2e
+npm run version:check
+npm --prefix apps/desktop run typecheck
+npm --prefix apps/desktop run test:e2e
 ```
+
+### 版本管理
+
+应用版本号的唯一手写来源是仓库根目录的 `release.config.json`。
+`Cargo.toml`、`apps/desktop/package.json` 和
+`apps/desktop/src-tauri/tauri.conf.json` 都由版本同步脚本更新或校验。
+
+常用命令：
+
+```bash
+# 同步派生版本号
+npm run version:sync
+
+# 检查派生版本号是否和 release.config.json 一致
+npm run version:check
+```
+
+`apps/desktop` 下的 `npm run dev`、`npm run build`、`npm run build:pkg` 和
+`npm run check` 会自动执行版本同步或校验；macOS / Windows 打包脚本也会在读取版本号前自动同步。
+
+发布版本只能通过根目录 release 命令自增：
+
+```bash
+npm run release -- patch  # 1.4.27 -> 1.4.28
+npm run release -- minor  # 1.4.27 -> 1.5.0
+npm run release -- major  # 1.4.27 -> 2.0.0
+```
+
+`patch` 用于日常修复发布；`minor` 用于大型 feature 发布；`major` 用于平台级重构或破坏兼容的发布。普通 dev/build/check/package 命令只同步或校验版本，不会自增版本号。
+
+发布前可先 dry-run：
+
+```bash
+npm run release:dry -- patch
+npm run release:dry -- minor
+npm run release:dry -- major
+```
+
+Git tag 必须和配置版本一致：`release.config.json` 中的 `1.4.28` 对应 tag `v1.4.28`。
 
 打包：
 

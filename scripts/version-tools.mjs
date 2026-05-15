@@ -1,0 +1,203 @@
+import { execFileSync } from "node:child_process";
+import fs from "node:fs";
+import path from "node:path";
+import { fileURLToPath } from "node:url";
+
+const THIS_DIR = path.dirname(fileURLToPath(import.meta.url));
+export const REPO_ROOT = path.resolve(THIS_DIR, "..");
+
+const SEMVER_RE = /^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)(?:-([0-9A-Za-z.-]+))?(?:\+([0-9A-Za-z.-]+))?$/;
+const BUMP_LEVELS = new Set(["patch", "minor", "major"]);
+
+export function repoPath(root, ...parts) {
+  return path.join(root, ...parts);
+}
+
+export function readText(filePath) {
+  return fs.readFileSync(filePath, "utf8");
+}
+
+export function writeText(filePath, text) {
+  fs.writeFileSync(filePath, text);
+}
+
+export function readJson(filePath) {
+  return JSON.parse(readText(filePath));
+}
+
+export function writeJson(filePath, value) {
+  writeText(filePath, `${JSON.stringify(value, null, 2)}\n`);
+}
+
+export function parseSemver(version) {
+  const match = SEMVER_RE.exec(version);
+  if (!match) {
+    throw new Error(`Invalid SemVer version: ${version}`);
+  }
+  return {
+    major: Number(match[1]),
+    minor: Number(match[2]),
+    patch: Number(match[3]),
+    prerelease: match[4] || "",
+    build: match[5] || "",
+  };
+}
+
+export function bumpVersion(version, level) {
+  if (!BUMP_LEVELS.has(level)) {
+    throw new Error(`Invalid bump level: ${level || "(missing)"}. Expected patch, minor, or major.`);
+  }
+  const parsed = parseSemver(version);
+  if (parsed.prerelease || parsed.build) {
+    throw new Error(`Cannot bump pre-release/build metadata version automatically: ${version}`);
+  }
+  if (level === "patch") return `${parsed.major}.${parsed.minor}.${parsed.patch + 1}`;
+  if (level === "minor") return `${parsed.major}.${parsed.minor + 1}.0`;
+  return `${parsed.major + 1}.0.0`;
+}
+
+export function validateReleaseConfig(config) {
+  if (!config || typeof config !== "object" || Array.isArray(config)) {
+    throw new Error("release.config.json must contain an object");
+  }
+  for (const key of ["version", "channel", "releaseUrl", "updaterManifestUrl"]) {
+    if (typeof config[key] !== "string" || !config[key].trim()) {
+      throw new Error(`release.config.json missing required string field: ${key}`);
+    }
+  }
+  const version = config.version.trim();
+  const parsed = parseSemver(version);
+  const allowedChannels = new Set(["stable", "beta", "dev"]);
+  if (!allowedChannels.has(config.channel)) {
+    throw new Error(`release.config.json channel must be stable, beta, or dev: ${config.channel}`);
+  }
+  if (config.channel === "stable" && parsed.prerelease) {
+    throw new Error(`stable channel cannot use pre-release version: ${version}`);
+  }
+  return { ...config, version };
+}
+
+export function loadReleaseConfig(root = REPO_ROOT) {
+  const filePath = repoPath(root, "release.config.json");
+  return validateReleaseConfig(readJson(filePath));
+}
+
+function replaceWorkspacePackageVersion(cargoToml, version) {
+  const headerRe = /^\[workspace\.package\]\s*$/m;
+  const header = headerRe.exec(cargoToml);
+  if (!header) {
+    throw new Error("Cargo.toml missing [workspace.package] section");
+  }
+  const bodyStart = header.index + header[0].length;
+  const nextSection = cargoToml.slice(bodyStart).search(/^\[/m);
+  const bodyEnd = nextSection === -1 ? cargoToml.length : bodyStart + nextSection;
+  const body = cargoToml.slice(bodyStart, bodyEnd);
+  if (!/^version\s*=\s*"[^"]*"\s*$/m.test(body)) {
+    throw new Error("Cargo.toml [workspace.package] missing version field");
+  }
+  const nextBody = body.replace(/^version\s*=\s*"[^"]*"\s*$/m, `version = "${version}"`);
+  return cargoToml.slice(0, bodyStart) + nextBody + cargoToml.slice(bodyEnd);
+}
+
+function updateJsonVersion(filePath, version) {
+  const text = readText(filePath);
+  const json = readJson(filePath);
+  if (typeof json.version !== "string") {
+    throw new Error(`${filePath} missing version string`);
+  }
+  if (!/"version"\s*:\s*"[^"]*"/.test(text)) {
+    throw new Error(`${filePath} missing version field`);
+  }
+  return text.replace(/("version"\s*:\s*)"[^"]*"/, `$1"${version}"`);
+}
+
+export function computeSyncedFiles(root = REPO_ROOT, config = loadReleaseConfig(root)) {
+  const version = config.version;
+  const cargoPath = repoPath(root, "Cargo.toml");
+  const packagePath = repoPath(root, "apps", "desktop", "package.json");
+  const tauriPath = repoPath(root, "apps", "desktop", "src-tauri", "tauri.conf.json");
+
+  return [
+    {
+      path: cargoPath,
+      label: "Cargo.toml",
+      content: replaceWorkspacePackageVersion(readText(cargoPath), version),
+    },
+    {
+      path: packagePath,
+      label: "apps/desktop/package.json",
+      content: updateJsonVersion(packagePath, version),
+    },
+    {
+      path: tauriPath,
+      label: "apps/desktop/src-tauri/tauri.conf.json",
+      content: updateJsonVersion(tauriPath, version),
+    },
+  ];
+}
+
+export function syncVersion({ root = REPO_ROOT, check = false } = {}) {
+  const config = loadReleaseConfig(root);
+  const files = computeSyncedFiles(root, config);
+  const stale = [];
+
+  for (const file of files) {
+    const current = readText(file.path);
+    if (current === file.content) continue;
+    stale.push(file.label);
+    if (!check) writeText(file.path, file.content);
+  }
+
+  if (check && stale.length > 0) {
+    throw new Error(`Version drift detected in: ${stale.join(", ")}. Run npm run version:sync.`);
+  }
+
+  return { version: config.version, stale };
+}
+
+export function getGitTag(root = REPO_ROOT) {
+  const envTag = process.env.GITHUB_REF_NAME || process.env.RELEASE_TAG || "";
+  if (envTag) return envTag.trim();
+  try {
+    return execFileSync("git", ["describe", "--tags", "--exact-match"], {
+      cwd: root,
+      encoding: "utf8",
+      stdio: ["ignore", "pipe", "ignore"],
+    }).trim();
+  } catch {
+    return "";
+  }
+}
+
+export function assertTagMatchesVersion(version, tag) {
+  if (!tag) return;
+  if (tag !== `v${version}`) {
+    throw new Error(`Release tag ${tag} does not match release.config.json version ${version}`);
+  }
+}
+
+export function ensureCleanWorktree(root = REPO_ROOT) {
+  const status = execFileSync("git", ["status", "--short"], { cwd: root, encoding: "utf8" }).trim();
+  if (status) {
+    throw new Error(`Release requires a clean worktree:\n${status}`);
+  }
+}
+
+export function runCommand(command, args, options = {}) {
+  if (options.dryRun) {
+    console.log(`[dry-run] ${command} ${args.join(" ")}`);
+    return;
+  }
+  execFileSync(command, args, {
+    cwd: options.cwd || REPO_ROOT,
+    stdio: "inherit",
+    shell: false,
+  });
+}
+
+export function updateReleaseConfigVersion(root, version) {
+  const filePath = repoPath(root, "release.config.json");
+  const config = validateReleaseConfig(readJson(filePath));
+  config.version = version;
+  writeJson(filePath, config);
+}

@@ -48,6 +48,12 @@ jobs:
         working-directory: apps/desktop
         run: npm ci
 
+      - name: Version check
+        env:
+          CI_RELEASE: "1"
+          RELEASE_TAG: ${{ inputs.tag || github.ref_name }}
+        run: npm run version:check -- --verify-tag
+
       - name: Frontend checks
         if: runner.os != 'Windows'
         working-directory: apps/desktop
