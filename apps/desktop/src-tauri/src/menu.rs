@@ -5,6 +5,7 @@ use tauri::{AppHandle, Manager, Wry};
 
 pub const MENU_EVENT_IDS: &[&str] = &[
     "settings",
+    "check-updates",
     "debug-console",
     "new-document",
     "open-document",
@@ -30,6 +31,7 @@ pub fn build_app_menu<M: Manager<tauri::Wry>>(
         MenuItem::with_id(manager, "debug-console", "调试控制台", false, None::<&str>)?;
     let app_menu = SubmenuBuilder::with_id(manager, "app-menu", "AIMD")
         .text("settings", "设置...")
+        .text("check-updates", "检查更新...")
         .item(&debug_item)
         .separator()
         .item(&quit_item)

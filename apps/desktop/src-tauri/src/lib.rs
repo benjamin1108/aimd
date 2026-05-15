@@ -18,6 +18,7 @@ mod llm;
 mod macos_assoc;
 mod menu;
 mod settings;
+mod updater;
 mod web_clip_image_proxy;
 mod windows;
 mod workspace;
@@ -56,6 +57,8 @@ pub fn run() {
     dev_log::init();
 
     let builder = tauri::Builder::default()
+        .plugin(tauri_plugin_process::init())
+        .plugin(tauri_plugin_updater::Builder::new().build())
         .plugin(external::link_navigation_guard())
         .register_asynchronous_uri_scheme_protocol(
             web_clip_image_proxy::PROXY_SCHEME,
@@ -82,6 +85,7 @@ pub fn run() {
         .manage(windows::SettingsWindowState::default())
         .manage(importer::WebClipSessionState::default())
         .manage(web_clip_image_proxy::WebClipImageProxyState::default())
+        .manage(updater::UpdaterDirtyWindows::default())
         .setup(|app| {
             let menu = menu::build_app_menu(app)?;
             // macOS 必须用 app.set_menu 才能显示全局菜单。
@@ -197,6 +201,9 @@ pub fn run() {
             settings::load_settings,
             settings::save_settings,
             llm::test_model_connection,
+            updater::updater_set_dirty_state,
+            updater::updater_dirty_documents,
+            updater::updater_focus_dirty_window,
             windows::open_in_new_window,
             windows::open_draft_in_new_window,
             windows::initial_draft_path,
@@ -243,6 +250,7 @@ pub fn run() {
             ..
         } => {
             windows::unregister_window_label(app_handle, &label);
+            updater::unregister_window_label(app_handle, &label);
             if label == "extractor" {
                 let request_id = importer::take_current_request_id(app_handle);
                 web_clip_image_proxy::clear_session_for_app(app_handle, request_id.as_deref());

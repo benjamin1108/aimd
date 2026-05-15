@@ -34,6 +34,12 @@ jobs:
       - name: Version tests
         run: npm run test:version
 
+      - name: Updater manifest tests
+        run: npm run test:updater
+
+      - name: Updater release plan
+        run: npm run updater:plan
+
       - name: Release dry-run patch
         run: npm run release:dry -- patch
 

@@ -3,8 +3,13 @@
   "scripts": {
     "version:sync": "node scripts/sync-version.mjs",
     "version:check": "node scripts/sync-version.mjs --check",
+    "updater:plan": "node scripts/updater-manifest.mjs plan",
+    "updater:check-secrets": "node scripts/updater-manifest.mjs check-secrets",
+    "updater:manifest": "node scripts/updater-manifest.mjs generate",
+    "updater:validate": "node scripts/updater-manifest.mjs validate",
     "release": "node scripts/release.mjs",
     "release:dry": "node scripts/release.mjs --dry-run",
-    "test:version": "node --test scripts/tests/version-tools.test.mjs"
+    "test:version": "node --test scripts/tests/version-tools.test.mjs",
+    "test:updater": "node --test scripts/tests/updater-tools.test.mjs"
   }
 }

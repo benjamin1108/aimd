@@ -30,6 +30,8 @@
   "dependencies": {
     "@mozilla/readability": "^0.6.0",
     "@tauri-apps/api": "^2.0.0",
+    "@tauri-apps/plugin-process": "^2.3.1",
+    "@tauri-apps/plugin-updater": "^2.10.1",
     "@types/turndown": "^5.0.6",
     "turndown": "^7.2.4",
     "turndown-plugin-gfm": "^1.0.2"

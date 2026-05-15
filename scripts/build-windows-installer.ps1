@@ -36,8 +36,44 @@ Options:
 
 Output:
   dist\AIMD-Desktop_<version>_windows_x64-setup.exe
+
+Set AIMD_RELEASE=1 or AIMD_UPDATER_ARTIFACTS=1 to sign the final patched NSIS
+installer for Tauri updater distribution:
+  dist\AIMD-Desktop_<version>_windows_x64-setup.exe.sig
 "@
     exit 0
+}
+
+function Test-UpdaterArtifactsRequired {
+    return ($env:AIMD_RELEASE -eq "1" -or $env:AIMD_UPDATER_ARTIFACTS -eq "1")
+}
+
+function Ensure-UpdaterSigningEnv {
+    if (-not $env:TAURI_SIGNING_PRIVATE_KEY -and -not $env:TAURI_SIGNING_PRIVATE_KEY_PATH) {
+        throw "updater signing requires TAURI_SIGNING_PRIVATE_KEY or TAURI_SIGNING_PRIVATE_KEY_PATH"
+    }
+    if ($null -eq $env:TAURI_SIGNING_PRIVATE_KEY_PASSWORD) {
+        $env:TAURI_SIGNING_PRIVATE_KEY_PASSWORD = ""
+    }
+}
+
+function Sign-UpdaterArtifact($ArtifactPath) {
+    Ensure-UpdaterSigningEnv
+    $sig = "$ArtifactPath.sig"
+    if (Test-Path -LiteralPath $sig -PathType Leaf) {
+        Remove-Item -LiteralPath $sig -Force
+    }
+    Push-Location $desktop
+    try {
+        npx tauri signer sign $ArtifactPath
+        if ($LASTEXITCODE -ne 0) { throw "npx tauri signer sign failed" }
+    } finally {
+        Pop-Location
+    }
+    if (-not (Test-Path -LiteralPath $sig -PathType Leaf)) {
+        throw "updater signature was not produced: $sig"
+    }
+    Write-Host "signature -> $sig"
 }
 
 function Require-Command($Name, $InstallId) {
@@ -284,6 +320,13 @@ if (-not $setup) {
 }
 
 Copy-Item -LiteralPath $setup.FullName -Destination $normalized -Force
+if (Test-Path -LiteralPath "$normalized.sig" -PathType Leaf) {
+    Remove-Item -LiteralPath "$normalized.sig" -Force
+}
+
+if (Test-UpdaterArtifactsRequired) {
+    Sign-UpdaterArtifact $normalized
+}
 
 Write-Host "installer -> $normalized"
 Get-ChildItem -LiteralPath $OutDir -Filter "AIMD-Desktop_*_windows_x64-setup.exe" | Select-Object Name,Length

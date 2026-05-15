@@ -13,6 +13,7 @@ import {
   markdownEl, inlineEditorEl, modeReadEl, modeEditEl, modeSourceEl,
   saveEl, saveAsEl, closeEl,
   moreMenuToggleEl, moreMenuEl, webImportEl, formatDocumentEl,
+  checkUpdatesEl,
   debugIndicatorEl, debugIndicatorCountEl,
 } from "./core/dom";
 import { setMode, refreshSourceBanner } from "./ui/mode";
@@ -55,9 +56,11 @@ import { bindGitDiffView } from "./ui/git-diff";
 import { bindSelectionBoundary } from "./ui/selection";
 import { loadAppSettings, type AppSettings } from "./core/settings";
 import { createSourceModel } from "./editor/source-preserve";
+import { bindUpdater, checkForUpdates, scheduleStartupUpdateCheck } from "./updater/client";
 
 installDebugConsole();
 bindSelectionBoundary("main");
+bindUpdater();
 if (isTauri()) {
   void listen<{ level?: string; traceId?: string; elapsedMs?: number; message?: string }>("aimd-pdf-log", (event) => {
     const payload = event.payload || {};
@@ -147,6 +150,7 @@ formatDocumentEl().addEventListener("click", () => { closeActionMenus(); void fo
 $("#package-local-images").addEventListener("click", () => { closeActionMenus(); void packageLocalImages(); });
 webImportEl().addEventListener("click", () => { closeActionMenus(); void importWebClip(); });
 $("#health-check").addEventListener("click", () => { closeActionMenus(); void runHealthCheck(); });
+checkUpdatesEl().addEventListener("click", () => { closeActionMenus(); void checkForUpdates({ manual: true }); });
 $("#export-markdown").addEventListener("click", () => { closeActionMenus(); void exportMarkdownAssets(); });
 $("#export-html").addEventListener("click", () => { closeActionMenus(); void exportHTML(); });
 $("#export-pdf").addEventListener("click", () => { closeActionMenus(); void exportPDF(); });
@@ -297,6 +301,7 @@ window.addEventListener("DOMContentLoaded", async () => {
     });
     const menuHandlers: Record<string, () => void> = {
       "settings":          () => { void invoke("open_settings_window"); },
+      "check-updates":     () => { void checkForUpdates({ manual: true }); },
       "debug-console":     () => { if (state.uiSettings.debugMode) openDebugConsole(); },
       "new-document":      () => { void newDocument(); },
       "open-document":     () => { void chooseAndOpen(); },
@@ -355,6 +360,7 @@ window.addEventListener("DOMContentLoaded", async () => {
     state.isBootstrappingSession = false;
     void cleanupOldDrafts(state.doc?.draftSourcePath ? [state.doc.draftSourcePath] : []);
     if (!state.doc) updateChrome();
+    scheduleStartupUpdateCheck();
   }
 });
 

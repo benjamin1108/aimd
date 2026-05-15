@@ -55,6 +55,7 @@ export const formatDocumentEl = lazyEl<HTMLButtonElement>("#format-document");
 export const packageLocalImagesEl = lazyEl<HTMLButtonElement>("#package-local-images");
 export const healthCheckEl = lazyEl<HTMLButtonElement>("#health-check");
 export const webImportEl = lazyEl<HTMLButtonElement>("#web-import");
+export const checkUpdatesEl = lazyEl<HTMLButtonElement>("#check-updates");
 export const exportMarkdownEl = lazyEl<HTMLButtonElement>("#export-markdown");
 export const exportHtmlEl = lazyEl<HTMLButtonElement>("#export-html");
 export const exportPdfEl = lazyEl<HTMLButtonElement>("#export-pdf");

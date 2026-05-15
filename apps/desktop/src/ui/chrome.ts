@@ -15,6 +15,7 @@ import { fileStem, extractHeadingTitle } from "../util/path";
 import { escapeAttr, escapeHTML } from "../util/escape";
 import { renderRecentList } from "./recents";
 import { persistSessionSnapshot } from "../session/snapshot";
+import { syncDirtyDocumentState } from "../updater/dirty-state";
 
 export function displayDocTitle(doc: AimdDocument): string {
   return extractHeadingTitle(doc.markdown) || doc.title || fileStem(doc.path) || "未命名文档";
@@ -79,6 +80,7 @@ export function setStatus(text: string, tone: "idle" | "loading" | "success" | "
 
 export function updateChrome() {
   const doc = state.doc;
+  void syncDirtyDocumentState();
   const hasWorkspace = Boolean(state.workspace);
   renderRecentList();
   panelEl().dataset.shell = doc || hasWorkspace ? "document" : "launch";

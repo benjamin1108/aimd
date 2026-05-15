@@ -3,5 +3,5 @@
   "identifier": "default",
   "description": "Default permissions for the AIMD desktop window",
   "windows": ["main", "doc-*", "settings"],
-  "permissions": ["core:default"]
+  "permissions": ["core:default", "updater:default", "process:default"]
 }

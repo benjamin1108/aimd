@@ -52,6 +52,11 @@ The final package is written to dist/. Cargo/Tauri caches stay under target/.
 After a successful package build, distributable byproducts such as .app/.dmg
 bundles are removed so dist/ contains the PKG and target/ remains a build cache.
 
+Set AIMD_RELEASE=1 or AIMD_UPDATER_ARTIFACTS=1 to additionally create and sign
+the Tauri updater app archive:
+  dist/AIMD-Desktop_<version>_macos_aarch64.app.tar.gz
+  dist/AIMD-Desktop_<version>_macos_aarch64.app.tar.gz.sig
+
 By default the script reuses target/ for faster builds. Pass --clean to remove
 the target/ cache first and perform a fresh build.
 USAGE
@@ -161,10 +166,50 @@ prepare_build_paths() {
   CLI_PATH="$BUILD_TARGET/release/aimd"
 }
 
+updater_artifacts_required() {
+  [[ "${AIMD_RELEASE:-0}" == "1" || "${AIMD_UPDATER_ARTIFACTS:-0}" == "1" ]]
+}
+
+ensure_updater_signing_env() {
+  if [[ -z "${TAURI_SIGNING_PRIVATE_KEY:-}" && -z "${TAURI_SIGNING_PRIVATE_KEY_PATH:-}" ]]; then
+    echo "error: updater signing requires TAURI_SIGNING_PRIVATE_KEY or TAURI_SIGNING_PRIVATE_KEY_PATH" >&2
+    exit 1
+  fi
+  export TAURI_SIGNING_PRIVATE_KEY_PASSWORD="${TAURI_SIGNING_PRIVATE_KEY_PASSWORD-}"
+}
+
+sign_updater_artifact() {
+  local artifact="$1"
+  ensure_updater_signing_env
+  rm -f "$artifact.sig"
+  (cd "$DESKTOP" && npx tauri signer sign "$artifact")
+  if [[ ! -s "$artifact.sig" ]]; then
+    echo "error: updater signature was not produced: $artifact.sig" >&2
+    exit 1
+  fi
+}
+
+create_macos_updater_artifact() {
+  if ! updater_artifacts_required; then
+    return
+  fi
+  if [[ "$(uname -m)" != "arm64" ]]; then
+    echo "error: macOS updater contract currently supports darwin-aarch64 only; runner is $(uname -m)" >&2
+    exit 1
+  fi
+  local updater="$OUT_DIR/AIMD-Desktop_${VERSION}_macos_aarch64.app.tar.gz"
+  echo "==> creating macOS updater artifact"
+  rm -f "$updater" "$updater.sig"
+  COPYFILE_DISABLE=1 tar -czf "$updater" -C "$BUNDLE_MACOS" "$(basename "$APP_PATH")"
+  sign_updater_artifact "$updater"
+  echo "updater -> $updater"
+  echo "signature -> $updater.sig"
+}
+
 prepare_output_dir() {
   mkdir -p "$OUT_DIR"
   if [[ "$OUT_DIR" == "$ROOT/dist" ]]; then
-    find "$OUT_DIR" -maxdepth 1 \( -name 'AIMD-*.pkg' -o -name 'AIMD*.dmg' -o -name 'AIMD*.app' -o -name '.DS_Store' \) -exec rm -rf {} +
+    find "$OUT_DIR" -maxdepth 1 \( -name 'AIMD-*.pkg' -o -name 'AIMD*.dmg' -o -name 'AIMD*.app' -o -name 'AIMD-Desktop_*_macos_*.app.tar.gz' -o -name 'AIMD-Desktop_*_macos_*.app.tar.gz.sig' -o -name '.DS_Store' \) -exec rm -rf {} +
   fi
 }
 
@@ -245,6 +290,7 @@ pkgbuild \
   --install-location "/" \
   "$OUT_DIR/AIMD-${VERSION}.pkg"
 
+create_macos_updater_artifact
 cleanup_packaging_byproducts
 
 echo "pkg -> $OUT_DIR/AIMD-${VERSION}.pkg"

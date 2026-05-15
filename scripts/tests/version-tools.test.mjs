@@ -21,6 +21,12 @@ function fixture() {
       channel: "stable",
       releaseUrl: "https://github.com/benjamin1108/aimd/releases",
       updaterManifestUrl: "https://github.com/benjamin1108/aimd/releases/latest/download/latest.json",
+      updater: {
+        manifestAsset: "latest.json",
+        pubkey: "test-updater-public-key",
+        windowsInstallMode: "passive",
+        supportedPlatforms: ["darwin-aarch64", "windows-x86_64"],
+      },
     }, null, 2) + "\n",
   );
   fs.writeFileSync(
@@ -52,20 +58,43 @@ test("release config validates channel and pre-release policy", () => {
     channel: "stable",
     releaseUrl: "https://example.test/releases",
     updaterManifestUrl: "https://example.test/latest.json",
+    updater: {
+      manifestAsset: "latest.json",
+      pubkey: "public-key",
+      windowsInstallMode: "passive",
+      supportedPlatforms: ["darwin-aarch64", "windows-x86_64"],
+    },
   }).version, "1.2.3");
   assert.throws(() => validateReleaseConfig({
     version: "1.2.3-beta.1",
     channel: "stable",
     releaseUrl: "https://example.test/releases",
     updaterManifestUrl: "https://example.test/latest.json",
+    updater: {
+      manifestAsset: "latest.json",
+      pubkey: "public-key",
+      windowsInstallMode: "passive",
+      supportedPlatforms: ["darwin-aarch64", "windows-x86_64"],
+    },
   }), /stable channel cannot use pre-release/);
+  assert.throws(() => validateReleaseConfig({
+    version: "1.2.3",
+    channel: "stable",
+    releaseUrl: "https://example.test/releases",
+    updaterManifestUrl: "https://example.test/latest.json",
+  }), /missing required updater object/);
 });
 
 test("syncVersion updates all derived version fields and is idempotent", () => {
   const root = fixture();
   assert.throws(() => syncVersion({ root, check: true }), /Version drift detected/);
   const result = syncVersion({ root });
-  assert.deepEqual(result.stale, ["Cargo.toml", "apps/desktop/package.json", "apps/desktop/src-tauri/tauri.conf.json"]);
+  assert.deepEqual(result.stale, [
+    "Cargo.toml",
+    "apps/desktop/package.json",
+    "apps/desktop/src-tauri/tauri.conf.json",
+    "apps/desktop/src/updater/release.ts",
+  ]);
   assert.doesNotThrow(() => syncVersion({ root, check: true }));
   const files = computeSyncedFiles(root);
   for (const file of files) {
@@ -75,18 +104,10 @@ test("syncVersion updates all derived version fields and is idempotent", () => {
 
 test("syncVersion check ignores Windows CRLF checkout when versions match", () => {
   const root = fixture();
-  fs.writeFileSync(
-    path.join(root, "Cargo.toml"),
-    `[workspace]\r\nresolver = "2"\r\n\r\n[workspace.package]\r\nversion = "1.0.0"\r\nedition = "2021"\r\n`,
-  );
-  fs.writeFileSync(
-    path.join(root, "apps", "desktop", "package.json"),
-    `{\r\n  "name": "@aimd/desktop-tauri",\r\n  "version": "1.0.0",\r\n  "private": true\r\n}\r\n`,
-  );
-  fs.writeFileSync(
-    path.join(root, "apps", "desktop", "src-tauri", "tauri.conf.json"),
-    `{\r\n  "productName": "AIMD Desktop",\r\n  "version": "1.0.0"\r\n}\r\n`,
-  );
+  syncVersion({ root });
+  for (const file of computeSyncedFiles(root)) {
+    fs.writeFileSync(file.path, fs.readFileSync(file.path, "utf8").replace(/\n/g, "\r\n"));
+  }
   assert.doesNotThrow(() => syncVersion({ root, check: true }));
 });
 

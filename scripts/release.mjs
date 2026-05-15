@@ -9,6 +9,7 @@ import {
   syncVersion,
   updateReleaseConfigVersion,
 } from "./version-tools.mjs";
+import { updaterPlan } from "./updater-tools.mjs";
 
 const RELEASE_MODES = new Set(["patch", "minor", "major", "republish"]);
 const RELEASE_FILES = new Set([
@@ -17,6 +18,7 @@ const RELEASE_FILES = new Set([
   "Cargo.lock",
   "apps/desktop/package.json",
   "apps/desktop/src-tauri/tauri.conf.json",
+  "apps/desktop/src/updater/release.ts",
   "README.md",
 ]);
 
@@ -135,6 +137,7 @@ try {
   if (!dryRun) ensureReleaseWorktree({ resume });
 
   const current = loadReleaseConfig(REPO_ROOT).version;
+  const currentConfig = loadReleaseConfig(REPO_ROOT);
   const republish = mode === "republish";
   const next = republish || resume ? current : bumpVersion(current, mode);
   const tag = `v${next}`;
@@ -142,7 +145,12 @@ try {
   assertTagMatchesVersion(next, tag);
 
   if (dryRun) {
+    const plan = updaterPlan({ ...currentConfig, version: next }, tag);
     console.log(republish ? `release republish: ${tag}` : `release ${mode}: ${current} -> ${next}`);
+    console.log(`updater manifest: ${plan.manifestAsset}`);
+    for (const platform of plan.platforms) {
+      console.log(`updater ${platform.platform}: ${platform.updaterAsset} + ${platform.signatureAsset}`);
+    }
     console.log(republish
       ? `[dry-run] would check main/origin, delete existing ${tag} release/tag, recreate tag, and push`
       : `[dry-run] would sync, check, commit, tag ${tag}, and push`);
@@ -168,7 +176,7 @@ try {
   runCommand("cargo", ["check", "--workspace"], { cwd: REPO_ROOT });
   runCommand("git", ["diff", "--check"], { cwd: REPO_ROOT });
 
-  runCommand("git", ["add", "release.config.json", "Cargo.toml", "Cargo.lock", "apps/desktop/package.json", "apps/desktop/src-tauri/tauri.conf.json", "README.md"], { cwd: REPO_ROOT });
+  runCommand("git", ["add", "release.config.json", "Cargo.toml", "Cargo.lock", "apps/desktop/package.json", "apps/desktop/src-tauri/tauri.conf.json", "apps/desktop/src/updater/release.ts", "README.md"], { cwd: REPO_ROOT });
   if (hasStagedChanges()) {
     runCommand("git", ["commit", "-m", `Release ${tag}`], { cwd: REPO_ROOT });
   } else {

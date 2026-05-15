@@ -33,6 +33,7 @@ bug-screen/
 .env.*
 !.env.example
 !*.env.example
+/secrets/
 
 # Local Claude Code settings (user-specific permissions, not for repo)
 .claude/settings.local.json

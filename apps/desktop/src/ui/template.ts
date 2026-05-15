@@ -125,6 +125,10 @@ export const APP_HTML = `
                   <span class="action-menu-icon">${ICONS.info}</span>
                   <span>资源检查</span>
                 </button>
+                <button id="check-updates" class="action-menu-item" type="button">
+                  <span class="action-menu-icon">${ICONS.refresh}</span>
+                  <span>检查更新</span>
+                </button>
                 <hr class="action-menu-divider" role="separator">
                 <button id="export-markdown" class="action-menu-item" type="button" disabled>
                   <span class="action-menu-icon">${ICONS.source}</span>
@@ -304,6 +308,22 @@ export const APP_HTML = `
               <strong>AIMD (.aimd)</strong>
               <span>保留 Markdown、YAML 元信息和内嵌资源，适合长期归档。</span>
             </button>
+          </div>
+        </div>
+
+        <div id="update-panel" class="update-panel" data-phase="idle" hidden aria-live="polite">
+          <div class="update-panel-head">
+            <div>
+              <div id="update-title" class="update-title">AIMD 更新</div>
+              <div id="update-message" class="update-message"></div>
+            </div>
+            <button id="update-later" class="ft-btn" type="button" title="稍后">${ICONS.close}</button>
+          </div>
+          <div id="update-notes" class="update-notes" hidden></div>
+          <div id="update-progress" class="update-progress" hidden></div>
+          <div class="update-actions">
+            <button id="update-retry" class="secondary-btn sm" type="button" hidden>重新检查</button>
+            <button id="update-install" class="primary-btn sm" type="button" hidden>下载并安装</button>
           </div>
         </div>
 

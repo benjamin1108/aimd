@@ -52,6 +52,22 @@ https://github.com/benjamin1108/aimd/releases
 | macOS Apple Silicon | `AIMD-<version>.pkg` |
 | Windows x64 | `AIMD-Desktop_<version>_windows_x64-setup.exe` |
 
+AIMD Desktop 支持应用内在线更新。应用会在启动后后台检查 GitHub
+Releases 上的 `latest.json`，没有更新时保持静默；发现新版本时显示轻量更新通知。
+下载安装必须由用户显式点击触发，且任何文档窗口存在未保存修改时都会阻止安装。
+
+更新包使用 Tauri updater 签名校验：
+
+- macOS Apple Silicon：应用内更新下载
+  `AIMD-Desktop_<version>_macos_aarch64.app.tar.gz`。
+- Windows x64：应用内更新下载
+  `AIMD-Desktop_<version>_windows_x64-setup.exe`，安装模式为 Tauri
+  推荐的 `passive`。
+- Linux 当前未发布桌面安装包，因此未写入 updater manifest。
+
+macOS 应用内更新替换桌面 App bundle。若本次发布还需要刷新
+`/usr/local/bin/aimd` 或 Agent skill payload，请重新安装对应版本 PKG。
+
 macOS 版本当前尚未完成 Apple 公证。首次打开如被系统拦截，请到：
 
 ```text
@@ -179,6 +195,75 @@ npm run release:dry -- republish
 ```
 
 Git tag 必须和配置版本一致：`release.config.json` 中的 `1.4.28` 对应 tag `v1.4.28`。
+
+### 在线更新发布
+
+在线更新的发布契约由 `release.config.json`、`scripts/updater-tools.mjs`
+和 release workflow 共同定义。不要手工编辑 `latest.json`，也不要手工上传
+`.sig` 文件替代脚本产物。
+
+检查当前版本会发布哪些 updater 资产：
+
+```bash
+npm run updater:plan
+```
+
+生产 release workflow 会为每个平台生成并上传：
+
+```text
+AIMD-<version>.pkg
+AIMD-Desktop_<version>_macos_aarch64.app.tar.gz
+AIMD-Desktop_<version>_macos_aarch64.app.tar.gz.sig
+AIMD-Desktop_<version>_windows_x64-setup.exe
+AIMD-Desktop_<version>_windows_x64-setup.exe.sig
+latest.json
+```
+
+GitHub Actions 需要配置 updater 私钥 secret：
+
+```bash
+# 私钥内容来自本地生成的 secrets/aimd-updater.key；secrets/ 已被 .gitignore 忽略
+gh secret set TAURI_SIGNING_PRIVATE_KEY < secrets/aimd-updater.key
+
+# 如果生成 key 时设置了密码，也设置这个 secret；无密码 key 可以不设置
+gh secret set TAURI_SIGNING_PRIVATE_KEY_PASSWORD
+```
+
+本地验证 secret 是否存在：
+
+```bash
+npm run updater:check-secrets -- --require
+```
+
+如果要重新生成 updater key：
+
+```bash
+cd apps/desktop
+npx tauri signer generate -w ../../secrets/aimd-updater.key --ci -p ""
+```
+
+重新生成后必须把新的 public key 写入 `release.config.json` 的
+`updater.pubkey`，运行 `npm run version:sync`，并更新 GitHub secret。
+已经安装旧 public key 的用户只能安装旧 private key 签名的更新；丢失 private key
+等同于切断旧版本的在线升级路径。
+
+release tag 推送后会触发 `Release Desktop` workflow：
+
+1. 校验 tag 与 `release.config.json` 版本一致。
+2. macOS 构建 PKG 和 `.app.tar.gz` updater 资产并签名。
+3. Windows 构建 patched NSIS installer，并对最终 exe 签名。
+4. 上传平台安装包和 `.sig`。
+5. manifest job 下载已上传资产，生成并校验 `latest.json`。
+6. 上传 `latest.json` 并再次检查 GitHub Release 资产完整性。
+
+补发当前版本仍使用：
+
+```bash
+npm run release -- republish
+```
+
+`republish` 不要求指定 `patch` / `minor` / `major`，不会自增版本号。它会重新创建
+当前版本 tag，触发 release workflow，workflow 会重新生成签名和 `latest.json`。
 
 打包：
 

@@ -24,10 +24,15 @@ jobs:
         include:
           - name: macOS Apple Silicon
             os: macos-14
-            artifact_glob: "target/release/bundle/dmg/*.dmg"
+            upload_globs: |
+              dist/AIMD-*.pkg
+              dist/AIMD-Desktop_*_macos_aarch64.app.tar.gz
+              dist/AIMD-Desktop_*_macos_aarch64.app.tar.gz.sig
           - name: Windows x64
             os: windows-latest
-            artifact_glob: "dist/AIMD-Desktop_*_windows_x64-setup.exe"
+            upload_globs: |
+              dist/AIMD-Desktop_*_windows_x64-setup.exe
+              dist/AIMD-Desktop_*_windows_x64-setup.exe.sig
 
     steps:
       - name: Checkout
@@ -54,19 +59,37 @@ jobs:
           RELEASE_TAG: ${{ inputs.tag || github.ref_name }}
         run: npm run version:check -- --verify-tag
 
+      - name: Updater signing secret check
+        env:
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PATH: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PATH }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+        run: npm run updater:check-secrets -- --require
+
       - name: Frontend checks
         if: runner.os != 'Windows'
         working-directory: apps/desktop
         run: npm run check
 
-      - name: Build desktop app
+      - name: Build macOS PKG and updater artifact
         if: runner.os != 'Windows'
-        working-directory: apps/desktop
-        run: npm run build
+        env:
+          AIMD_RELEASE: "1"
+          AIMD_UPDATER_ARTIFACTS: "1"
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PATH: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PATH }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+        run: ./scripts/build-macos-pkg.sh --skip-env
 
       - name: Build Windows installer
         if: runner.os == 'Windows'
         shell: pwsh
+        env:
+          AIMD_RELEASE: "1"
+          AIMD_UPDATER_ARTIFACTS: "1"
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PATH: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PATH }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
         run: |
           .\scripts\build-windows-installer.ps1 -SkipEnv
           target\release\aimd.exe version
@@ -82,9 +105,69 @@ jobs:
           set -euo pipefail
           gh release view "$RELEASE_TAG" >/dev/null 2>&1 || gh release create "$RELEASE_TAG" --title "$RELEASE_TAG" --notes "AIMD Desktop $RELEASE_TAG"
           shopt -s nullglob
-          files=( ${{ matrix.artifact_glob }} )
+          files=()
+          while IFS= read -r pattern; do
+            pattern="${pattern#"${pattern%%[![:space:]]*}"}"
+            pattern="${pattern%"${pattern##*[![:space:]]}"}"
+            [ -n "$pattern" ] || continue
+            matches=( $pattern )
+            if [ "${#matches[@]}" -eq 0 ]; then
+              echo "No release assets found for pattern: $pattern" >&2
+              exit 1
+            fi
+            files+=( "${matches[@]}" )
+          done <<'GLOBS'
+          ${{ matrix.upload_globs }}
+          GLOBS
           if [ "${#files[@]}" -eq 0 ]; then
-            echo "No release assets found for pattern: ${{ matrix.artifact_glob }}" >&2
+            echo "No release assets found for configured upload globs" >&2
             exit 1
           fi
           gh release upload "$RELEASE_TAG" "${files[@]}" --clobber
+
+  manifest:
+    name: Generate updater manifest
+    runs-on: ubuntu-latest
+    needs: build
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Version check
+        env:
+          CI_RELEASE: "1"
+          RELEASE_TAG: ${{ inputs.tag || github.ref_name }}
+        run: npm run version:check -- --verify-tag
+
+      - name: Download uploaded release assets
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_TAG: ${{ inputs.tag || github.ref_name }}
+        run: |
+          set -euo pipefail
+          mkdir -p dist
+          gh release download "$RELEASE_TAG" --dir dist --clobber --pattern "AIMD*"
+          find dist -maxdepth 1 -type f -print | sort
+
+      - name: Generate and validate latest.json
+        env:
+          RELEASE_TAG: ${{ inputs.tag || github.ref_name }}
+        run: |
+          set -euo pipefail
+          node scripts/updater-manifest.mjs generate --dist dist --tag "$RELEASE_TAG" --output dist/latest.json
+          node scripts/updater-manifest.mjs validate --dist dist --tag "$RELEASE_TAG" --manifest dist/latest.json --require-files
+
+      - name: Upload and verify updater manifest
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_TAG: ${{ inputs.tag || github.ref_name }}
+        run: |
+          set -euo pipefail
+          gh release upload "$RELEASE_TAG" dist/latest.json --clobber
+          node scripts/updater-manifest.mjs verify-release --tag "$RELEASE_TAG" --manifest dist/latest.json
