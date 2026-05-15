@@ -8,6 +8,14 @@ use std::path::PathBuf;
 use tauri::{AppHandle, Emitter, Manager};
 
 const SETTINGS_FILE: &str = "settings.json";
+pub const MODEL_TIMEOUT_SECONDS_MIN: u64 = 5;
+pub const MODEL_TIMEOUT_SECONDS_MAX: u64 = 600;
+pub const MODEL_RETRY_COUNT_MIN: u32 = 0;
+pub const MODEL_RETRY_COUNT_MAX: u32 = 5;
+
+#[cfg(test)]
+#[path = "settings_tests.rs"]
+mod tests;
 
 fn default_provider() -> String {
     "dashscope".to_string()
@@ -19,6 +27,18 @@ fn default_web_clip_output_language() -> String {
 
 fn default_format_output_language() -> String {
     "zh-CN".to_string()
+}
+
+fn default_web_clip_model_timeout_seconds() -> u64 {
+    300
+}
+
+fn default_format_model_timeout_seconds() -> u64 {
+    300
+}
+
+fn default_model_retry_count() -> u32 {
+    2
 }
 
 fn default_dashscope_model() -> String {
@@ -111,6 +131,10 @@ pub struct WebClipSettings {
     pub model: String,
     #[serde(default = "default_web_clip_output_language")]
     pub output_language: String,
+    #[serde(default = "default_web_clip_model_timeout_seconds")]
+    pub model_timeout_seconds: u64,
+    #[serde(default = "default_model_retry_count")]
+    pub model_retry_count: u32,
 }
 
 impl Default for WebClipSettings {
@@ -120,6 +144,8 @@ impl Default for WebClipSettings {
             provider: default_provider(),
             model: default_dashscope_model(),
             output_language: default_web_clip_output_language(),
+            model_timeout_seconds: default_web_clip_model_timeout_seconds(),
+            model_retry_count: default_model_retry_count(),
         }
     }
 }
@@ -133,6 +159,10 @@ pub struct FormatSettings {
     pub model: String,
     #[serde(default = "default_format_output_language")]
     pub output_language: String,
+    #[serde(default = "default_format_model_timeout_seconds")]
+    pub model_timeout_seconds: u64,
+    #[serde(default = "default_model_retry_count")]
+    pub model_retry_count: u32,
 }
 
 impl Default for FormatSettings {
@@ -141,6 +171,8 @@ impl Default for FormatSettings {
             provider: default_provider(),
             model: default_dashscope_model(),
             output_language: default_format_output_language(),
+            model_timeout_seconds: default_format_model_timeout_seconds(),
+            model_retry_count: default_model_retry_count(),
         }
     }
 }
@@ -184,6 +216,19 @@ fn provider_cred_model(settings: &AppSettings, provider: &str) -> String {
     }
 }
 
+pub fn normalize_model_timeout_seconds(value: u64, fallback: u64) -> u64 {
+    let fallback = fallback.clamp(MODEL_TIMEOUT_SECONDS_MIN, MODEL_TIMEOUT_SECONDS_MAX);
+    if value == 0 {
+        fallback
+    } else {
+        value.clamp(MODEL_TIMEOUT_SECONDS_MIN, MODEL_TIMEOUT_SECONDS_MAX)
+    }
+}
+
+pub fn normalize_model_retry_count(value: u32) -> u32 {
+    value.clamp(MODEL_RETRY_COUNT_MIN, MODEL_RETRY_COUNT_MAX)
+}
+
 fn normalize_app_settings(settings: &mut AppSettings) {
     if settings.ai.active_provider != "dashscope" && settings.ai.active_provider != "gemini" {
         settings.ai.active_provider = default_provider();
@@ -203,6 +248,12 @@ fn normalize_app_settings(settings: &mut AppSettings) {
     if settings.web_clip.output_language != "en" {
         settings.web_clip.output_language = default_web_clip_output_language();
     }
+    settings.web_clip.model_timeout_seconds = normalize_model_timeout_seconds(
+        settings.web_clip.model_timeout_seconds,
+        default_web_clip_model_timeout_seconds(),
+    );
+    settings.web_clip.model_retry_count =
+        normalize_model_retry_count(settings.web_clip.model_retry_count);
     if settings.format.provider != "dashscope" && settings.format.provider != "gemini" {
         settings.format.provider = default_provider();
     }
@@ -212,6 +263,12 @@ fn normalize_app_settings(settings: &mut AppSettings) {
     if settings.format.output_language != "en" {
         settings.format.output_language = default_format_output_language();
     }
+    settings.format.model_timeout_seconds = normalize_model_timeout_seconds(
+        settings.format.model_timeout_seconds,
+        default_format_model_timeout_seconds(),
+    );
+    settings.format.model_retry_count =
+        normalize_model_retry_count(settings.format.model_retry_count);
 }
 
 fn settings_path(app: &AppHandle) -> Result<PathBuf, String> {
@@ -366,115 +423,4 @@ pub fn save_settings(app: AppHandle, settings: AppSettings) -> Result<(), String
     menu::set_debug_menu_enabled(&app, normalized.ui.debug_mode);
     let _ = app.emit("aimd-settings-updated", &normalized);
     Ok(())
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn migrate_legacy_docutour_to_ai() {
-        let mut v = serde_json::json!({
-            "docutour": {
-                "provider": "dashscope",
-                "model": "qwen3.6-plus",
-                "apiKey": "sk-legacy-dashscope",
-                "apiBase": "",
-                "maxSteps": 6,
-                "language": "zh-CN"
-            }
-        });
-        migrate_legacy_inplace(&mut v);
-        assert!(v.get("docutour").is_none());
-        let ai = v.get("ai").unwrap().as_object().unwrap();
-        assert_eq!(ai.get("activeProvider").unwrap(), "dashscope");
-        assert!(ai.get("provider").is_none());
-        assert!(ai.get("apiKey").is_none());
-        assert!(ai.get("maxSteps").is_none());
-        let providers = ai.get("providers").unwrap().as_object().unwrap();
-        assert_eq!(
-            providers.get("dashscope").unwrap().get("apiKey").unwrap(),
-            "sk-legacy-dashscope"
-        );
-        assert_eq!(providers.get("gemini").unwrap().get("apiKey").unwrap(), "");
-    }
-
-    #[test]
-    fn missing_ui_defaults_to_quiet_ui() {
-        let mut settings: AppSettings = serde_json::from_value(serde_json::json!({
-            "ai": {
-                "activeProvider": "dashscope",
-                "providers": {}
-            },
-            "webClip": {}
-        }))
-        .unwrap();
-        normalize_app_settings(&mut settings);
-        assert!(!settings.ui.show_asset_panel);
-        assert!(!settings.ui.debug_mode);
-        assert_eq!(settings.web_clip.model, default_dashscope_model());
-        assert_eq!(settings.format.provider, "dashscope");
-        assert_eq!(settings.format.model, default_dashscope_model());
-        assert_eq!(settings.format.output_language, "zh-CN");
-    }
-
-    #[test]
-    fn missing_web_clip_model_defaults_to_provider_global_model() {
-        let mut settings: AppSettings = serde_json::from_value(serde_json::json!({
-            "ai": {
-                "activeProvider": "dashscope",
-                "providers": {
-                    "dashscope": {
-                        "model": "qwen-global-custom",
-                        "apiKey": "sk",
-                        "apiBase": ""
-                    }
-                }
-            },
-            "webClip": {
-                "llmEnabled": true,
-                "provider": "dashscope",
-                "outputLanguage": "zh-CN"
-            }
-        }))
-        .unwrap();
-        normalize_app_settings(&mut settings);
-
-        assert_eq!(settings.web_clip.model, "qwen-global-custom");
-    }
-
-    #[test]
-    fn web_clip_model_deserializes_and_round_trips() {
-        let mut settings: AppSettings = serde_json::from_value(serde_json::json!({
-            "webClip": {
-                "llmEnabled": true,
-                "provider": "gemini",
-                "model": "gemini-webclip-custom",
-                "outputLanguage": "en"
-            }
-        }))
-        .unwrap();
-        normalize_app_settings(&mut settings);
-
-        assert!(settings.web_clip.llm_enabled);
-        assert_eq!(settings.web_clip.provider, "gemini");
-        assert_eq!(settings.web_clip.model, "gemini-webclip-custom");
-        assert_eq!(settings.web_clip.output_language, "en");
-
-        let value = serde_json::to_value(&settings).unwrap();
-        assert_eq!(value["webClip"]["model"], "gemini-webclip-custom");
-    }
-
-    #[test]
-    fn ui_debug_mode_round_trips() {
-        let settings: AppSettings = serde_json::from_value(serde_json::json!({
-            "ui": {
-                "showAssetPanel": true,
-                "debugMode": true
-            }
-        }))
-        .unwrap();
-        assert!(settings.ui.show_asset_panel);
-        assert!(settings.ui.debug_mode);
-    }
 }

@@ -19,12 +19,12 @@ import {
   syncActiveTabFromFacade,
 } from "./open-document-state";
 
-function currentMarkdown() {
-  if (state.mode === "edit") flushInline();
+function currentMarkdown(): string | null {
+  if (state.mode === "edit" && !flushInline().ok) return null;
   return state.doc?.markdown ?? "";
 }
 
-function markdownForTab(tabId: string) {
+function markdownForTab(tabId: string): string | null {
   if (state.openDocuments.activeTabId === tabId) return currentMarkdown();
   return findTab(tabId)?.doc.markdown ?? "";
 }
@@ -41,6 +41,7 @@ export async function runHealthCheck() {
   if (!targetTab) return;
   const path = targetTab.doc.path || null;
   const markdown = markdownForTab(target.tabId);
+  if (markdown === null) return;
   setStatus("正在检查资源", "loading");
   try {
     const report = await invoke<DocumentHealthReport>("check_document_health", {
@@ -146,10 +147,12 @@ export async function cleanupUnreferencedAssets() {
   if (!target) return;
   const targetTab = findTab(target.tabId);
   if (!targetTab) return;
+  const markdown = markdownForTab(target.tabId);
+  if (markdown === null) return;
   try {
     const doc = await invoke<AimdDocument>("save_aimd", {
       path: targetTab.doc.path,
-      markdown: markdownForTab(target.tabId),
+      markdown,
     });
     if (!isOperationCurrent(target)) return;
     applyDocumentToTab(target.tabId, { ...doc, isDraft: false, format: "aimd", dirty: false }, targetTab.mode);
@@ -191,6 +194,7 @@ export async function packageLocalImages(options: { refreshHealth?: boolean } = 
   if (!targetTab) return;
   const path = targetTab.doc.path;
   const markdown = markdownForTab(target.tabId);
+  if (markdown === null) return;
   try {
     const doc = await invoke<AimdDocument>("package_local_images", {
       path,
@@ -219,6 +223,7 @@ export async function packageRemoteImages(options: { refreshHealth?: boolean } =
   if (!targetTab) return;
   const path = targetTab.doc.path;
   const markdown = markdownForTab(target.tabId);
+  if (markdown === null) return;
   try {
     const doc = await invoke<AimdDocument>("package_remote_images", {
       path,

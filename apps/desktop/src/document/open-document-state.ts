@@ -6,6 +6,7 @@ import type {
   Mode,
   OpenDocumentId,
   OpenDocumentTab,
+  OutlineNode,
 } from "../core/types";
 import { fileStem, extractHeadingTitle } from "../util/path";
 import {
@@ -16,6 +17,8 @@ import {
   sanitizeDisplayURL,
 } from "./assets";
 import { createSourceModel } from "../editor/source-preserve";
+import { normalizeRenderedHTML } from "../rendered-surface/pipeline";
+import { rewriteRenderedSurfaceAssets } from "../rendered-surface/assets";
 
 export type DocumentOperationTarget = {
   tabId: string;
@@ -73,6 +76,19 @@ export function displayTabTitle(doc: AimdDocument): string {
   return extractHeadingTitle(doc.markdown) || doc.title || fileStem(doc.path) || "未命名文档";
 }
 
+function canonicalizeDocumentHTML(doc: AimdDocument): { html: string; outline: OutlineNode[] } {
+  if (!doc.html) return { html: "", outline: [] };
+  try {
+    const rendered = rewriteRenderedSurfaceAssets(doc.html, {
+      assets: doc.assets,
+      markdownPath: doc.format === "markdown" && doc.path ? doc.path : undefined,
+    });
+    return normalizeRenderedHTML(rendered);
+  } catch {
+    return { html: doc.html, outline: [] };
+  }
+}
+
 export function activeTab(): OpenDocumentTab | null {
   const id = state.openDocuments.activeTabId;
   return id ? state.openDocuments.tabs.find((tab) => tab.id === id) ?? null : null;
@@ -93,18 +109,26 @@ export function createOpenDocumentTab(
   options: { id?: string; forceDraft?: boolean } = {},
 ): OpenDocumentTab {
   const normalized = normalizeDocument(doc);
-  const pathKey = options.forceDraft || normalized.isDraft ? null : normalizePathKey(normalized.path);
+  const canonical = canonicalizeDocumentHTML(normalized);
+  const normalizedDoc = { ...normalized, html: canonical.html };
+  const pathKey = options.forceDraft || normalizedDoc.isDraft ? null : normalizePathKey(normalizedDoc.path);
   const id = options.id || pathKey || `draft-${Date.now().toString(36)}-${++draftCounter}`;
   return {
     id,
     pathKey,
-    title: displayTabTitle(normalized),
-    doc: normalized,
-    sourceModel: createSourceModel(normalized.markdown),
+    title: displayTabTitle(normalizedDoc),
+    doc: normalizedDoc,
+    sourceModel: createSourceModel(normalizedDoc.markdown),
     sourceDirtyRefs: new Set(),
     sourceStructuralDirty: false,
     inlineDirty: false,
+    outline: canonical.outline,
+    markdownVersion: 0,
     htmlVersion: 0,
+    htmlMarkdownVersion: normalizedDoc.html || !normalizedDoc.markdown.trim() ? 0 : -1,
+    pendingRenderVersion: null,
+    renderErrorVersion: null,
+    renderTimer: null,
     paintedVersion: { read: -1, edit: -1, source: -1 },
     operationVersion: 0,
     mode,
@@ -124,7 +148,12 @@ export function bindFacadeFromTab(tab: OpenDocumentTab) {
   state.sourceDirtyRefs = tab.sourceDirtyRefs;
   state.sourceStructuralDirty = tab.sourceStructuralDirty;
   state.inlineDirty = tab.inlineDirty;
+  state.outline = tab.outline;
+  state.markdownVersion = tab.markdownVersion;
   state.htmlVersion = tab.htmlVersion;
+  state.htmlMarkdownVersion = tab.htmlMarkdownVersion;
+  state.pendingRenderVersion = tab.pendingRenderVersion;
+  state.renderErrorVersion = tab.renderErrorVersion;
   state.paintedVersion = { ...tab.paintedVersion };
   state.mainView = "document";
 }
@@ -139,7 +168,12 @@ export function syncActiveTabFromFacade() {
   tab.sourceDirtyRefs = state.sourceDirtyRefs;
   tab.sourceStructuralDirty = state.sourceStructuralDirty;
   tab.inlineDirty = state.inlineDirty;
+  tab.outline = state.outline;
+  tab.markdownVersion = state.markdownVersion;
   tab.htmlVersion = state.htmlVersion;
+  tab.htmlMarkdownVersion = state.htmlMarkdownVersion;
+  tab.pendingRenderVersion = state.pendingRenderVersion;
+  tab.renderErrorVersion = state.renderErrorVersion;
   tab.paintedVersion = { ...state.paintedVersion };
   tab.mode = state.mode;
 }
@@ -152,19 +186,28 @@ export function addTabAndBind(tab: OpenDocumentTab) {
 
 export function replaceActiveTabDocument(doc: AimdDocument, mode: Mode): OpenDocumentTab {
   const normalized = normalizeDocument(doc);
+  const canonical = canonicalizeDocumentHTML(normalized);
+  const normalizedDoc = { ...normalized, html: canonical.html };
   let tab = activeTab();
   if (!tab) {
-    tab = createOpenDocumentTab(normalized, mode);
+    tab = createOpenDocumentTab(normalizedDoc, mode);
     state.openDocuments.tabs.push(tab);
   } else {
-    tab.doc = normalized;
-    tab.title = displayTabTitle(normalized);
-    tab.pathKey = normalized.isDraft ? null : normalizePathKey(normalized.path);
-    tab.sourceModel = createSourceModel(normalized.markdown);
+    tab.doc = normalizedDoc;
+    tab.title = displayTabTitle(normalizedDoc);
+    tab.pathKey = normalizedDoc.isDraft ? null : normalizePathKey(normalizedDoc.path);
+    tab.sourceModel = createSourceModel(normalizedDoc.markdown);
     tab.sourceDirtyRefs = new Set();
     tab.sourceStructuralDirty = false;
     tab.inlineDirty = false;
+    if (tab.renderTimer) window.clearTimeout(tab.renderTimer);
+    tab.outline = canonical.outline;
+    tab.markdownVersion = 0;
     tab.htmlVersion = 0;
+    tab.htmlMarkdownVersion = normalizedDoc.html || !normalizedDoc.markdown.trim() ? 0 : -1;
+    tab.pendingRenderVersion = null;
+    tab.renderErrorVersion = null;
+    tab.renderTimer = null;
     tab.paintedVersion = { read: -1, edit: -1, source: -1 };
     tab.operationVersion += 1;
     tab.mode = mode;
@@ -181,14 +224,23 @@ export function replaceTabDocument(tabId: string, doc: AimdDocument, mode?: Mode
   const tab = findTab(tabId);
   if (!tab) return null;
   const normalized = normalizeDocument(doc);
-  tab.doc = normalized;
-  tab.title = displayTabTitle(normalized);
-  tab.pathKey = normalized.isDraft ? null : normalizePathKey(normalized.path);
-  tab.sourceModel = createSourceModel(normalized.markdown);
+  const canonical = canonicalizeDocumentHTML(normalized);
+  const normalizedDoc = { ...normalized, html: canonical.html };
+  tab.doc = normalizedDoc;
+  tab.title = displayTabTitle(normalizedDoc);
+  tab.pathKey = normalizedDoc.isDraft ? null : normalizePathKey(normalizedDoc.path);
+  tab.sourceModel = createSourceModel(normalizedDoc.markdown);
   tab.sourceDirtyRefs = new Set();
   tab.sourceStructuralDirty = false;
   tab.inlineDirty = false;
+  if (tab.renderTimer) window.clearTimeout(tab.renderTimer);
+  tab.outline = canonical.outline;
+  tab.markdownVersion = 0;
   tab.htmlVersion = 0;
+  tab.htmlMarkdownVersion = normalizedDoc.html || !normalizedDoc.markdown.trim() ? 0 : -1;
+  tab.pendingRenderVersion = null;
+  tab.renderErrorVersion = null;
+  tab.renderTimer = null;
   tab.paintedVersion = { read: -1, edit: -1, source: -1 };
   if (mode) tab.mode = mode;
   tab.recoveryState = null;
@@ -200,7 +252,13 @@ export function replaceTabDocument(tabId: string, doc: AimdDocument, mode?: Mode
 export function removeTab(tabId: string): OpenDocumentTab | null {
   const index = state.openDocuments.tabs.findIndex((tab) => tab.id === tabId);
   if (index < 0) return null;
-  return state.openDocuments.tabs.splice(index, 1)[0] ?? null;
+  const removed = state.openDocuments.tabs.splice(index, 1)[0] ?? null;
+  if (removed?.renderTimer) window.clearTimeout(removed.renderTimer);
+  return removed;
+}
+
+export function tabHTMLMatchesMarkdown(tab: OpenDocumentTab): boolean {
+  return tab.htmlMarkdownVersion === tab.markdownVersion;
 }
 
 export function nextTabIdAfterClose(tabId: string): string | null {

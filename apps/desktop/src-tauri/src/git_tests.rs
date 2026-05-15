@@ -1,4 +1,4 @@
-﻿use super::*;
+use super::*;
 use std::fs;
 
 fn root() -> tempfile::TempDir {
@@ -85,11 +85,7 @@ fn file_diff_uses_configured_textconv_for_aimd() {
 
     fs::write(repo.join(".gitattributes"), "*.aimd diff=aimd\n").unwrap();
     Command::new("git")
-        .args([
-            "config",
-            "diff.aimd.textconv",
-            textconv.to_str().unwrap(),
-        ])
+        .args(["config", "diff.aimd.textconv", textconv.to_str().unwrap()])
         .current_dir(repo)
         .output()
         .unwrap();

@@ -1,5 +1,8 @@
-use crate::llm::{generate_text, GenerateTextRequest, ModelConfig};
-use crate::settings::{default_model_for_provider, load_settings};
+use crate::llm::{generate_text_with_retries, GenerateTextRequest, ModelConfig};
+use crate::settings::{
+    default_model_for_provider, load_settings, normalize_model_retry_count,
+    normalize_model_timeout_seconds,
+};
 use crate::web_clip_image_proxy::{
     clear_session as clear_image_proxy_session, ensure_session as ensure_image_proxy_session,
     WebClipImageProxyState,
@@ -302,12 +305,21 @@ pub async fn refine_markdown(
     model: Option<String>,
     guard_reason: Option<String>,
     output_language: Option<String>,
+    model_timeout_seconds: Option<u64>,
+    model_retry_count: Option<u32>,
 ) -> Result<String, String> {
     let settings = load_settings(app)?;
     let output_language = normalize_web_clip_output_language(
         output_language
             .as_deref()
             .unwrap_or(settings.web_clip.output_language.as_str()),
+    );
+    let timeout_seconds = normalize_model_timeout_seconds(
+        model_timeout_seconds.unwrap_or(settings.web_clip.model_timeout_seconds),
+        settings.web_clip.model_timeout_seconds,
+    );
+    let retry_count = normalize_model_retry_count(
+        model_retry_count.unwrap_or(settings.web_clip.model_retry_count),
     );
     let cred = match provider.as_str() {
         "gemini" => settings.ai.providers.gemini,
@@ -351,9 +363,14 @@ pub async fn refine_markdown(
         temperature: 0.1,
     };
 
-    let response = tokio::time::timeout(Duration::from_secs(45), generate_text(&config, request))
-        .await
-        .map_err(|_| "智能排版超时".to_string())??;
+    let response = generate_text_with_retries(
+        &config,
+        request,
+        Duration::from_secs(timeout_seconds),
+        retry_count,
+        "智能排版超时",
+    )
+    .await?;
     let cleaned = response.text.trim();
 
     let final_text = if let Some(rest) = cleaned.strip_prefix("```markdown") {

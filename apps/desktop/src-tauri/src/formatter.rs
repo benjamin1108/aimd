@@ -1,5 +1,7 @@
-use crate::llm::{generate_text, GenerateTextRequest, ModelConfig};
-use crate::settings::load_settings;
+use crate::llm::{generate_text_with_retries, GenerateTextRequest, ModelConfig};
+use crate::settings::{
+    load_settings, normalize_model_retry_count, normalize_model_timeout_seconds,
+};
 use chrono::Utc;
 use serde::{Deserialize, Serialize};
 use std::time::Duration;
@@ -33,6 +35,8 @@ pub async fn format_markdown(
     provider: String,
     model: String,
     output_language: Option<String>,
+    model_timeout_seconds: Option<u64>,
+    model_retry_count: Option<u32>,
 ) -> Result<FormatMarkdownResult, String> {
     if markdown.trim().is_empty() {
         return Err("当前文档为空，无法格式化".to_string());
@@ -52,6 +56,12 @@ pub async fn format_markdown(
     let output_language = output_language
         .as_deref()
         .unwrap_or(settings.format.output_language.as_str());
+    let timeout_seconds = normalize_model_timeout_seconds(
+        model_timeout_seconds.unwrap_or(settings.format.model_timeout_seconds),
+        settings.format.model_timeout_seconds,
+    );
+    let retry_count =
+        normalize_model_retry_count(model_retry_count.unwrap_or(settings.format.model_retry_count));
 
     let config = ModelConfig {
         provider: provider.to_string(),
@@ -66,9 +76,14 @@ pub async fn format_markdown(
         temperature: 0.1,
     };
 
-    let response = tokio::time::timeout(Duration::from_secs(60), generate_text(&config, request))
-        .await
-        .map_err(|_| "文档格式化超时".to_string())??;
+    let response = generate_text_with_retries(
+        &config,
+        request,
+        Duration::from_secs(timeout_seconds),
+        retry_count,
+        "文档格式化超时",
+    )
+    .await?;
     parse_format_markdown_result(&response.text)
 }
 

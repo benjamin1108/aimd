@@ -141,9 +141,15 @@ test.describe("one-click format, YAML meta, and save format choice", () => {
     await page.locator("#format-model-select").selectOption("__custom__");
     await page.locator("#format-model").fill("gemini-custom-format");
     await page.locator("#format-output-language").selectOption("en");
+    await expect(page.locator("#format-model-timeout")).toHaveValue("300");
+    await expect(page.locator("#format-model-retry")).toHaveValue("2");
+    await page.locator("#format-model-timeout").fill("90");
+    await page.locator("#format-model-retry").fill("2");
     await page.locator("#save-settings").click();
     await expect.poll(() => page.evaluate(() => (window as any).__lastSettings?.format?.model)).toBe("gemini-custom-format");
     await expect.poll(() => page.evaluate(() => (window as any).__lastSettings?.format?.outputLanguage)).toBe("en");
+    expect(await page.evaluate(() => (window as any).__lastSettings?.format?.modelTimeoutSeconds)).toBe(90);
+    expect(await page.evaluate(() => (window as any).__lastSettings?.format?.modelRetryCount)).toBe(2);
     expect(await page.evaluate(() => (window as any).__lastSettings?.webClip?.outputLanguage)).toBe("zh-CN");
   });
 
@@ -160,11 +166,17 @@ test.describe("one-click format, YAML meta, and save format choice", () => {
     await page.locator("#webclip-model-select").selectOption("__custom__");
     await page.locator("#webclip-model").fill("gemini-webclip-custom");
     await page.locator("#webclip-output-language").selectOption("en");
+    await expect(page.locator("#webclip-model-timeout")).toHaveValue("300");
+    await expect(page.locator("#webclip-model-retry")).toHaveValue("2");
+    await page.locator("#webclip-model-timeout").fill("75");
+    await page.locator("#webclip-model-retry").fill("3");
     await page.locator("#save-settings").click();
 
     await expect.poll(() => page.evaluate(() => (window as any).__lastSettings?.webClip?.model)).toBe("gemini-webclip-custom");
     expect(await page.evaluate(() => (window as any).__lastSettings?.webClip?.provider)).toBe("gemini");
     expect(await page.evaluate(() => (window as any).__lastSettings?.webClip?.outputLanguage)).toBe("en");
+    expect(await page.evaluate(() => (window as any).__lastSettings?.webClip?.modelTimeoutSeconds)).toBe(75);
+    expect(await page.evaluate(() => (window as any).__lastSettings?.webClip?.modelRetryCount)).toBe(3);
     expect(await page.evaluate(() => (window as any).__lastSettings?.ai?.providers?.gemini?.model)).toBe("gemini-3.1-flash-lite-preview");
   });
 
@@ -209,6 +221,8 @@ test.describe("one-click format, YAML meta, and save format choice", () => {
     await page.locator("#format-document").click();
     await expect(page.locator("#format-preview-panel")).toBeVisible();
     await expect.poll(() => page.evaluate(() => (window as any).__formatArgs?.outputLanguage)).toBe("zh-CN");
+    expect(await page.evaluate(() => (window as any).__formatArgs?.modelTimeoutSeconds)).toBe(300);
+    expect(await page.evaluate(() => (window as any).__formatArgs?.modelRetryCount)).toBe(2);
     await page.locator("#format-cancel").click();
     await expect(page.locator("#format-preview-panel")).toBeHidden();
     await page.locator("#mode-source").click();
@@ -339,7 +353,7 @@ test.describe("one-click format, YAML meta, and save format choice", () => {
     await expect(page.locator("#format-preview-panel")).toBeHidden();
   });
 
-  test("frontmatter is visible in read mode, protected in edit mode, and preserved on flush", async ({ page }) => {
+  test("frontmatter is visible in read mode, hidden from source chrome, and preserved on flush", async ({ page }) => {
     await installMock(page);
     await page.goto("/");
     await page.locator("#empty-open").click();
@@ -351,7 +365,7 @@ test.describe("one-click format, YAML meta, and save format choice", () => {
       el.dispatchEvent(new InputEvent("input", { bubbles: true, inputType: "insertText", data: " 已编辑" }));
     });
     await page.locator("#mode-source").click();
-    await expect(page.locator("#source-banner")).toBeVisible();
+    await expect(page.locator("#source-banner")).toBeHidden();
     await expect(page.locator("#markdown")).toHaveValue(/summary: 原摘要/);
     await expect(page.locator("#markdown")).toHaveValue(/已编辑/);
   });

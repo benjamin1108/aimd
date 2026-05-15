@@ -43,7 +43,10 @@ pub struct PendingOpenPaths(pub Mutex<Vec<String>>);
 
 #[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
-pub struct FileFingerprint { mtime_ms: u128, size: u64 }
+pub struct FileFingerprint {
+    mtime_ms: u128,
+    size: u64,
+}
 
 pub fn is_supported_doc_extension(path: &Path) -> bool {
     matches!(
@@ -127,7 +130,9 @@ pub fn open_aimd(path: String) -> Result<Value, String> {
 #[tauri::command]
 pub fn document_file_fingerprint(path: String) -> Result<FileFingerprint, String> {
     let metadata = fs::metadata(&path).map_err(|e| format!("读取文件信息失败: {e}"))?;
-    let modified = metadata.modified().map_err(|e| format!("读取修改时间失败: {e}"))?;
+    let modified = metadata
+        .modified()
+        .map_err(|e| format!("读取修改时间失败: {e}"))?;
     let mtime_ms = modified
         .duration_since(std::time::UNIX_EPOCH)
         .map_err(|e| format!("修改时间早于 UNIX epoch: {e}"))?
@@ -394,14 +399,7 @@ pub fn convert_md_to_draft(markdown_path: String) -> Result<Value, String> {
 #[tauri::command]
 pub fn save_markdown(path: String, markdown: String) -> Result<(), String> {
     let path_ref: &std::path::Path = path.as_ref();
-    let tmp_name = format!(
-        ".{}.tmp",
-        path_ref
-            .file_name()
-            .and_then(|s| s.to_str())
-            .unwrap_or("md")
-    );
-    let tmp = path_ref.with_file_name(tmp_name);
+    let tmp = markdown_tmp_path(path_ref);
     fs::write(&tmp, markdown.as_bytes()).map_err(|e| format!("save_markdown write tmp: {e}"))?;
     fs::rename(&tmp, path_ref).map_err(|e| {
         let _ = fs::remove_file(&tmp);
@@ -482,15 +480,16 @@ pub fn save_markdown_as(
     .map_err(|e| e.to_string())
 }
 
+fn markdown_tmp_path(path_ref: &Path) -> std::path::PathBuf {
+    let filename = path_ref
+        .file_name()
+        .and_then(|s| s.to_str())
+        .unwrap_or("md");
+    path_ref.with_file_name(format!(".{filename}.tmp"))
+}
+
 fn write_markdown_atomic(path_ref: &Path, markdown: &[u8]) -> Result<(), String> {
-    let tmp_name = format!(
-        ".{}.tmp",
-        path_ref
-            .file_name()
-            .and_then(|s| s.to_str())
-            .unwrap_or("md")
-    );
-    let tmp = path_ref.with_file_name(tmp_name);
+    let tmp = markdown_tmp_path(path_ref);
     fs::write(&tmp, markdown).map_err(|e| format!("save_markdown write tmp: {e}"))?;
     fs::rename(&tmp, path_ref).map_err(|e| {
         let _ = fs::remove_file(&tmp);

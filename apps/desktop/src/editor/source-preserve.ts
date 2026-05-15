@@ -138,6 +138,24 @@ export function patchDirtySource(root: HTMLElement, model: MarkdownSourceModel, 
   return { ok: true, markdown };
 }
 
+export function patchRemovedImageBlocks(root: HTMLElement, model: MarkdownSourceModel): PatchResult | null {
+  const patches: Array<{ start: number; end: number; value: string }> = [];
+  for (const block of model.blocks) {
+    const source = model.markdown.slice(block.start, block.end).trim();
+    if (!isImageOnlyMarkdown(source)) continue;
+    const el = root.querySelector<HTMLElement>(`[data-md-source-ref="${CSS.escape(block.id)}"]`);
+    if (el && (el.querySelector("img") || (el.textContent || "").trim())) continue;
+    patches.push({ start: block.start, end: block.end, value: "" });
+  }
+  if (!patches.length) return null;
+  patches.sort((a, b) => b.start - a.start);
+  let markdown = model.markdown;
+  for (const patch of patches) {
+    markdown = markdown.slice(0, patch.start) + patch.value + markdown.slice(patch.end);
+  }
+  return { ok: true, markdown };
+}
+
 export function appendedStructuralHTML(root: HTMLElement): string | null {
   const children = Array.from(root.children) as HTMLElement[];
   const firstUnmapped = children.findIndex((child) => !child.dataset[SOURCE_REF]);
@@ -147,6 +165,10 @@ export function appendedStructuralHTML(root: HTMLElement): string | null {
   const appended = children.slice(firstUnmapped);
   if (appended.some((child) => child.dataset[SOURCE_REF])) return null;
   return appended.map((child) => child.outerHTML).join("");
+}
+
+function isImageOnlyMarkdown(source: string) {
+  return /^!\[[^\]]*\]\([^)]+\)$/.test(source);
 }
 
 function block(id: string, kind: MarkdownSourceBlock["kind"], start: number, end: number, contentStart: number, contentEnd: number): MarkdownSourceBlock {

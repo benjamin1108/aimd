@@ -29,7 +29,6 @@ import { showFileContextMenu } from "./ui/context-menu";
 import { onInlineInput, flushInline } from "./editor/inline";
 import { bindImageDeleteGuard } from "./editor/image-delete";
 import { onInlinePaste, onInlineKeydown, collectClipboardImages, pasteImageFiles } from "./editor/paste";
-import { scheduleRender } from "./ui/outline";
 import { clearRecentDocuments, loadRecentPaths } from "./ui/recents";
 import {
   chooseAndOpen, newDocument, closeCurrentTab,
@@ -37,7 +36,7 @@ import {
   closeDocumentTab, confirmAllDirtyTabsForWindowClose,
 } from "./document/lifecycle";
 import { saveDocument, saveDocumentAs } from "./document/persist";
-import { hasAimdImageReferences, hasExternalImageReferences } from "./document/assets";
+import { commitMarkdownChange } from "./document/markdown-mutation";
 import { importWebClip } from "./document/web-clip";
 import { bindFormatDocumentPanel, formatCurrentDocument } from "./document/format";
 import { cleanupOldDrafts } from "./document/drafts";
@@ -48,7 +47,7 @@ import {
   onWindowDragOver, onWindowDragLeave, onWindowDrop,
 } from "./drag/window-drop";
 import { persistSessionSnapshot, restoreSession } from "./session/snapshot";
-import { activateDocumentTab, applyDocument, hasGitConflictMarkers } from "./document/apply";
+import { activateDocumentTab, applyDocument } from "./document/apply";
 import { debugLog, installDebugConsole, openDebugConsole, onDebugChange, setDebugMode } from "./debug/console";
 import { bindWorkspacePanel, openWorkspacePicker } from "./ui/workspace";
 import { bindDocPanelTabs, renderDocPanelTabs } from "./ui/doc-panel";
@@ -62,7 +61,6 @@ import {
 } from "./ui/git-diff";
 import { bindSelectionBoundary } from "./ui/selection";
 import { loadAppSettings, type AppSettings } from "./core/settings";
-import { createSourceModel } from "./editor/source-preserve";
 import { bindUpdater, checkForUpdates, scheduleStartupUpdateCheck, showAboutAimd } from "./updater/client";
 import { syncActiveTabFromFacade } from "./document/open-document-state";
 
@@ -196,20 +194,12 @@ document.addEventListener("click", (event) => {
 
 markdownEl().addEventListener("input", () => {
   if (!state.doc) return;
-  state.doc.markdown = markdownEl().value;
-  state.sourceModel = createSourceModel(state.doc.markdown);
-  state.sourceDirtyRefs.clear();
-  state.sourceStructuralDirty = false;
-  state.doc.dirty = true;
-  state.doc.hasGitConflicts = hasGitConflictMarkers(state.doc.markdown);
-  state.doc.hasExternalImageReferences = hasExternalImageReferences(state.doc.markdown);
-  if (state.doc.format === "markdown") {
-    state.doc.requiresAimdSave = hasAimdImageReferences(state.doc.markdown) || state.doc.assets.length > 0;
-    state.doc.needsAimdSave = state.doc.requiresAimdSave;
-  }
-  updateChrome();
+  commitMarkdownChange({
+    markdown: markdownEl().value,
+    origin: "source-input",
+    updateSourceTextarea: false,
+  });
   refreshSourceBanner();
-  scheduleRender();
 });
 
 markdownEl().addEventListener("paste", (event) => {
@@ -362,7 +352,7 @@ async function bindWindowCloseGuard() {
       closeApprovalInFlight = true;
       void (async () => {
         try {
-          if (state.mode === "edit" && state.inlineDirty) flushInline();
+          if (state.mode === "edit" && state.inlineDirty && !flushInline().ok) return;
           syncActiveTabFromFacade();
           if (await confirmAllDirtyTabsForWindowClose()) {
             await destroyCurrentWindowAfterCloseApproval();

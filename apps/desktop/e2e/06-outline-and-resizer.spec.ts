@@ -102,63 +102,36 @@ test.describe("Outline navigation across modes", () => {
   }
 });
 
-test.describe("Sidebar resizer", () => {
-  // ux-product-audit P1-4：原 doc-section 已经从 sidebar 移走（与 header 重复）。
-  // 现在 sidebar 上下两段是 #outline-section 和 #asset-section，
-  // 它们之间的 resizer 改名为 #sb-resizer-outline-asset。
-  test("dragging the outline/asset resizer changes outline-section flex height", async ({ page }) => {
+test.describe("Inspector asset tab", () => {
+  // 当前检查器把大纲 / 资源做成 tab，不再把两个 section 垂直堆叠。
+  // 因此旧的 outline/asset 纵向 resizer 应保持隐藏，资源面板通过 tab 进入。
+  test("asset tab shows managed assets without exposing the obsolete outline/asset resizer", async ({ page }) => {
     await installTauriMock(page);
     await page.goto("/");
     await page.locator("#empty-open").click();
 
-    const resizer = page.locator("#sb-resizer-outline-asset");
-    await expect(resizer).toBeVisible();
+    await expect(page.locator("#sidebar-tab-assets")).toBeVisible();
+    await expect(page.locator("#outline-panel")).toBeVisible();
+    await expect(page.locator("#asset-panel")).toBeHidden();
+    await expect(page.locator("#sb-resizer-outline-asset")).toBeHidden();
 
-    const outlineSection = page.locator("#outline-section");
-    const before = await outlineSection.evaluate((el: HTMLElement) => el.getBoundingClientRect().height);
-
-    // Use raw mouse events so pointer capture on the resizer engages.
-    const box = await resizer.boundingBox();
-    if (!box) throw new Error("resizer not laid out");
-    const startX = box.x + box.width / 2;
-    const startY = box.y + box.height / 2;
-
-    await page.mouse.move(startX, startY);
-    await page.mouse.down();
-    await page.mouse.move(startX, startY - 60, { steps: 6 });
-    await page.mouse.up();
-
-    const after = await outlineSection.evaluate((el: HTMLElement) => el.getBoundingClientRect().height);
-    expect(after).not.toBe(before);
-
-    // After pointerup, the body must NOT remain in the resizing state, otherwise
-    // the whole UI stays locked to ns-resize.
-    const stuck = await page.evaluate(() => document.body.classList.contains("resizing-v"));
-    expect(stuck).toBe(false);
+    await page.locator("#sidebar-tab-assets").click();
+    await expect(page.locator("#asset-panel")).toBeVisible();
+    await expect(page.locator("#asset-section")).toBeVisible();
+    await expect(page.locator("#asset-list")).toContainText("img-1");
+    await expect(page.locator("#sb-resizer-outline-asset")).toBeHidden();
   });
 
-  test("double-clicking the resizer resets flex", async ({ page }) => {
+  test("switching back to outline keeps outline navigation reachable", async ({ page }) => {
     await installTauriMock(page);
     await page.goto("/");
     await page.locator("#empty-open").click();
 
-    const resizer = page.locator("#sb-resizer-outline-asset");
-    const outlineSection = page.locator("#outline-section");
-
-    // First, force a custom flex via direct drag.
-    const box = await resizer.boundingBox();
-    if (!box) throw new Error("resizer not laid out");
-    await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
-    await page.mouse.down();
-    await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2 - 50, { steps: 6 });
-    await page.mouse.up();
-
-    const customFlex = await outlineSection.evaluate((el: HTMLElement) => el.style.flex);
-    expect(customFlex).not.toBe("");
-
-    await resizer.dblclick();
-    const reset = await outlineSection.evaluate((el: HTMLElement) => el.style.flex);
-    expect(reset).toBe("");
+    await page.locator("#sidebar-tab-assets").click();
+    await expect(page.locator("#asset-panel")).toBeVisible();
+    await page.locator("#sidebar-tab-outline").click();
+    await expect(page.locator("#outline-panel")).toBeVisible();
+    await expect(page.locator(".outline-item")).toHaveCount(3);
   });
 
   test("asset-section 无内容时整段折叠（不再常驻空区域）", async ({ page }) => {

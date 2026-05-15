@@ -1,13 +1,11 @@
 import {
-  inlineEditorEl, formatToolbarEl, markdownEl,
+  inlineEditorEl, formatToolbarEl,
   imageAltPopoverEl, imageAltInputEl, imageAltConfirmEl, imageAltCancelEl,
 } from "../core/dom";
 import { state } from "../core/state";
 import { showLinkPopover } from "./link-popover";
 import { insertImage } from "./images";
-import { updateChrome } from "../ui/chrome";
-import { createSourceModel } from "./source-preserve";
-import { scheduleRender } from "../ui/outline";
+import { commitMarkdownChange } from "../document/markdown-mutation";
 
 export const BLOCK_TAGS = new Set([
   "P", "H1", "H2", "H3", "H4", "H5", "H6",
@@ -186,7 +184,7 @@ export function wrapSelectionInTag(tag: string) {
 
 let selectedImage: HTMLImageElement | null = null;
 
-function insertHTMLAtSelection(html: string) {
+function insertHTMLAtSelection(html: string, emitInput = true) {
   inlineEditorEl().focus();
   const tpl = document.createElement("template");
   tpl.innerHTML = html.trim();
@@ -196,7 +194,7 @@ function insertHTMLAtSelection(html: string) {
   const sel = document.getSelection();
   if (!sel || sel.rangeCount === 0) {
     inlineEditorEl().appendChild(fragment);
-    inlineEditorEl().dispatchEvent(new Event("input"));
+    if (emitInput) inlineEditorEl().dispatchEvent(new Event("input"));
     return;
   }
   const range = sel.getRangeAt(0);
@@ -210,7 +208,7 @@ function insertHTMLAtSelection(html: string) {
       sel.removeAllRanges();
       sel.addRange(range);
     }
-    inlineEditorEl().dispatchEvent(new Event("input"));
+    if (emitInput) inlineEditorEl().dispatchEvent(new Event("input"));
     return;
   }
   range.deleteContents();
@@ -222,7 +220,7 @@ function insertHTMLAtSelection(html: string) {
     sel.removeAllRanges();
     sel.addRange(range);
   }
-  inlineEditorEl().dispatchEvent(new Event("input"));
+  if (emitInput) inlineEditorEl().dispatchEvent(new Event("input"));
 }
 
 function insertTable() {
@@ -282,14 +280,12 @@ function updateImageAltMarkdown(img: HTMLImageElement, alt: string) {
   const re = new RegExp(`!\\[[^\\]]*\\]\\(${escapeRegExp(rawSrc)}\\)`);
   const next = state.doc.markdown.replace(re, `![${alt.replace(/]/g, "\\]")}](${rawSrc})`);
   if (next === state.doc.markdown) return;
-  state.doc.markdown = next;
-  state.doc.dirty = true;
-  state.sourceModel = createSourceModel(next);
-  state.sourceDirtyRefs.clear();
-  state.sourceStructuralDirty = false;
   state.inlineDirty = false;
-  markdownEl().value = next;
-  updateChrome();
+  commitMarkdownChange({
+    markdown: next,
+    origin: "image-alt",
+    updateSourceTextarea: true,
+  });
 }
 
 function appendMarkdownBlock(markdown: string, html: string) {
@@ -298,19 +294,16 @@ function appendMarkdownBlock(markdown: string, html: string) {
     return;
   }
   const next = `${state.doc.markdown.replace(/\s*$/, "")}\n\n${markdown.trim()}\n`;
-  state.doc.markdown = next;
-  state.doc.dirty = true;
-  state.sourceModel = createSourceModel(next);
+  state.inlineDirty = false;
+  commitMarkdownChange({
+    markdown: next,
+    origin: "format-toolbar",
+    updateSourceTextarea: true,
+  });
+  insertHTMLAtSelection(html, false);
+  state.inlineDirty = false;
   state.sourceDirtyRefs.clear();
   state.sourceStructuralDirty = false;
-  state.inlineDirty = false;
-  markdownEl().value = next;
-  insertHTMLAtSelection(html);
-  state.inlineDirty = false;
-  state.sourceDirtyRefs.clear();
-  state.sourceStructuralDirty = false;
-  updateChrome();
-  scheduleRender();
 }
 
 export function runFormatCommand(cmd: string) {

@@ -150,7 +150,7 @@ test.describe("Workspace scrolls when content overflows", () => {
   });
 
   test("outline click leaves the reader scrolled — and scrolling back is possible", async ({ page }) => {
-    await page.setViewportSize({ width: 1100, height: 720 });
+    await page.setViewportSize({ width: 1280, height: 720 });
     await installLongDocMock(page);
     await page.goto("/");
     await page.locator("#empty-open").click();

@@ -6,7 +6,6 @@ import {
 } from "../core/dom";
 import { setStatus, updateChrome } from "../ui/chrome";
 import { flushInline, insertAtCursor } from "./inline";
-import { scheduleRender } from "../ui/outline";
 
 let activeIndex = -1;
 
@@ -65,7 +64,7 @@ function jumpToMatch(direction: 1 | -1) {
     updateFindCount();
     return;
   }
-  if (state.mode === "edit") flushInline();
+  if (state.mode === "edit" && !flushInline().ok) return;
   const matches = collectMatches(query);
   if (matches.length === 0) {
     activeIndex = -1;
@@ -168,8 +167,6 @@ function replaceOne() {
     return;
   }
   insertAtCursor(replaceInputEl().value);
-  state.doc!.dirty = true;
-  scheduleRender();
   activeIndex = -1;
   findNext();
   updateChrome();

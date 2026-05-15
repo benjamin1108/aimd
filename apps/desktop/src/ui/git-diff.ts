@@ -130,8 +130,8 @@ async function prepareLeavingDocumentView(): Promise<boolean> {
     return true;
   }
   if (state.mode === "edit" && state.inlineDirty) {
-    flushInline();
-    if (state.inlineDirty) return false;
+    const flushed = flushInline();
+    if (!flushed.ok) return false;
   }
   captureActiveViewState();
   syncActiveTabFromFacade();

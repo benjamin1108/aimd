@@ -15,7 +15,7 @@ import {
   webClipUrlEl,
 } from "../core/dom";
 import { loadAppSettings } from "../core/settings";
-import type { AimdDocument } from "../core/types";
+import type { AimdDocument, WebClipSettings } from "../core/types";
 import { setStatus } from "../ui/chrome";
 import { deleteDraftFile } from "./drafts";
 import {
@@ -62,7 +62,8 @@ type WebClipTask = {
   applied: boolean;
 };
 
-const DEFAULT_REFINE_TIMEOUT_MS = 45_000;
+const DEFAULT_REFINE_TIMEOUT_MS = 300_000;
+const WEB_CLIP_STATUS_ACTION = "web-clip-worker";
 let activeTask: WebClipTask | null = null;
 let panelBound = false;
 let statusRevealBound = false;
@@ -74,9 +75,16 @@ function makeRequestId(): string {
     || `webclip-${Date.now().toString(36)}-${Math.random().toString(36).slice(2)}`;
 }
 
-function refineTimeoutMs(): number {
+function refineTimeoutMs(config?: WebClipSettings): number {
   const override = Number((globalThis as { __aimdWebClipRefineTimeoutMs?: unknown }).__aimdWebClipRefineTimeoutMs);
-  return Number.isFinite(override) && override > 0 ? override : DEFAULT_REFINE_TIMEOUT_MS;
+  if (Number.isFinite(override) && override > 0) return override;
+  const seconds = Number(config?.modelTimeoutSeconds);
+  const perAttemptMs = Number.isFinite(seconds) && seconds > 0
+    ? seconds * 1000
+    : DEFAULT_REFINE_TIMEOUT_MS;
+  const retryCount = Number(config?.modelRetryCount);
+  const attempts = 1 + (Number.isFinite(retryCount) && retryCount > 0 ? Math.floor(retryCount) : 0);
+  return (perAttemptMs * attempts) + (Math.max(0, attempts - 1) * 500) + 5000;
 }
 
 async function invokeWithTimeout<T>(
@@ -150,7 +158,7 @@ function hidePanel() {
 function setStatusRevealEnabled(enabled: boolean) {
   const pill = statusPillEl();
   if (enabled) {
-    pill.dataset.action = "web-clip-worker";
+    pill.dataset.action = WEB_CLIP_STATUS_ACTION;
     pill.setAttribute("role", "button");
     pill.setAttribute("tabindex", "0");
     pill.title = "查看正在工作的网页导入窗口";
@@ -162,6 +170,10 @@ function setStatusRevealEnabled(enabled: boolean) {
   pill.removeAttribute("title");
 }
 
+function setWebClipStatus(text: string, tone: "idle" | "loading" | "success" | "warn" | "info" = "loading") {
+  setStatus(text, tone, activeTask ? WEB_CLIP_STATUS_ACTION : undefined);
+}
+
 async function revealActiveExtractorWindow() {
   const task = activeTask;
   if (!task || !isTauri()) return;
@@ -169,7 +181,7 @@ async function revealActiveExtractorWindow() {
     await invoke("show_extractor_window", { requestId: task.requestId });
   } catch (err) {
     console.warn("[web-clip] failed to show extractor window:", err);
-    setStatus("显示网页导入窗口失败", "warn");
+    setWebClipStatus("显示网页导入窗口失败", "warn");
   }
 }
 
@@ -229,7 +241,7 @@ async function ensureEventListeners() {
     await listen<{ requestId?: string; status?: string }>("web_clip_progress", (event) => {
       const task = activeTask;
       if (!task || event.payload?.requestId !== task.requestId || !event.payload.status) return;
-      setStatus(event.payload.status, "loading");
+      setWebClipStatus(event.payload.status, "loading");
     });
     await listen<{ requestId?: string }>("web_clip_closed", (event) => {
       const task = activeTask;
@@ -278,7 +290,7 @@ async function startImport(url: string, fallbackWindow: boolean) {
   activeTask = task;
   setStatusRevealEnabled(true);
   hidePanel();
-  setStatus("正在打开网页...", "loading");
+  setWebClipStatus("正在打开网页...", "loading");
 
   try {
     await invoke("start_url_extraction", {
@@ -287,7 +299,7 @@ async function startImport(url: string, fallbackWindow: boolean) {
       visible: fallbackWindow,
       auto: !fallbackWindow,
     });
-    if (fallbackWindow) setStatus("已打开提取窗口", "info");
+    if (fallbackWindow) setWebClipStatus("已打开提取窗口", "info");
   } catch (err) {
     activeTask = null;
     setStatusRevealEnabled(false);
@@ -328,7 +340,7 @@ async function handleExtracted(payload: ExtractPayload) {
     return;
   }
 
-  setStatus("正在提取正文...", "loading");
+  setWebClipStatus("正在提取正文...", "loading");
   console.info("[web-clip] extractor finished", {
     requestId: task.requestId,
     elapsedMs: Math.round(performance.now() - task.startedAt),
@@ -354,7 +366,7 @@ async function handleExtracted(payload: ExtractPayload) {
     });
 
     if (images.length > 0) {
-      setStatus("正在处理图片...", "loading");
+      setWebClipStatus("正在处理图片...", "loading");
       const localized = await invoke<WebClipImageLocalization>("localize_web_clip_images", {
         requestId: task.requestId,
         markdown,
@@ -372,7 +384,7 @@ async function handleExtracted(payload: ExtractPayload) {
     const settings = await loadAppSettings();
     const webClipConfig = settings.webClip;
     if (webClipConfig?.llmEnabled) {
-      setStatus("正在智能排版...", "loading");
+      setWebClipStatus("正在智能排版...", "loading");
       const rawMarkdown = markdown;
       try {
         const refined = await invokeWithTimeout<string>(
@@ -383,8 +395,10 @@ async function handleExtracted(payload: ExtractPayload) {
             model: webClipConfig.model,
             guardReason: null,
             outputLanguage: webClipConfig.outputLanguage,
+            modelTimeoutSeconds: webClipConfig.modelTimeoutSeconds,
+            modelRetryCount: webClipConfig.modelRetryCount,
           },
-          refineTimeoutMs(),
+          refineTimeoutMs(webClipConfig),
           "智能排版超时",
         );
         const normalized = normalizeMarkdownTitle(refined, title);
@@ -392,16 +406,16 @@ async function handleExtracted(payload: ExtractPayload) {
           markdown = normalized;
         } else {
           markdown = markUnfinishedSmartSections(cleanBasicMarkdown(rawMarkdown, title));
-          setStatus("未完成智能分章，使用基础提取", "warn");
+          setWebClipStatus("未完成智能分章，使用基础提取", "warn");
         }
       } catch (llmError) {
         console.error("[web-clip] LLM refinement failed:", llmError);
         markdown = markUnfinishedSmartSections(cleanBasicMarkdown(rawMarkdown, title));
-        setStatus("未完成智能分章，使用基础提取", "warn");
+        setWebClipStatus("未完成智能分章，使用基础提取", "warn");
       }
     }
 
-    setStatus("正在生成网页草稿...", "loading");
+    setWebClipStatus("正在生成网页草稿...", "loading");
     const doc = await invoke<AimdDocument>("save_web_clip", {
       title,
       markdown,

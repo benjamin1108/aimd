@@ -11,6 +11,7 @@ import { updateChrome } from "./chrome";
 import { flushInline } from "../editor/inline";
 import { captureActiveViewState, restoreActiveViewState } from "../document/view-state";
 import { clearRenderedSurfaceInteractionStatus } from "../rendered-surface/interactions";
+import { refreshSourceHighlight } from "../editor/source-highlight";
 
 export function refreshSourceBanner() {
   const banner = sourceBannerEl();
@@ -27,11 +28,14 @@ export function refreshSourceBanner() {
   banner.hidden = true;
 }
 
-export function setMode(mode: Mode, options: { skipCapture?: boolean } = {}) {
+export function setMode(mode: Mode, options: { skipCapture?: boolean } = {}): boolean {
   clearRenderedSurfaceInteractionStatus();
   if (!options.skipCapture) captureActiveViewState();
   // Flush from the mode we are leaving.
-  if (state.mode === "edit" && mode !== "edit") flushInline();
+  if (state.mode === "edit" && mode !== "edit") {
+    const flushed = flushInline();
+    if (!flushed.ok) return false;
+  }
 
   state.mode = mode;
   const hasDoc = Boolean(state.doc);
@@ -43,7 +47,7 @@ export function setMode(mode: Mode, options: { skipCapture?: boolean } = {}) {
     formatToolbarEl().hidden = true;
     gitDiffViewEl().hidden = false;
     updateChrome();
-    return;
+    return true;
   }
 
   emptyEl().hidden = hasDoc;
@@ -60,7 +64,10 @@ export function setMode(mode: Mode, options: { skipCapture?: boolean } = {}) {
   // nothing to repaint and stay snappy on long documents.
   if (hasDoc) {
     paintPaneIfStale(mode);
-    if (mode === "source") refreshSourceBanner();
+    if (mode === "source") {
+      refreshSourceHighlight();
+      refreshSourceBanner();
+    }
     restoreActiveViewState(mode);
   }
 
@@ -70,4 +77,5 @@ export function setMode(mode: Mode, options: { skipCapture?: boolean } = {}) {
   }
 
   updateChrome();
+  return true;
 }

@@ -1,14 +1,17 @@
 import { state, ASSET_URI_PREFIX } from "../core/state";
 import { inlineEditorEl, markdownEl } from "../core/dom";
 import { setStatus, updateChrome } from "../ui/chrome";
-import {
-  extractOutlineFromHTML, renderOutline, scheduleRender,
-} from "../ui/outline";
+import { activeHTMLMatchesMarkdown } from "../ui/outline";
 import { persistSessionSnapshot } from "../session/snapshot";
 import { htmlToMarkdown } from "./markdown";
-import { hasAimdImageReferences, hasExternalImageReferences } from "../document/assets";
 import { joinFrontmatter, splitFrontmatter } from "../markdown/frontmatter";
-import { appendedStructuralHTML, createSourceModel, patchDirtySource, sourceRefFromEvent } from "./source-preserve";
+import { appendedStructuralHTML, patchDirtySource, patchRemovedImageBlocks, sourceRefFromEvent } from "./source-preserve";
+import { commitMarkdownChange } from "../document/markdown-mutation";
+import { syncActiveTabFromFacade } from "../document/open-document-state";
+
+export type FlushInlineResult =
+  | { ok: true; markdownChanged: boolean }
+  | { ok: false; reason: string };
 
 export function lightNormalize(root: HTMLElement) {
   root.querySelectorAll<HTMLElement>("h1[style], h2[style], h3[style], h4[style], h5[style], h6[style], p[style]").forEach((el) => el.removeAttribute("style"));
@@ -47,6 +50,12 @@ function enforceTitleLength(root: HTMLElement) {
 
 export function onInlineInput(event?: Event) {
   if (!state.doc) return;
+  if (!activeHTMLMatchesMarkdown()) {
+    state.inlineDirty = false;
+    setStatus("可视化编辑器正在同步最新 Markdown，请稍后再编辑", "info");
+    updateChrome();
+    return;
+  }
   const composing = (event as InputEvent | undefined)?.isComposing;
   const sourceRef = sourceRefFromEvent(event);
   if (sourceRef) state.sourceDirtyRefs.add(sourceRef);
@@ -98,9 +107,9 @@ export function normalizeInlineDOM() {
   });
 }
 
-export function flushInline() {
-  if (!state.doc) return;
-  if (state.mode !== "edit") return;
+export function flushInline(): FlushInlineResult {
+  if (!state.doc) return { ok: true, markdownChanged: false };
+  if (state.mode !== "edit") return { ok: true, markdownChanged: false };
   if (state.flushTimer) {
     window.clearTimeout(state.flushTimer);
     state.flushTimer = null;
@@ -109,34 +118,35 @@ export function flushInline() {
   // to run turndown on every transition; on long docs that was the dominant
   // chunk of the perceived "click takes a beat" lag. Skip it when nothing
   // mutated the inline editor since the last flush / paint.
-  if (!state.inlineDirty) return;
+  if (!state.inlineDirty) return { ok: true, markdownChanged: false };
+  if (!activeHTMLMatchesMarkdown()) {
+    return failInlineFlush("可视化编辑器尚未同步最新 Markdown，请等待同步完成后再继续");
+  }
   normalizeInlineDOM();
-  state.inlineDirty = false;
   const html = inlineEditorEl().innerHTML;
   const existing = splitFrontmatter(state.doc.markdown);
   let structuralMarkdown: string | null = null;
   if (state.sourceStructuralDirty) {
-    const appended = appendedStructuralHTML(inlineEditorEl());
-    if (appended !== null && state.sourceModel?.markdown === state.doc.markdown) {
+    const removedImages = state.sourceModel?.markdown === state.doc.markdown
+      ? patchRemovedImageBlocks(inlineEditorEl(), state.sourceModel)
+      : null;
+    const appended = removedImages ? null : appendedStructuralHTML(inlineEditorEl());
+    if (removedImages?.ok) {
+      structuralMarkdown = removedImages.markdown;
+    } else if (appended !== null && state.sourceModel?.markdown === state.doc.markdown) {
       const serialized = htmlToMarkdown(appended).trim();
       structuralMarkdown = serialized
         ? `${state.doc.markdown.replace(/\s*$/, "")}\n\n${serialized}\n`
         : state.doc.markdown;
     } else {
-      state.inlineDirty = true;
-      setStatus("当前可视化结构编辑不能安全保持 Markdown 原文，请切到 Markdown 模式完成这次结构修改", "warn");
-      updateChrome();
-      return;
+      return failInlineFlush("当前可视化结构编辑不能安全保持 Markdown 原文，请切到 Markdown 模式完成这次结构修改");
     }
   }
   const patched = state.sourceModel?.markdown === state.doc.markdown && state.sourceDirtyRefs.size > 0
     ? patchDirtySource(inlineEditorEl(), state.sourceModel, state.sourceDirtyRefs)
     : null;
   if (patched && !patched.ok) {
-    state.inlineDirty = true;
-    setStatus(`可视化保存受限: ${patched.reason}，请切到 Markdown 模式保存该结构`, "warn");
-    updateChrome();
-    return;
+    return failInlineFlush(`可视化保存受限: ${patched.reason}，请切到 Markdown 模式保存该结构`);
   }
   const md = structuralMarkdown
     ?? (patched?.ok
@@ -147,23 +157,33 @@ export function flushInline() {
     state.sourceStructuralDirty = false;
   }
   if (md !== state.doc.markdown) {
-    state.doc.markdown = md;
-    state.sourceModel = createSourceModel(md);
-    markdownEl().value = md;
-    state.doc.hasExternalImageReferences = hasExternalImageReferences(md);
-    if (state.doc.format === "markdown") {
-      state.doc.requiresAimdSave = hasAimdImageReferences(md) || state.doc.assets.length > 0;
-      state.doc.needsAimdSave = state.doc.requiresAimdSave;
-    }
-    state.outline = extractOutlineFromHTML(html);
-    state.doc.html = inlineEditorEl().innerHTML;
-    state.htmlVersion += 1;
-    state.paintedVersion.edit = state.htmlVersion;
-    renderOutline();
+    state.inlineDirty = false;
+    commitMarkdownChange({
+      markdown: md,
+      origin: "visual-flush",
+      updateSourceTextarea: true,
+      clearSourceDirty: true,
+    });
     gcInlineAssets(md);
-    persistSessionSnapshot();
-    scheduleRender();
+    return { ok: true, markdownChanged: true };
   }
+  state.inlineDirty = false;
+  state.sourceDirtyRefs.clear();
+  state.sourceStructuralDirty = false;
+  syncActiveTabFromFacade();
+  persistSessionSnapshot();
+  updateChrome();
+  return { ok: true, markdownChanged: false };
+}
+
+function failInlineFlush(reason: string): FlushInlineResult {
+  state.inlineDirty = true;
+  if (state.doc) state.doc.dirty = true;
+  syncActiveTabFromFacade();
+  persistSessionSnapshot();
+  updateChrome();
+  setStatus(reason, "warn");
+  return { ok: false, reason };
 }
 
 function gcInlineAssets(markdown: string) {

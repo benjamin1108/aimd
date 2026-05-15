@@ -10,6 +10,7 @@ import { applyHTML } from "../ui/outline";
 import { rememberOpenedPath } from "../ui/recents";
 import { fileStem } from "../util/path";
 import { activateDocumentTab, applyDocumentAsNewTab, applyDocumentToTab } from "./apply";
+import { flushInline } from "../editor/inline";
 import { hasExternalImageReferences } from "./assets";
 import { triggerOptimizeOnOpen } from "./optimize";
 import { saveDocument } from "./persist";
@@ -216,6 +217,11 @@ function clearDocumentSurface() {
   state.sourceModel = null;
   state.sourceDirtyRefs.clear();
   state.sourceStructuralDirty = false;
+  state.markdownVersion = 0;
+  state.htmlVersion = 0;
+  state.htmlMarkdownVersion = 0;
+  state.pendingRenderVersion = null;
+  state.renderErrorVersion = null;
   markdownEl().value = "";
   inlineEditorEl().innerHTML = "";
   previewEl().innerHTML = "";
@@ -298,6 +304,14 @@ async function saveTabBeforeLeaving(tabId: string): Promise<boolean> {
 export async function ensureCanCloseTab(tabId: string, action: string): Promise<boolean> {
   const tab = findTab(tabId);
   if (!tab?.doc.dirty) return true;
+  if (state.openDocuments.activeTabId === tab.id && state.mode === "edit" && state.inlineDirty) {
+    const flushed = flushInline();
+    if (!flushed.ok) return false;
+    syncActiveTabFromFacade();
+  } else if (tab.inlineDirty) {
+    setStatus("可视化编辑仍有未同步修改，请先切回该文档处理", "warn");
+    return false;
+  }
   const label = displayTabTitle(tab.doc);
   let choice: "save" | "discard" | "cancel";
   try {

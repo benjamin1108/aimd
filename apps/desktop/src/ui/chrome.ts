@@ -96,8 +96,12 @@ function renderDocumentStateBadges(doc: AimdDocument | null) {
 //
 // state.statusTimer 同时充当"当前是否在临时反馈窗口期"的标志：updateChrome 看到
 // 它非 null 时会跳过稳定态写入，避免把"已保存"立刻盖回"就绪"。
-export function setStatus(text: string, tone: "idle" | "loading" | "success" | "warn" | "info" = "idle") {
-  applyStatus(text, tone);
+export function setStatus(
+  text: string,
+  tone: "idle" | "loading" | "success" | "warn" | "info" = "idle",
+  action?: string,
+) {
+  applyStatus(text, tone, action);
   if (state.statusTimer) {
     window.clearTimeout(state.statusTimer);
     state.statusTimer = null;

@@ -140,7 +140,10 @@ pub fn update_window_path(
         if let Ok(mut map) = ow.0.lock() {
             if let Some(old_path) = old_path {
                 let old_key = normalize_path(&old_path);
-                if map.get(&old_key).is_some_and(|label| label == window.label()) {
+                if map
+                    .get(&old_key)
+                    .is_some_and(|label| label == window.label())
+                {
                     map.remove(&old_key);
                 }
             }

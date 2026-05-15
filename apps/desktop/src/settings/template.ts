@@ -125,6 +125,20 @@ export function settingsTemplateHTML() {
               </select>
             </label>
             <p style="font-size: 13px; color: var(--text-muted); margin-bottom: 16px;">如果网页原文不是所选语言，智能排版会在保留链接、图片和术语的前提下翻译正文。</p>
+
+            <div class="field-grid">
+              <label class="field">
+                <span class="field-label">模型超时（秒）</span>
+                <input id="webclip-model-timeout" type="number" min="5" max="600" step="5" inputmode="numeric" />
+                <span class="field-hint">仅限制智能排版的大模型处理阶段。</span>
+              </label>
+
+              <label class="field">
+                <span class="field-label">重试次数</span>
+                <input id="webclip-model-retry" type="number" min="0" max="5" step="1" inputmode="numeric" />
+                <span class="field-hint">模型处理失败或超时后再尝试的次数。</span>
+              </label>
+            </div>
           </section>
 
           <section class="settings-section" data-section="format" role="tabpanel" aria-labelledby="settings-tab-format" hidden>
@@ -155,6 +169,20 @@ export function settingsTemplateHTML() {
                 <option value="en">英文</option>
               </select>
             </label>
+
+            <div class="field-grid">
+              <label class="field">
+                <span class="field-label">模型超时（秒）</span>
+                <input id="format-model-timeout" type="number" min="5" max="600" step="5" inputmode="numeric" />
+                <span class="field-hint">仅限制一键格式化的大模型处理阶段。</span>
+              </label>
+
+              <label class="field">
+                <span class="field-label">重试次数</span>
+                <input id="format-model-retry" type="number" min="0" max="5" step="1" inputmode="numeric" />
+                <span class="field-hint">模型处理失败或超时后再尝试的次数。</span>
+              </label>
+            </div>
           </section>
 
           ${gitIntegrationSectionHTML()}

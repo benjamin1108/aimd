@@ -140,6 +140,15 @@ test.describe("Open Documents tabs", () => {
 
     await expect(page.locator(".open-tab")).toHaveCount(2);
     await expect(page.locator("#doc-title")).toHaveText("Beta");
+    await expect(page.locator("#reader h1")).toHaveText("Beta");
+
+    await page.locator(".open-tab", { hasText: "Alpha" }).locator(".open-tab-main").click();
+    await expect(page.locator("#doc-title")).toHaveText("Alpha");
+    await expect(page.locator("#reader h1")).toHaveText("Alpha");
+
+    await page.locator(".open-tab", { hasText: "Beta" }).locator(".open-tab-main").click();
+    await expect(page.locator("#doc-title")).toHaveText("Beta");
+    await expect(page.locator("#reader h1")).toHaveText("Beta");
 
     await page.locator(".workspace-row", { hasText: "Beta.aimd" }).click();
     await expect(page.locator(".open-tab")).toHaveCount(2);

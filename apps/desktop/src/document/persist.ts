@@ -12,9 +12,10 @@ import { applyDocument, applyDocumentToTab } from "./apply";
 import { flushInline } from "../editor/inline";
 import { deleteDraftFile } from "./drafts";
 import { hasAimdImageReferences } from "./assets";
-import { renderPreview } from "../ui/outline";
+import { ensureCanonicalHTMLForTab, renderPreview } from "../ui/outline";
 import { activeTab, beginTabOperation, findTab, isOperationCurrent, syncActiveTabFromFacade } from "./open-document-state";
 import { refreshTabFingerprint } from "./fingerprint";
+import { commitMarkdownChange } from "./markdown-mutation";
 
 type SaveFormat = "markdown" | "aimd";
 
@@ -33,7 +34,7 @@ function messageFromError(err: unknown, fallback: string): string {
 
 export async function saveDocument() {
   if (!state.doc) return;
-  if (state.mode === "edit") flushInline();
+  if (state.mode === "edit" && !flushInline().ok) return;
   syncActiveTabFromFacade();
   const target = beginTabOperation();
   const tab = target ? findTab(target.tabId) : activeTab();
@@ -63,6 +64,7 @@ export async function saveDocument() {
       if (savedTab) savedTab.doc.dirty = false;
       if (savedTab?.id === state.openDocuments.activeTabId && state.doc) state.doc.dirty = false;
       if (savedTab?.doc.path) void refreshTabFingerprint(savedTab.id, savedTab.doc.path);
+      if (savedTab) await ensureCanonicalHTMLForTab(savedTab.id);
       updateChrome();
       rememberOpenedPath(doc.path);
       setStatus("已保存（Markdown）", "success");
@@ -151,14 +153,19 @@ async function saveDocumentAsMarkdown(sourcePath: string | null, wasDraft: boole
       markdown: state.doc.markdown,
     });
     state.doc.path = result.path;
-    state.doc.markdown = result.markdown;
     state.doc.format = "markdown";
     state.doc.assets = [];
     state.doc.isDraft = false;
     state.doc.draftSourcePath = undefined;
-    state.doc.dirty = false;
     state.doc.requiresAimdSave = hasAimdImageReferences(result.markdown);
     state.doc.needsAimdSave = state.doc.requiresAimdSave;
+    commitMarkdownChange({
+      markdown: result.markdown,
+      origin: "save-canonical",
+      dirty: false,
+      updateSourceTextarea: true,
+      renderImmediately: true,
+    });
     await renderPreview();
     rememberOpenedPath(result.path);
     const savedTab = activeTab();
@@ -218,7 +225,7 @@ async function saveDocumentAsAimd(sourcePath: string | null, wasDraft: boolean, 
 
 export async function saveDocumentAs() {
   if (!state.doc) return;
-  if (state.mode === "edit") flushInline();
+  if (state.mode === "edit" && !flushInline().ok) return;
   if (state.doc.hasGitConflicts && !window.confirm("文档仍包含 Git 冲突标记。确认另存？")) {
     setStatus("已取消保存，请先解决 Git 冲突", "warn");
     return;

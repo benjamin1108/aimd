@@ -19,6 +19,11 @@ export type AppSettings = {
   ui: UiSettings;
 };
 
+export const MODEL_TIMEOUT_SECONDS_MIN = 5;
+export const MODEL_TIMEOUT_SECONDS_MAX = 600;
+export const MODEL_RETRY_COUNT_MIN = 0;
+export const MODEL_RETRY_COUNT_MAX = 5;
+
 export function defaultModelForProvider(provider: ModelProvider) {
   return provider === "gemini" ? "gemini-3.1-flash-lite-preview" : "qwen3.6-plus";
 }
@@ -40,12 +45,16 @@ export const DEFAULT_WEB_CLIP_SETTINGS: WebClipSettings = {
   provider: "dashscope",
   model: defaultModelForProvider("dashscope"),
   outputLanguage: "zh-CN",
+  modelTimeoutSeconds: 300,
+  modelRetryCount: 2,
 };
 
 export const DEFAULT_FORMAT_SETTINGS: FormatSettings = {
   provider: "dashscope",
   model: defaultModelForProvider("dashscope"),
   outputLanguage: "zh-CN",
+  modelTimeoutSeconds: 300,
+  modelRetryCount: 2,
 };
 
 export const DEFAULT_UI_SETTINGS: UiSettings = {
@@ -63,6 +72,31 @@ function normalizeWebClipOutputLanguage(value: unknown): WebClipOutputLanguage {
 
 function normalizeFormatOutputLanguage(value: unknown): FormatOutputLanguage {
   return value === "en" ? "en" : "zh-CN";
+}
+
+function coerceBoundedInteger(value: unknown, fallback: number, min: number, max: number): number {
+  if (typeof value === "string" && !value.trim()) return fallback;
+  const raw = typeof value === "string" ? Number(value.trim()) : Number(value);
+  if (!Number.isFinite(raw)) return fallback;
+  return Math.min(max, Math.max(min, Math.round(raw)));
+}
+
+export function coerceModelTimeoutSeconds(value: unknown, fallback: number): number {
+  return coerceBoundedInteger(
+    value,
+    fallback,
+    MODEL_TIMEOUT_SECONDS_MIN,
+    MODEL_TIMEOUT_SECONDS_MAX,
+  );
+}
+
+export function coerceModelRetryCount(value: unknown, fallback: number): number {
+  return coerceBoundedInteger(
+    value,
+    fallback,
+    MODEL_RETRY_COUNT_MIN,
+    MODEL_RETRY_COUNT_MAX,
+  );
 }
 
 function coerceProviderCred(raw: unknown, provider: ModelProvider): ProviderCredential {
@@ -113,6 +147,14 @@ export function coerceWebClipSettings(raw: unknown): WebClipSettings {
     provider,
     model,
     outputLanguage: normalizeWebClipOutputLanguage(obj.outputLanguage),
+    modelTimeoutSeconds: coerceModelTimeoutSeconds(
+      obj.modelTimeoutSeconds,
+      DEFAULT_WEB_CLIP_SETTINGS.modelTimeoutSeconds,
+    ),
+    modelRetryCount: coerceModelRetryCount(
+      obj.modelRetryCount,
+      DEFAULT_WEB_CLIP_SETTINGS.modelRetryCount,
+    ),
   };
 }
 
@@ -129,6 +171,14 @@ export function coerceFormatSettings(raw: unknown): FormatSettings {
     provider,
     model,
     outputLanguage: normalizeFormatOutputLanguage(obj.outputLanguage),
+    modelTimeoutSeconds: coerceModelTimeoutSeconds(
+      obj.modelTimeoutSeconds,
+      DEFAULT_FORMAT_SETTINGS.modelTimeoutSeconds,
+    ),
+    modelRetryCount: coerceModelRetryCount(
+      obj.modelRetryCount,
+      DEFAULT_FORMAT_SETTINGS.modelRetryCount,
+    ),
   };
 }
 

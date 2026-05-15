@@ -206,6 +206,10 @@ async function installWebClipMock(page: Page) {
         runtime.settings.webClip.provider = provider;
         runtime.settings.webClip.model = model;
       },
+      setWebClipModelGenerationControls: (timeoutSeconds: number, retryCount: number) => {
+        (runtime.settings.webClip as any).modelTimeoutSeconds = timeoutSeconds;
+        (runtime.settings.webClip as any).modelRetryCount = retryCount;
+      },
       removeWebClipModel: () => {
         delete (runtime.settings.webClip as any).model;
       },
@@ -418,6 +422,8 @@ test.describe("Web Clip background import", () => {
     expect(stats.refineCalls[0].provider).toBe("dashscope");
     expect(stats.refineCalls[0].model).toBe("qwen-webclip");
     expect(stats.refineCalls[0].outputLanguage).toBe("zh-CN");
+    expect(stats.refineCalls[0].modelTimeoutSeconds).toBe(300);
+    expect(stats.refineCalls[0].modelRetryCount).toBe(2);
     expect(stats.saveCalls[0].markdown).toContain("> **摘要**");
     expect(stats.saveCalls[0].markdown).toContain("短新闻正文第二段");
   });
@@ -504,6 +510,7 @@ test.describe("Web Clip background import", () => {
     await page.goto("/");
     await page.evaluate(() => {
       (window as any).__aimdWebClipMock.setWebClipModel("dashscope", "qwen-webclip-custom");
+      (window as any).__aimdWebClipMock.setWebClipModelGenerationControls(80, 2);
       (window as any).__aimdWebClipMock.enableLlm(["# Web Clip\n\nBody."]);
     });
 
@@ -516,6 +523,8 @@ test.describe("Web Clip background import", () => {
       provider: "dashscope",
       model: "qwen-webclip-custom",
       outputLanguage: "zh-CN",
+      modelTimeoutSeconds: 80,
+      modelRetryCount: 2,
     });
   });
 

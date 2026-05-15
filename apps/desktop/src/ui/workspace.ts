@@ -13,7 +13,6 @@ import {
   workspaceRefreshEl,
   workspaceRootLabelEl,
   workspaceTreeEl,
-  markdownEl,
 } from "../core/dom";
 import type { WorkspaceRoot, WorkspaceTreeNode } from "../core/types";
 import { escapeAttr, escapeHTML } from "../util/escape";
@@ -27,6 +26,7 @@ import { refreshGitStatus, resetGitState } from "./git";
 import { showDocumentView } from "./git-diff";
 import { applyWorkspaceCollapseState, bindWorkspaceCollapse } from "./sidebar-layout";
 import { updateOpenTabPath } from "../document/open-document-state";
+import { commitMarkdownChange } from "../document/markdown-mutation";
 
 function samePath(a: string, b: string): boolean { return a.replace(/\\/g, "/").toLowerCase() === b.replace(/\\/g, "/").toLowerCase(); }
 
@@ -46,9 +46,11 @@ function updateDefaultHeadingAfterRename(oldPath: string, newPath: string) {
   const oldStem = fileStem(oldPath);
   const newStem = fileStem(newPath);
   if (!oldStem || !newStem || extractHeadingTitle(state.doc.markdown) !== oldStem) return;
-  state.doc.markdown = state.doc.markdown.replace(/^# .*(\r?\n|$)/m, `# ${newStem}$1`);
-  markdownEl().value = state.doc.markdown;
-  state.doc.dirty = true;
+  commitMarkdownChange({
+    markdown: state.doc.markdown.replace(/^# .*(\r?\n|$)/m, `# ${newStem}$1`),
+    origin: "workspace-rename",
+    updateSourceTextarea: true,
+  });
 }
 
 function updateOpenPathAfterWorkspaceChange(oldPath: string, newPath: string, title?: string) {

@@ -60,7 +60,6 @@ export const state: {
   openDocuments: OpenDocumentsState;
   mainView: MainView;
   mode: Mode;
-  renderTimer: number | null;
   flushTimer: number | null;
   statusTimer: number | null;
   statusOverride: {
@@ -69,7 +68,11 @@ export const state: {
     action?: string;
   } | null;
   outline: OutlineNode[];
+  markdownVersion: number;
   htmlVersion: number;
+  htmlMarkdownVersion: number;
+  pendingRenderVersion: number | null;
+  renderErrorVersion: number | null;
   paintedVersion: Record<Mode, number>;
   recentPaths: string[];
   workspace: WorkspaceRoot | null;
@@ -109,7 +112,6 @@ export const state: {
   },
   mainView: "document",
   mode: "read",
-  renderTimer: null,
   flushTimer: null,
   statusTimer: null,
   statusOverride: null,
@@ -119,7 +121,11 @@ export const state: {
   // only re-paints a pane when its painted version trails htmlVersion. Without
   // this, mode hops on a long doc rebuild innerHTML for the destination pane
   // every time and feel sluggish.
+  markdownVersion: 0,
   htmlVersion: 0,
+  htmlMarkdownVersion: 0,
+  pendingRenderVersion: null,
+  renderErrorVersion: null,
   paintedVersion: { read: -1, edit: -1, source: -1 },
   recentPaths: [],
   workspace: null,

@@ -40,7 +40,7 @@ async function installMock(page: Page) {
 }
 
 test.describe("A. inline editor 横向位置在内容增长时保持稳定", () => {
-  test("editor box 宽度恒等于 max-width（880px），left/right 不漂移", async ({ page }) => {
+  test("editor box uses available column width without left/right drift", async ({ page }) => {
     await installMock(page);
     await page.setViewportSize({ width: 1280, height: 800 });
     await page.goto("/");
@@ -54,7 +54,8 @@ test.describe("A. inline editor 横向位置在内容增长时保持稳定", () 
       });
 
     const m0 = await measure();
-    expect(m0.width).toBe(880);
+    expect(m0.width).toBeGreaterThan(700);
+    expect(m0.width).toBeLessThanOrEqual(880);
 
     // 把光标放进 H1 末尾，敲一段标题
     await page.locator("#inline-editor").evaluate((el: HTMLElement) => {

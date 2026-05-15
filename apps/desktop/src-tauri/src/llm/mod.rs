@@ -4,7 +4,7 @@ mod gemini;
 
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
-use std::time::Instant;
+use std::time::{Duration, Instant};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -110,6 +110,32 @@ pub async fn generate_text(
         "gemini" => gemini::generate_text(config, request).await,
         _ => Err(format!("暂不支持的模型 Provider：{}", config.provider)),
     }
+}
+
+pub async fn generate_text_with_retries(
+    config: &ModelConfig,
+    request: GenerateTextRequest,
+    timeout: Duration,
+    retry_count: u32,
+    timeout_message: &str,
+) -> Result<GenerateTextResponse, String> {
+    let max_attempts = retry_count.saturating_add(1);
+    let mut last_error = None;
+
+    for attempt in 1..=max_attempts {
+        let result = tokio::time::timeout(timeout, generate_text(config, request.clone())).await;
+        match result {
+            Ok(Ok(response)) => return Ok(response),
+            Ok(Err(err)) => last_error = Some(err),
+            Err(_) => last_error = Some(timeout_message.to_string()),
+        }
+
+        if attempt < max_attempts {
+            tokio::time::sleep(Duration::from_millis(500)).await;
+        }
+    }
+
+    Err(last_error.unwrap_or_else(|| timeout_message.to_string()))
 }
 
 fn strip_provider_prefix<'a>(model: &'a str, prefix: &str) -> &'a str {

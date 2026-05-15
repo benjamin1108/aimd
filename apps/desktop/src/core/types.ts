@@ -80,7 +80,13 @@ export type OpenDocumentTab = {
   sourceDirtyRefs: Set<string>;
   sourceStructuralDirty: boolean;
   inlineDirty: boolean;
+  outline: OutlineNode[];
+  markdownVersion: number;
   htmlVersion: number;
+  htmlMarkdownVersion: number;
+  pendingRenderVersion: number | null;
+  renderErrorVersion: number | null;
+  renderTimer: number | null;
   paintedVersion: Record<Mode, number>;
   operationVersion: number;
   mode: Mode;
@@ -204,12 +210,16 @@ export type WebClipSettings = {
   provider: ModelProvider;
   model: string;
   outputLanguage: WebClipOutputLanguage;
+  modelTimeoutSeconds: number;
+  modelRetryCount: number;
 };
 
 export type FormatSettings = {
   provider: ModelProvider;
   model: string;
   outputLanguage: FormatOutputLanguage;
+  modelTimeoutSeconds: number;
+  modelRetryCount: number;
 };
 
 export type UiSettings = {

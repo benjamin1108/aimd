@@ -6,8 +6,8 @@ import { flushInline } from "../editor/inline";
 import { fileStem } from "../util/path";
 import { showHealthReport } from "./health";
 
-function currentMarkdown(): string {
-  if (state.mode === "edit") flushInline();
+function currentMarkdown(): string | null {
+  if (state.mode === "edit" && !flushInline().ok) return null;
   return state.doc?.markdown ?? "";
 }
 
@@ -17,12 +17,12 @@ function suggestedBaseName(): string {
   return fileStem(doc.path) || displayDocTitle(doc).replace(/[\\/:*?"<>|]+/g, "-") || "document";
 }
 
-async function checkBeforeExport(): Promise<boolean> {
+async function checkBeforeExport(markdown: string): Promise<boolean> {
   if (!state.doc) return false;
   try {
     const report = await invoke<DocumentHealthReport>("check_document_health", {
       path: state.doc.path || null,
-      markdown: currentMarkdown(),
+      markdown,
     });
     if (report.status === "missing") {
       showHealthReport(report);
@@ -46,7 +46,8 @@ export async function exportMarkdownAssets() {
     return;
   }
   const markdown = currentMarkdown();
-  if (!await checkBeforeExport()) return;
+  if (markdown === null) return;
+  if (!await checkBeforeExport(markdown)) return;
   const outputDir = await invoke<string | null>("choose_export_markdown_dir");
   if (!outputDir) {
     setStatus("导出已取消", "info");
@@ -69,7 +70,8 @@ export async function exportMarkdownAssets() {
 export async function exportHTML() {
   if (!state.doc) return;
   const markdown = currentMarkdown();
-  if (!await checkBeforeExport()) return;
+  if (markdown === null) return;
+  if (!await checkBeforeExport(markdown)) return;
   const outputPath = await invoke<string | null>("choose_export_html_file", {
     suggestedName: `${suggestedBaseName()}.html`,
   });
@@ -94,7 +96,8 @@ export async function exportHTML() {
 export async function exportPDF() {
   if (!state.doc) return;
   const markdown = currentMarkdown();
-  if (!await checkBeforeExport()) return;
+  if (markdown === null) return;
+  if (!await checkBeforeExport(markdown)) return;
   const outputPath = await invoke<string | null>("choose_export_pdf_file", {
     suggestedName: `${suggestedBaseName()}.pdf`,
   });

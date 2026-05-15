@@ -362,11 +362,8 @@ pub async fn get_git_file_diff(root: String, path: String) -> Result<GitFileDiff
         let (staged_diff, staged_truncated) =
             run_git_ok_limited(&root, &staged_args, DIFF_OUTPUT_LIMIT)?;
         let unstaged_args = git_file_diff_args(false, &rel);
-        let (unstaged_diff, unstaged_truncated) = run_git_ok_limited(
-            &root,
-            &unstaged_args,
-            DIFF_OUTPUT_LIMIT,
-        )?;
+        let (unstaged_diff, unstaged_truncated) =
+            run_git_ok_limited(&root, &unstaged_args, DIFF_OUTPUT_LIMIT)?;
         let combined = format!("{staged_diff}\n{unstaged_diff}");
         Ok(GitFileDiff {
             path: rel,

@@ -4,9 +4,10 @@ import { inlineEditorEl } from "../core/dom";
 import type { AddedAsset } from "../core/types";
 import { setStatus } from "../ui/chrome";
 import { updateChrome } from "../ui/chrome";
-import { scheduleRender } from "../ui/outline";
+import { applyHTML, scheduleRender } from "../ui/outline";
 import { normalizeAssets } from "../document/apply";
 import { ensureDraftPackage } from "../document/drafts";
+import { commitMarkdownChange } from "../document/markdown-mutation";
 import { insertAtCursor } from "./inline";
 
 export const IMG_COMPRESS_MAX_SIDE = 2560;
@@ -83,7 +84,7 @@ export function buildAssetImage(added: AddedAsset): HTMLImageElement {
   return img;
 }
 
-export function insertImageInline(added: AddedAsset) {
+export function insertImageInline(added: AddedAsset, emitInput = true) {
   inlineEditorEl().focus();
   const sel = document.getSelection();
   if (!sel || sel.rangeCount === 0) {
@@ -99,7 +100,30 @@ export function insertImageInline(added: AddedAsset) {
   range.collapse(true);
   sel.removeAllRanges();
   sel.addRange(range);
-  inlineEditorEl().dispatchEvent(new Event("input"));
+  if (emitInput) inlineEditorEl().dispatchEvent(new Event("input"));
+}
+
+function markdownWithInsertedImage(markdown: string, imageMarkdown: string): string {
+  const model = state.sourceModel?.markdown === markdown ? state.sourceModel : null;
+  const anchor = window.getSelection()?.anchorNode;
+  const anchorElement = anchor instanceof HTMLElement ? anchor : anchor?.parentElement;
+  const sourceRef = anchorElement?.closest<HTMLElement>("[data-md-source-ref]")?.dataset.mdSourceRef || "";
+  const blockId = sourceRef.split(":")[0];
+  const block = model?.blocks.find((candidate) => candidate.id === blockId);
+  const insertAt = block?.end ?? markdown.length;
+  const before = markdown.slice(0, insertAt).replace(/\s*$/, "");
+  const after = markdown.slice(insertAt).replace(/^\s*/, "");
+  return after
+    ? `${before}\n\n${imageMarkdown.trim()}\n\n${after}`
+    : `${before}\n\n${imageMarkdown.trim()}\n`;
+}
+
+export function applyVisualEditorHTMLAsCurrent() {
+  if (!state.doc) return;
+  const template = document.createElement("template");
+  template.innerHTML = state.doc.html || "";
+  const frontmatter = template.content.querySelector<HTMLElement>(".aimd-frontmatter")?.outerHTML || "";
+  applyHTML(`${frontmatter}${inlineEditorEl().innerHTML}`);
 }
 
 export async function insertImage() {
@@ -126,14 +150,27 @@ export async function insertImage() {
       data: Array.from(compressed.data),
     }));
     if (state.mode === "edit") {
-      insertImageInline(added);
+      state.doc.assets = [...state.doc.assets, added.asset];
+      commitMarkdownChange({
+        markdown: markdownWithInsertedImage(state.doc.markdown, added.markdown),
+        origin: "insert-image",
+        updateSourceTextarea: true,
+        scheduleRender: false,
+      });
+      insertImageInline(added, false);
+      state.inlineDirty = false;
+      applyVisualEditorHTMLAsCurrent();
     } else if (state.mode === "source") {
       insertAtCursor(`${added.markdown}\n`);
     } else {
-      // In read mode, just append to markdown source for next save.
-      state.doc.markdown += `\n${added.markdown}\n`;
+      state.doc.assets = [...state.doc.assets, added.asset];
+      commitMarkdownChange({
+        markdown: `${state.doc.markdown}\n${added.markdown}\n`,
+        origin: "insert-image",
+        updateSourceTextarea: true,
+      });
     }
-    state.doc.assets = [...state.doc.assets, added.asset];
+    if (state.mode === "source") state.doc.assets = [...state.doc.assets, added.asset];
     state.doc.dirty = true;
     if (state.doc.format === "markdown") {
       state.doc.requiresAimdSave = true;

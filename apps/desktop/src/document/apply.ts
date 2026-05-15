@@ -1,7 +1,7 @@
 import { state } from "../core/state";
 import { markdownEl } from "../core/dom";
 import type { AimdDocument, Mode } from "../core/types";
-import { applyHTML } from "../ui/outline";
+import { extractOutlineFromHTML, renderOutline } from "../ui/outline";
 import { setMode } from "../ui/mode";
 import { updateChrome } from "../ui/chrome";
 import { renderDocPanelTabs } from "../ui/doc-panel";
@@ -31,8 +31,14 @@ export function paintActiveDocument(mode: Mode) {
     ? { scroll: { ...tab.scroll }, sourceSelection: { ...tab.sourceSelection } }
     : null;
   markdownEl().value = state.doc.markdown;
-  refreshSourceHighlight();
-  applyHTML(state.doc.html);
+  if (mode === "source") refreshSourceHighlight();
+  if (tab) {
+    tab.outline = tab.outline.length ? tab.outline : extractOutlineFromHTML(state.doc.html);
+    state.outline = tab.outline;
+  } else {
+    state.outline = extractOutlineFromHTML(state.doc.html);
+  }
+  renderOutline();
   if (tab && viewState && activeTab()?.id === tab.id) {
     tab.scroll = viewState.scroll;
     tab.sourceSelection = viewState.sourceSelection;
@@ -76,8 +82,8 @@ export async function activateDocumentTab(tabId: string): Promise<boolean> {
     return true;
   }
   if (state.mode === "edit" && state.inlineDirty) {
-    flushInline();
-    if (state.inlineDirty) return false;
+    const flushed = flushInline();
+    if (!flushed.ok) return false;
   }
   captureActiveViewState();
   syncActiveTabFromFacade();

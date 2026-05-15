@@ -7,6 +7,7 @@ import { scheduleRender } from "../ui/outline";
 import { ensureDraftPackage } from "../document/drafts";
 import {
   compressImageBytes, normalizeAddedAsset,
+  applyVisualEditorHTMLAsCurrent,
   insertImageInline,
 } from "./images";
 import {
@@ -15,6 +16,7 @@ import {
 } from "./inline";
 import { insertAtCursor } from "./inline";
 import { closestBlock, runFormatCommand } from "./format-toolbar";
+import { commitMarkdownChange } from "../document/markdown-mutation";
 
 function isHeading(el: Element | null): boolean {
   return !!el && /^H[1-6]$/.test(el.tagName);
@@ -98,11 +100,20 @@ export async function pasteImageFiles(files: File[], target: "edit" | "source") 
         data: Array.from(compressed.data),
       }));
       if (target === "edit") {
-        insertImageInline(added);
+        state.doc.assets = [...state.doc.assets, added.asset];
+        commitMarkdownChange({
+          markdown: `${state.doc.markdown.replace(/\s*$/, "")}\n\n${added.markdown.trim()}\n`,
+          origin: "paste-image",
+          updateSourceTextarea: true,
+          scheduleRender: false,
+        });
+        insertImageInline(added, false);
+        state.inlineDirty = false;
+        applyVisualEditorHTMLAsCurrent();
       } else {
         insertAtCursor(`${added.markdown}\n`);
+        state.doc.assets = [...state.doc.assets, added.asset];
       }
-      state.doc.assets = [...state.doc.assets, added.asset];
       state.doc.dirty = true;
       if (state.doc.format === "markdown") {
         state.doc.requiresAimdSave = true;

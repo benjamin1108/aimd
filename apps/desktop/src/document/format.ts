@@ -2,13 +2,13 @@ import { invoke } from "@tauri-apps/api/core";
 import { state } from "../core/state";
 import { setStatus, updateChrome } from "../ui/chrome";
 import { flushInline } from "../editor/inline";
-import { markdownEl, formatPreviewPanelEl, formatPreviewTextEl, formatApplyEl, formatCancelEl, formatPreviewCancelXEl } from "../core/dom";
+import { formatPreviewPanelEl, formatPreviewTextEl, formatApplyEl, formatCancelEl, formatPreviewCancelXEl } from "../core/dom";
 import { renderPreview } from "../ui/outline";
 import { loadAppSettings } from "../core/settings";
-import { hasAimdImageReferences } from "./assets";
 import { splitFrontmatter } from "../markdown/frontmatter";
 import { hasGitConflictMarkers } from "./apply";
 import { beginTabOperation, isActiveOperationCurrent } from "./open-document-state";
+import { commitMarkdownChange } from "./markdown-mutation";
 
 let formatting = false;
 let pendingMarkdown = "";
@@ -85,14 +85,12 @@ export function bindFormatDocumentPanel() {
     if (!state.doc || !pendingMarkdown || pendingTabId !== state.openDocuments.activeTabId) return;
     const markdown = pendingMarkdown;
     hidePreview();
-    state.doc.markdown = markdown;
-    state.doc.dirty = true;
-    state.doc.hasExternalImageReferences = false;
-    if (state.doc.format === "markdown") {
-      state.doc.requiresAimdSave = hasAimdImageReferences(markdown) || state.doc.assets.length > 0;
-      state.doc.needsAimdSave = state.doc.requiresAimdSave;
-    }
-    markdownEl().value = markdown;
+    commitMarkdownChange({
+      markdown,
+      origin: "format-apply",
+      updateSourceTextarea: true,
+      renderImmediately: true,
+    });
     await renderPreview();
     updateChrome();
     setStatus("格式化结果已应用", "success");
@@ -111,7 +109,7 @@ export async function formatCurrentDocument() {
     setStatus("文档包含 Git 冲突，请解决后再格式化", "warn");
     return;
   }
-  if (state.mode === "edit") flushInline();
+  if (state.mode === "edit" && !flushInline().ok) return;
   const target = beginTabOperation();
   if (!target) return;
   formatting = true;
@@ -124,6 +122,8 @@ export async function formatCurrentDocument() {
       provider: config.provider,
       model: config.model,
       outputLanguage: config.outputLanguage,
+      modelTimeoutSeconds: config.modelTimeoutSeconds,
+      modelRetryCount: config.modelRetryCount,
     });
     if (!isActiveOperationCurrent(target)) return;
     if (!result.needed) {

@@ -2,18 +2,12 @@ import { getCurrentWindow } from "@tauri-apps/api/window";
 import { invoke } from "@tauri-apps/api/core";
 import "../styles.css";
 
-import { cloneSettings, DEFAULT_AI_SETTINGS, DEFAULT_UI_SETTINGS, DEFAULT_WEB_CLIP_SETTINGS, DEFAULT_FORMAT_SETTINGS, loadAppSettings, saveAppSettings, defaultModelForProvider, defaultWebClipModelForProvider, type AppSettings } from "../core/settings";
-import type {
-  ModelProvider,
-  ProviderCredential,
-  WebClipOutputLanguage,
-  UiSettings,
-  FormatSettings,
-  FormatOutputLanguage,
-} from "../core/types";
+import { cloneSettings, coerceModelRetryCount, coerceModelTimeoutSeconds, DEFAULT_AI_SETTINGS, DEFAULT_UI_SETTINGS, DEFAULT_WEB_CLIP_SETTINGS, DEFAULT_FORMAT_SETTINGS, loadAppSettings, saveAppSettings, defaultModelForProvider, defaultWebClipModelForProvider, type AppSettings } from "../core/settings";
+import type { ModelProvider, ProviderCredential, WebClipOutputLanguage, UiSettings, FormatSettings, FormatOutputLanguage } from "../core/types";
 import { setupGitIntegration } from "./git-integration";
 import { settingsTemplateHTML } from "./template";
 import { bindSelectionBoundary } from "../ui/selection";
+import { bindApiKeyMask } from "./api-key-mask";
 import { customModelValue, renderModelOptionsFor, type ModelConnectionTestResult } from "./model-controls";
 
 declare global {
@@ -50,10 +44,14 @@ const webClipProviderEl = $<HTMLSelectElement>("#webclip-provider");
 const webClipModelSelectEl = $<HTMLSelectElement>("#webclip-model-select");
 const webClipModelEl = $<HTMLInputElement>("#webclip-model");
 const webClipOutputLanguageEl = $<HTMLSelectElement>("#webclip-output-language");
+const webClipModelTimeoutEl = $<HTMLInputElement>("#webclip-model-timeout");
+const webClipModelRetryEl = $<HTMLInputElement>("#webclip-model-retry");
 const formatProviderEl = $<HTMLSelectElement>("#format-provider");
 const formatModelSelectEl = $<HTMLSelectElement>("#format-model-select");
 const formatModelEl = $<HTMLInputElement>("#format-model");
 const formatOutputLanguageEl = $<HTMLSelectElement>("#format-output-language");
+const formatModelTimeoutEl = $<HTMLInputElement>("#format-model-timeout");
+const formatModelRetryEl = $<HTMLInputElement>("#format-model-retry");
 const saveStateEl = $<HTMLElement>("#save-state");
 const saveButtonEl = $<HTMLButtonElement>("#save-settings");
 const cancelButtonEl = $<HTMLButtonElement>("#cancel");
@@ -68,8 +66,8 @@ const gitIntegration = setupGitIntegration(root);
 let saving = false;
 let testingConnection = false;
 let closing = false;
-let revealApiKey = false;
 let baseline = "";
+const apiKeyMask = bindApiKeyMask(apiKeyEl, apiKeyWrapEl, apiKeyMaskEl, apiKeyRevealEl);
 
 let activeProvider: ModelProvider = "dashscope";
 let draft: Record<ModelProvider, ProviderCredential> = {
@@ -126,6 +124,10 @@ function readCredFromForm(): ProviderCredential {
   };
 }
 
+function readModelTimeout(el: HTMLInputElement, fallback: number): number { return coerceModelTimeoutSeconds(el.value, fallback); }
+
+function readModelRetry(el: HTMLInputElement, fallback: number): number { return coerceModelRetryCount(el.value, fallback); }
+
 function captureFormToDraft() {
   draft[activeProvider] = readCredFromForm();
   uiConfig.showAssetPanel = uiShowAssetPanelEl.checked;
@@ -139,6 +141,14 @@ function captureFormToDraft() {
   webClipConfig.provider = webClipProvider;
   webClipConfig.model = webClipModel;
   webClipConfig.outputLanguage = webClipOutputLanguageEl.value as WebClipOutputLanguage;
+  webClipConfig.modelTimeoutSeconds = readModelTimeout(
+    webClipModelTimeoutEl,
+    DEFAULT_WEB_CLIP_SETTINGS.modelTimeoutSeconds,
+  );
+  webClipConfig.modelRetryCount = readModelRetry(
+    webClipModelRetryEl,
+    DEFAULT_WEB_CLIP_SETTINGS.modelRetryCount,
+  );
   const formatProvider = formatProviderEl.value as ModelProvider;
   formatConfig = {
     provider: formatProvider,
@@ -146,6 +156,14 @@ function captureFormToDraft() {
       ? (formatModelEl.value.trim() || defaultModelForProvider(formatProvider))
       : formatModelSelectEl.value,
     outputLanguage: formatOutputLanguageEl.value as FormatOutputLanguage,
+    modelTimeoutSeconds: readModelTimeout(
+      formatModelTimeoutEl,
+      DEFAULT_FORMAT_SETTINGS.modelTimeoutSeconds,
+    ),
+    modelRetryCount: readModelRetry(
+      formatModelRetryEl,
+      DEFAULT_FORMAT_SETTINGS.modelRetryCount,
+    ),
   };
 }
 
@@ -163,7 +181,7 @@ function loadProviderToForm(provider: ModelProvider) {
   apiBaseEl.value = cred.apiBase;
   apiKeyErrorEl.hidden = true;
   clearConnectionTestState();
-  refreshApiKeyMask();
+  apiKeyMask.refresh();
 }
 
 function fill(settings: AppSettings) {
@@ -178,6 +196,8 @@ function fill(settings: AppSettings) {
     provider: settings.webClip?.provider ?? "dashscope",
     model: settings.webClip?.model ?? defaultWebClipModelForProvider(settings.ai, settings.webClip?.provider ?? "dashscope"),
     outputLanguage: settings.webClip?.outputLanguage ?? "zh-CN",
+    modelTimeoutSeconds: settings.webClip?.modelTimeoutSeconds ?? DEFAULT_WEB_CLIP_SETTINGS.modelTimeoutSeconds,
+    modelRetryCount: settings.webClip?.modelRetryCount ?? DEFAULT_WEB_CLIP_SETTINGS.modelRetryCount,
   };
   webClipModelDraft = {
     dashscope: webClipConfig.provider === "dashscope"
@@ -191,6 +211,8 @@ function fill(settings: AppSettings) {
     provider: settings.format?.provider ?? "dashscope",
     model: settings.format?.model ?? defaultModelForProvider(settings.format?.provider ?? "dashscope"),
     outputLanguage: settings.format?.outputLanguage ?? "zh-CN",
+    modelTimeoutSeconds: settings.format?.modelTimeoutSeconds ?? DEFAULT_FORMAT_SETTINGS.modelTimeoutSeconds,
+    modelRetryCount: settings.format?.modelRetryCount ?? DEFAULT_FORMAT_SETTINGS.modelRetryCount,
   };
   uiConfig = {
     showAssetPanel: settings.ui?.showAssetPanel ?? false,
@@ -202,8 +224,12 @@ function fill(settings: AppSettings) {
   webClipProviderEl.value = webClipConfig.provider;
   renderModelOptionsFor(webClipModelSelectEl, webClipModelEl, webClipConfig.provider, webClipConfig.model);
   webClipOutputLanguageEl.value = webClipConfig.outputLanguage;
+  webClipModelTimeoutEl.value = String(webClipConfig.modelTimeoutSeconds);
+  webClipModelRetryEl.value = String(webClipConfig.modelRetryCount);
   formatProviderEl.value = formatConfig.provider;
   formatOutputLanguageEl.value = formatConfig.outputLanguage;
+  formatModelTimeoutEl.value = String(formatConfig.modelTimeoutSeconds);
+  formatModelRetryEl.value = String(formatConfig.modelRetryCount);
   renderModelOptionsFor(formatModelSelectEl, formatModelEl, formatConfig.provider, formatConfig.model);
 
   loadProviderToForm(activeProvider);
@@ -228,11 +254,15 @@ function readSettings(): AppSettings {
       provider: webClipConfig.provider,
       model: webClipConfig.model,
       outputLanguage: webClipConfig.outputLanguage,
+      modelTimeoutSeconds: webClipConfig.modelTimeoutSeconds,
+      modelRetryCount: webClipConfig.modelRetryCount,
     },
     format: {
       provider: formatConfig.provider,
       model: formatConfig.model,
       outputLanguage: formatConfig.outputLanguage,
+      modelTimeoutSeconds: formatConfig.modelTimeoutSeconds,
+      modelRetryCount: formatConfig.modelRetryCount,
     },
     ui: {
       showAssetPanel: uiConfig.showAssetPanel,
@@ -268,35 +298,13 @@ async function closeWindow() {
   closing = false;
 }
 
-function maskedDisplay(value: string): string {
-  const v = value.trim();
-  if (!v) return "";
-  if (v.length <= 8) return "已隐藏";
-  return `${v.slice(0, 4)}…${v.slice(-4)}`;
-}
-
-function refreshApiKeyMask() {
-  const hasValue = apiKeyEl.value.trim().length > 0;
-  apiKeyEl.type = revealApiKey ? "text" : "password";
-  const showOverlay = !revealApiKey && hasValue;
-  apiKeyWrapEl.dataset.state = showOverlay ? "masked" : "visible";
-  apiKeyMaskEl.textContent = showOverlay ? maskedDisplay(apiKeyEl.value) : "";
-}
-
-apiKeyEl.addEventListener("focus", refreshApiKeyMask);
-apiKeyEl.addEventListener("blur", refreshApiKeyMask);
 apiKeyEl.addEventListener("input", () => {
-  refreshApiKeyMask();
+  apiKeyMask.refresh();
   clearConnectionTestState();
   syncSaveButton();
 });
-apiKeyRevealEl.addEventListener("click", () => {
-  revealApiKey = !revealApiKey;
-  apiKeyRevealEl.setAttribute("aria-pressed", String(revealApiKey));
-  refreshApiKeyMask();
-});
 
-[apiBaseEl, modelEl, uiShowAssetPanelEl, uiDebugModeEl, webClipLlmEnabledEl, webClipModelEl, webClipOutputLanguageEl, formatProviderEl, formatModelEl, formatOutputLanguageEl].forEach((el) => {
+[apiBaseEl, modelEl, uiShowAssetPanelEl, uiDebugModeEl, webClipLlmEnabledEl, webClipModelEl, webClipOutputLanguageEl, webClipModelTimeoutEl, webClipModelRetryEl, formatProviderEl, formatModelEl, formatOutputLanguageEl, formatModelTimeoutEl, formatModelRetryEl].forEach((el) => {
   el.addEventListener("input", () => {
     clearConnectionTestState();
     syncSaveButton();
@@ -371,6 +379,8 @@ webClipProviderEl.addEventListener("change", () => {
     provider,
     model,
     outputLanguage: webClipOutputLanguageEl.value as WebClipOutputLanguage,
+    modelTimeoutSeconds: readModelTimeout(webClipModelTimeoutEl, DEFAULT_WEB_CLIP_SETTINGS.modelTimeoutSeconds),
+    modelRetryCount: readModelRetry(webClipModelRetryEl, DEFAULT_WEB_CLIP_SETTINGS.modelRetryCount),
   };
   renderModelOptionsFor(webClipModelSelectEl, webClipModelEl, provider, model);
   syncSaveButton();
