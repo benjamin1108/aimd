@@ -1,7 +1,7 @@
 /* Responsive collapse — explicit rail behavior.
    Wide desktop keeps three columns. Medium keeps the project rail and turns
-   the inspector into a stable 44px affordance before the editor surface starts
-   squeezing. Narrow tablet hides the project rail first; mobile hides both rails
+   the inspector into a stable narrow affordance before the editor surface starts
+   squeezing. Narrow tablet keeps the project rail as the same narrow affordance; mobile hides both rails
    and keeps document commands in the workspace header. */
 
 @media (max-width: 1180px) {
@@ -19,6 +19,13 @@
       minmax(0, 1fr)
       var(--rail-collapsed-width);
   }
+
+  .panel[data-mode="source"][data-source-pressure="true"][data-project-rail="collapsed"]:not([data-shell="launch"]) {
+    grid-template-columns:
+      var(--rail-collapsed-width)
+      minmax(0, 1fr)
+      var(--rail-collapsed-width);
+  }
 }
 
 @media (max-width: 1100px) {
@@ -31,18 +38,24 @@
     grid-template-columns: var(--project-rail-width) minmax(0, 1fr) var(--rail-collapsed-width);
   }
 
+  .panel[data-project-rail="collapsed"]:not([data-shell="launch"]) {
+    grid-template-columns: var(--rail-collapsed-width) minmax(0, 1fr) var(--rail-collapsed-width);
+  }
+
+  .panel[data-inspector="expanded"]:not([data-shell="launch"]) {
+    grid-template-columns: var(--project-rail-width) minmax(0, 1fr) var(--inspector-rail-width);
+  }
+
+  .panel[data-project-rail="collapsed"][data-inspector="expanded"]:not([data-shell="launch"]) {
+    grid-template-columns: var(--rail-collapsed-width) minmax(0, 1fr) var(--inspector-rail-width);
+  }
+
   .panel[data-shell="document"][data-has-doc="false"]:not([data-main-view="git-diff"]) {
     grid-template-columns: var(--project-rail-width) minmax(0, 1fr);
   }
 
-  .panel[data-inspector="expanded"] .inspector {
-    position: absolute;
-    top: 0;
-    right: 0;
-    bottom: 0;
-    width: var(--inspector-rail-width);
-    z-index: var(--z-drawer);
-    box-shadow: -18px 0 30px -24px rgba(31, 22, 11, 0.4);
+  .panel[data-shell="document"][data-has-doc="false"][data-project-rail="collapsed"]:not([data-main-view="git-diff"]) {
+    grid-template-columns: var(--rail-collapsed-width) minmax(0, 1fr);
   }
 }
 
@@ -55,10 +68,35 @@
     grid-template-columns: minmax(0, 1fr) var(--rail-collapsed-width);
   }
 
+  .panel[data-project-rail="expanded"]:not([data-shell="launch"]) {
+    grid-template-columns: var(--project-rail-width) minmax(0, 1fr) var(--rail-collapsed-width);
+  }
+
+  .panel[data-inspector="expanded"]:not([data-shell="launch"]) {
+    grid-template-columns: minmax(0, 1fr) var(--inspector-rail-width);
+  }
+
+  .panel[data-project-rail="collapsed"]:not([data-shell="launch"]) {
+    grid-template-columns: var(--rail-collapsed-width) minmax(0, 1fr) var(--rail-collapsed-width);
+  }
+
+  .panel[data-project-rail="expanded"][data-inspector="expanded"]:not([data-shell="launch"]) {
+    grid-template-columns: var(--project-rail-width) minmax(0, 1fr) var(--inspector-rail-width);
+  }
+
+  .panel[data-project-rail="collapsed"][data-inspector="expanded"]:not([data-shell="launch"]) {
+    grid-template-columns: var(--rail-collapsed-width) minmax(0, 1fr) var(--inspector-rail-width);
+  }
+
   .panel[data-shell="document"][data-has-doc="false"]:not([data-main-view="git-diff"]) {
     grid-template-columns: minmax(0, 1fr);
   }
-  .sidebar { display: none; }
+  .panel[data-shell="document"][data-has-doc="false"][data-project-rail="collapsed"]:not([data-main-view="git-diff"]) {
+    grid-template-columns: var(--rail-collapsed-width) minmax(0, 1fr);
+  }
+  .panel[data-shell="document"][data-has-doc="false"][data-project-rail="expanded"]:not([data-main-view="git-diff"]) {
+    grid-template-columns: var(--project-rail-width) minmax(0, 1fr);
+  }
   .reader { padding: 28px 28px 56px; }
 }
 
@@ -113,19 +151,33 @@
     flex: 0 0 auto;
   }
   .doc-toolbar {
+    display: flex;
+    align-items: center;
+    justify-content: flex-start;
     grid-template-columns: minmax(0, 1fr) auto auto auto;
     gap: 6px;
     padding: 0;
   }
-  .toolbar-group--mode { min-width: 0; }
-  .mode-switch {
-    flex: 0 1 auto;
+  .doc-toolbar > .format-toolbar {
+    flex: 1 1 auto;
     min-width: 0;
   }
+  .find-cluster,
+  .toolbar-group--mode,
+  .command-actions {
+    flex: 0 0 auto;
+  }
+  .toolbar-group--mode {
+    min-width: max-content;
+  }
+  .mode-switch {
+    flex: 0 0 auto;
+    min-width: max-content;
+  }
   .mode-btn {
-    flex: 0 1 auto;
-    min-width: 0;
-    padding: 0 8px;
+    flex: 0 0 36px;
+    min-width: 36px;
+    padding: 0 6px;
     justify-content: center;
   }
   .find-bar {

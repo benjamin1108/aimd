@@ -9,6 +9,7 @@
 @import "./styles/frame.css";
 @import "./styles/app-topbar.css";
 @import "./styles/sidebar.css";
+@import "./styles/tree-overflow-portal.css";
 @import "./styles/sidebar-layout.css";
 @import "./styles/inspector.css";
 @import "./styles/sidebar-git.css";

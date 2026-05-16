@@ -41,9 +41,29 @@
     var(--rail-collapsed-width);
 }
 
+.panel[data-project-rail="collapsed"] {
+  grid-template-columns:
+    var(--rail-collapsed-width)
+    minmax(var(--workspace-min-width), 1fr)
+    var(--inspector-rail-width);
+}
+
+.panel[data-project-rail="collapsed"][data-inspector="collapsed"] {
+  grid-template-columns:
+    var(--rail-collapsed-width)
+    minmax(var(--workspace-min-width), 1fr)
+    var(--rail-collapsed-width);
+}
+
 .panel[data-shell="document"][data-has-doc="false"]:not([data-main-view="git-diff"]) {
   grid-template-columns:
     var(--project-rail-width)
+    minmax(0, 1fr);
+}
+
+.panel[data-shell="document"][data-has-doc="false"][data-project-rail="collapsed"]:not([data-main-view="git-diff"]) {
+  grid-template-columns:
+    var(--rail-collapsed-width)
     minmax(0, 1fr);
 }
 

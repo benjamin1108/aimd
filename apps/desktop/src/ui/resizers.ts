@@ -1,5 +1,5 @@
 import { inspectorHrResizerEl, panelEl, sidebarHrResizerEl } from "../core/dom";
-import { state, STORAGE_DOC_PANEL_COLLAPSED, STORAGE_WORKSPACE_COLLAPSED } from "../core/state";
+import { state, STORAGE_DOC_PANEL_COLLAPSED } from "../core/state";
 
 export const PROJECT_RAIL_MIN_W = 200;
 export const PROJECT_RAIL_DEFAULT_W = 244;
@@ -59,27 +59,16 @@ export function applySidebarWidth(w: number) {
 }
 
 function expandForResize(el: HTMLElement) {
-  if (el.id === "workspace-section" && state.workspaceCollapsed) {
-    state.workspaceCollapsed = false;
-    window.localStorage.setItem(STORAGE_WORKSPACE_COLLAPSED, "false");
-    el.classList.remove("is-collapsed");
-    document.querySelector<HTMLButtonElement>("#workspace-collapse")?.setAttribute("aria-expanded", "true");
-    const btn = document.querySelector<HTMLButtonElement>("#workspace-collapse");
-    if (btn) {
-      btn.textContent = "⌃";
-      btn.title = "折叠项目";
-    }
-  }
   if (el.id === "outline-section" && state.docPanelCollapsed) {
     state.docPanelCollapsed = false;
     window.localStorage.setItem(STORAGE_DOC_PANEL_COLLAPSED, "false");
     el.classList.remove("is-collapsed");
-      const btn = document.querySelector<HTMLButtonElement>("#doc-panel-collapse");
-      if (btn) {
-        btn.setAttribute("aria-expanded", "true");
-        btn.textContent = "›";
-        btn.title = "折叠检查器";
-      }
+    const btn = document.querySelector<HTMLButtonElement>("#doc-panel-collapse");
+    if (btn) {
+      btn.setAttribute("aria-expanded", "true");
+      btn.textContent = "›";
+      btn.title = "折叠检查器";
+    }
   }
 }
 
@@ -144,6 +133,7 @@ export function bindSidebarHrResizer() {
   let startW = 0;
 
   handle.addEventListener("pointerdown", (e: PointerEvent) => {
+    if (state.projectRailCollapsed || window.innerWidth <= 900) return;
     e.preventDefault();
     startX = e.clientX;
     startW = currentProjectWidth();

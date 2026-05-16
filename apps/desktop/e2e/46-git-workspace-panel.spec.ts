@@ -192,7 +192,8 @@ test.describe("Git workspace panel", () => {
     await expect(page.locator("#doc-panel-tabs [role='tab']:not([hidden])")).toHaveText(["大纲", "Git", "资源"]);
     await page.locator("#sidebar-tab-git").click();
     await expect(page.locator("#git-panel")).toBeVisible();
-    await expect(page.locator("#git-content")).toHaveText("");
+    await expect(page.locator("#sidebar-tab-git")).toHaveAttribute("aria-selected", "true");
+    await expect(page.locator("#git-content")).toContainText("当前项目不是 Git 仓库");
   });
 
   test("shows Git tab for repo while keeping outline selected by default for the active document", async ({ page }) => {
@@ -382,12 +383,16 @@ test.describe("Git workspace panel", () => {
     await page.goto("/");
 
     await openWorkspaceDocument(page);
-    await page.locator("#workspace-collapse").click();
-    await expect(page.locator("#workspace-section")).toHaveClass(/is-collapsed/);
-    await expect(page.locator("#workspace-tree")).toBeHidden();
+    await expect(page.locator("#workspace-collapse")).toHaveCount(0);
 
-    await page.locator("#workspace-collapse").click();
-    await expect(page.locator("#workspace-section")).not.toHaveClass(/is-collapsed/);
+    await page.locator("#project-rail-collapse").click();
+    await expect(page.locator(".sidebar")).toHaveClass(/is-collapsed/);
+    await expect(page.locator("#workspace-tree")).toBeHidden();
+    const projectCollapsed = await page.locator(".sidebar").boundingBox();
+    expect(projectCollapsed!.width).toBeLessThanOrEqual(36);
+
+    await page.locator("#project-rail-collapse").click();
+    await expect(page.locator(".sidebar")).not.toHaveClass(/is-collapsed/);
 
     const projectBefore = await page.locator(".sidebar").boundingBox();
     const projectHandle = await page.locator("#sidebar-hr-resizer").boundingBox();
@@ -402,6 +407,8 @@ test.describe("Git workspace panel", () => {
     await page.locator("#doc-panel-collapse").click();
     await expect(page.locator("#outline-section")).toHaveClass(/is-collapsed/);
     await expect(page.locator("#inspector")).toHaveClass(/is-collapsed/);
+    const inspectorCollapsed = await page.locator("#inspector").boundingBox();
+    expect(inspectorCollapsed!.width).toBeLessThanOrEqual(36);
     await page.locator("#doc-panel-collapse").click();
     await expect(page.locator("#outline-section")).not.toHaveClass(/is-collapsed/);
 

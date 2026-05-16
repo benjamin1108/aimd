@@ -27,10 +27,10 @@ import { rememberOpenedPath, saveRecentPaths } from "./recents";
 import { confirmWorkspaceAction, promptWorkspaceText } from "./workspace-dialogs";
 import { refreshGitStatus, resetGitState } from "./git";
 import { showDocumentView } from "./git-diff";
-import { applyWorkspaceCollapseState, bindWorkspaceCollapse } from "./sidebar-layout";
 import { updateOpenTabPath } from "../document/open-document-state";
 import { commitMarkdownChange } from "../document/markdown-mutation";
 import { showWorkspaceNodeContextMenu } from "./workspace-context-menu";
+import { bindTreeOverflowOverlay, clearTreeOverflowOverlay } from "./tree-overflow-portal";
 
 function samePath(a: string, b: string): boolean { return a.replace(/\\/g, "/").toLowerCase() === b.replace(/\\/g, "/").toLowerCase(); }
 
@@ -121,13 +121,18 @@ function workspaceFormatTag(node: WorkspaceTreeNode): string {
   return `<span class="workspace-format-tag">${label}</span>`;
 }
 
+function workspaceIndentStyle(depth: number): string {
+  if (depth <= 0) return "--workspace-row-indent:var(--workspace-row-indent-base)";
+  return `--workspace-row-indent:calc(var(--workspace-row-indent-base) ${Array.from({ length: depth }, () => "+ var(--workspace-row-indent-step)").join(" ")})`;
+}
+
 function renderNode(node: WorkspaceTreeNode, depth: number): string {
   const expanded = state.workspaceExpanded.has(node.path);
   const active = Boolean(state.doc?.path && samePath(state.doc.path, node.path));
   const hasChildren = node.kind === "folder" && (node.children?.length || 0) > 0;
   const row = `
     <button class="workspace-row ${node.kind === "folder" ? "is-folder" : "is-document"} ${expanded ? "is-expanded" : ""} ${active ? "is-active" : ""}"
-            style="padding-left:${8 + depth * 14}px"
+            style="${workspaceIndentStyle(depth)}"
             data-workspace-path="${escapeAttr(node.path)}"
             data-workspace-kind="${escapeAttr(node.kind)}"
             data-file-item="true"
@@ -145,7 +150,7 @@ function renderNode(node: WorkspaceTreeNode, depth: number): string {
 }
 
 export function renderWorkspaceTree() {
-  applyWorkspaceCollapseState();
+  clearTreeOverflowOverlay();
   workspaceRefreshEl().disabled = !state.workspace || state.workspaceLoading;
   workspaceNewDocEl().disabled = !state.workspace || state.workspaceLoading;
   workspaceCloseEl().disabled = !state.workspace || state.workspaceLoading;
@@ -186,6 +191,7 @@ export function renderWorkspaceTree() {
 
 function bindWorkspaceRows() {
   workspaceTreeEl().querySelectorAll<HTMLButtonElement>(".workspace-row[data-workspace-path]").forEach((row) => {
+    bindTreeOverflowOverlay(row);
     row.addEventListener("click", () => {
       const path = row.dataset.workspacePath || "";
       const kind = row.dataset.workspaceKind;
@@ -451,7 +457,6 @@ export function closeWorkspace() {
 
 export function bindWorkspacePanel() {
   loadExpandedState();
-  bindWorkspaceCollapse(renderWorkspaceTree);
   workspaceOpenEl().addEventListener("click", () => { void openWorkspacePicker(); });
   workspaceRefreshEl().addEventListener("click", () => { void refreshWorkspace(); });
   workspaceNewDocEl().addEventListener("click", (event) => {

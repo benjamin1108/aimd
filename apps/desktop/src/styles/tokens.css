@@ -84,7 +84,14 @@
   --size-control-xs: 24px;
   --size-icon: 30px;
   --size-icon-lg: 32px;
-  --rail-collapsed-width: 46px;
+  --rail-collapsed-width: 20px;
+  --workspace-row-indent-base: 6px;
+  --workspace-row-indent-step: 10px;
+  --workspace-row-overflow-buffer: calc(var(--size-control-xs) / 3);
+  --workspace-row-overflow-max-extension: calc(var(--size-control-xs) * 7);
+  --workspace-row-overflow-viewport-gutter: var(--size-control);
+  --workspace-row-overflow-offset: calc(var(--size-control-xs) / -12);
+  --workspace-row-overflow-duration: 120ms;
 
   /* Motion */
   --ease: cubic-bezier(0.16, 1, 0.3, 1);

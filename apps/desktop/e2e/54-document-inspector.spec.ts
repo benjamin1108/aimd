@@ -326,6 +326,18 @@ test.describe("Document inspector ownership", () => {
     await openWorkspaceAndDocs(page);
     await page.setViewportSize({ width: 800, height: 720 });
 
+    const expandedMetrics = await page.evaluate(() => {
+      const workspace = document.querySelector<HTMLElement>(".workspace")!.getBoundingClientRect();
+      const inspector = document.querySelector<HTMLElement>("#inspector")!.getBoundingClientRect();
+      return {
+        workspaceRight: workspace.right,
+        inspectorLeft: inspector.left,
+        inspectorPosition: getComputedStyle(document.querySelector<HTMLElement>("#inspector")!).position,
+      };
+    });
+    expect(expandedMetrics.inspectorPosition).not.toBe("absolute");
+    expect(expandedMetrics.workspaceRight).toBeLessThanOrEqual(expandedMetrics.inspectorLeft + 1);
+
     await page.locator("#doc-panel-collapse").click();
     await expect(page.locator("#outline-section")).toHaveClass(/is-collapsed/);
     await expect(page.locator("#open-tabs")).toBeVisible();

@@ -343,11 +343,14 @@ test.describe("three-column CSS production polish", () => {
     await expectNoHorizontalOverflow(page);
 
     const inspectorChrome = await page.evaluate(() => {
+      const projectLabel = document.querySelector("#workspace-root-label")!.getBoundingClientRect();
       const owner = document.querySelector("#inspector-owner")!.getBoundingClientRect();
       const collapse = document.querySelector("#doc-panel-collapse")!.getBoundingClientRect();
       const tabs = document.querySelector("#doc-panel-tabs")!.getBoundingClientRect();
       const section = document.querySelector("#outline-section")!.getBoundingClientRect();
       return {
+        projectLabelTop: projectLabel.top,
+        ownerTop: owner.top,
         ownerCenterY: owner.top + owner.height / 2,
         collapseCenterY: collapse.top + collapse.height / 2,
         collapseBottom: collapse.bottom,
@@ -355,6 +358,7 @@ test.describe("three-column CSS production polish", () => {
         tabsCenterOffset: Math.abs((tabs.left + tabs.width / 2) - (section.left + section.width / 2)),
       };
     });
+    expect(Math.abs(inspectorChrome.projectLabelTop - inspectorChrome.ownerTop)).toBeLessThanOrEqual(3);
     expect(Math.abs(inspectorChrome.ownerCenterY - inspectorChrome.collapseCenterY)).toBeLessThanOrEqual(2);
     expect(inspectorChrome.collapseBottom).toBeLessThanOrEqual(inspectorChrome.tabsTop);
     expect(inspectorChrome.tabsCenterOffset).toBeLessThanOrEqual(2);
@@ -368,7 +372,103 @@ test.describe("three-column CSS production polish", () => {
     await openDoc(page, "Quarterly Report.aimd");
     await expect(page.locator("#inspector")).toHaveClass(/is-collapsed/);
     await expect(page.locator("#doc-panel-collapse")).toBeVisible();
+    const inspectorBefore = await page.locator("#inspector").boundingBox();
+    expect(inspectorBefore!.width).toBeGreaterThanOrEqual(18);
+    expect(inspectorBefore!.width).toBeLessThanOrEqual(22);
+    await page.setViewportSize({ width: 980, height: 720 });
+    const inspectorAfter = await page.locator("#inspector").boundingBox();
+    expect(Math.abs(inspectorAfter!.width - inspectorBefore!.width)).toBeLessThanOrEqual(1);
     await expectCommandStripAndTabsStable(page);
+    await expectNoHorizontalOverflow(page);
+  });
+
+  test("narrow desktop keeps project and inspector collapsed rails stable", async ({ page }) => {
+    await page.setViewportSize({ width: 880, height: 720 });
+    await installThreeColumnMock(page);
+    await page.goto("/");
+    await openProject(page);
+    await openDoc(page, "Quarterly Report.aimd");
+
+    await expect(page.locator(".sidebar")).toHaveClass(/is-collapsed/);
+    await expect(page.locator("#project-rail-collapse")).toBeVisible();
+    await expect(page.locator("#inspector")).toHaveClass(/is-collapsed/);
+
+    const before = await page.evaluate(() => {
+      const project = document.querySelector(".sidebar")!.getBoundingClientRect();
+      const projectToggle = document.querySelector("#project-rail-collapse")!.getBoundingClientRect();
+      const inspector = document.querySelector("#inspector")!.getBoundingClientRect();
+      const inspectorToggle = document.querySelector("#doc-panel-collapse")!.getBoundingClientRect();
+      return {
+        project: project.width,
+        inspector: inspector.width,
+        projectCenterOffset: Math.abs((projectToggle.top + projectToggle.height / 2) - (project.top + project.height / 2)),
+        inspectorCenterOffset: Math.abs((inspectorToggle.top + inspectorToggle.height / 2) - (inspector.top + inspector.height / 2)),
+      };
+    });
+    expect(before.project).toBeGreaterThanOrEqual(18);
+    expect(before.project).toBeLessThanOrEqual(22);
+    expect(before.inspector).toBeGreaterThanOrEqual(18);
+    expect(before.inspector).toBeLessThanOrEqual(22);
+    expect(before.projectCenterOffset).toBeLessThanOrEqual(2);
+    expect(before.inspectorCenterOffset).toBeLessThanOrEqual(2);
+
+    await page.setViewportSize({ width: 840, height: 720 });
+    const after = await page.evaluate(() => {
+      const project = document.querySelector(".sidebar")!.getBoundingClientRect();
+      const inspector = document.querySelector("#inspector")!.getBoundingClientRect();
+      return { project: project.width, inspector: inspector.width };
+    });
+    expect(Math.abs(after.project - before.project)).toBeLessThanOrEqual(1);
+    expect(Math.abs(after.inspector - before.inspector)).toBeLessThanOrEqual(1);
+
+    await page.locator(".workspace").hover();
+    const projectHoverBefore = await page.locator(".sidebar").evaluate((el) => getComputedStyle(el).backgroundImage);
+    await page.locator(".sidebar").hover();
+    const projectHover = await page.locator(".sidebar").evaluate((el) => ({
+      cursor: getComputedStyle(el).cursor,
+      backgroundImage: getComputedStyle(el).backgroundImage,
+      toggleBackground: getComputedStyle(document.querySelector("#project-rail-collapse")!).backgroundColor,
+    }));
+    expect(projectHover.cursor).toBe("pointer");
+    expect(projectHover.backgroundImage).not.toBe(projectHoverBefore);
+    expect(projectHover.toggleBackground).toBe("rgba(0, 0, 0, 0)");
+
+    const projectRail = await page.locator(".sidebar").boundingBox();
+    await page.mouse.click(projectRail!.x + projectRail!.width / 2, projectRail!.y + projectRail!.height * 0.75);
+    await expect(page.locator(".sidebar")).not.toHaveClass(/is-collapsed/);
+    await expect(page.locator("#project-rail-collapse")).toHaveAttribute("title", "折叠项目栏");
+    await expect(page.locator("#project-rail-collapse svg")).toHaveCount(1);
+    const projectCloseIcon = await page.locator("#project-rail-collapse svg").boundingBox();
+    expect(projectCloseIcon!.width).toBeLessThanOrEqual(13);
+    expect(projectCloseIcon!.height).toBeLessThanOrEqual(13);
+    const expanded = await page.evaluate(() => {
+      const project = document.querySelector(".sidebar")!.getBoundingClientRect();
+      const workspace = document.querySelector(".workspace")!.getBoundingClientRect();
+      return { projectRight: project.right, workspaceLeft: workspace.left, projectWidth: project.width };
+    });
+    expect(expanded.projectWidth).toBeGreaterThan(180);
+    expect(expanded.workspaceLeft).toBeGreaterThanOrEqual(expanded.projectRight - 1);
+
+    await page.locator(".workspace").hover();
+    const inspectorHoverBefore = await page.locator("#inspector").evaluate((el) => getComputedStyle(el).backgroundImage);
+    await page.locator("#inspector").hover();
+    const inspectorHover = await page.locator("#inspector").evaluate((el) => ({
+      cursor: getComputedStyle(el).cursor,
+      backgroundImage: getComputedStyle(el).backgroundImage,
+      toggleBackground: getComputedStyle(document.querySelector("#doc-panel-collapse")!).backgroundColor,
+    }));
+    expect(inspectorHover.cursor).toBe("pointer");
+    expect(inspectorHover.backgroundImage).not.toBe(inspectorHoverBefore);
+    expect(inspectorHover.toggleBackground).toBe("rgba(0, 0, 0, 0)");
+
+    const inspectorRail = await page.locator("#inspector").boundingBox();
+    await page.mouse.click(inspectorRail!.x + inspectorRail!.width / 2, inspectorRail!.y + inspectorRail!.height * 0.75);
+    await expect(page.locator("#inspector")).not.toHaveClass(/is-collapsed/);
+    await expect(page.locator("#doc-panel-collapse")).toHaveAttribute("title", "折叠检查器");
+    await expect(page.locator("#doc-panel-collapse svg")).toHaveCount(1);
+    const inspectorCloseIcon = await page.locator("#doc-panel-collapse svg").boundingBox();
+    expect(inspectorCloseIcon!.width).toBeLessThanOrEqual(13);
+    expect(inspectorCloseIcon!.height).toBeLessThanOrEqual(13);
     await expectNoHorizontalOverflow(page);
   });
 
@@ -409,6 +509,97 @@ test.describe("three-column CSS production polish", () => {
     expect(rowMetrics.textOverflow).toBe("ellipsis");
     expect(rowMetrics.whiteSpace).toBe("nowrap");
     await expectCommandStripAndTabsStable(page);
+  });
+
+  test("truncated project rows expand through a body portal without resizing the tree", async ({ page }) => {
+    await page.setViewportSize({ width: 1180, height: 760 });
+    await installThreeColumnMock(page);
+    await page.goto("/");
+    await openProject(page);
+
+    const untruncatedRowIndex = await page.locator(".workspace-row").evaluateAll((rows) => rows.findIndex((row) => {
+      const name = row.querySelector<HTMLElement>(".workspace-name");
+      return Boolean(name && name.scrollWidth <= name.clientWidth + 1);
+    }));
+    expect(untruncatedRowIndex).toBeGreaterThanOrEqual(0);
+    const shortRow = page.locator(".workspace-row").nth(untruncatedRowIndex);
+    await shortRow.hover();
+    await page.waitForTimeout(170);
+    await expect(page.locator(".workspace-row-overflow-overlay")).toHaveCount(0);
+
+    await openDoc(page, "Daily with an intentionally long project filename");
+    const longRow = page.locator(".workspace-row", { hasText: "Daily with an intentionally long project filename" }).first();
+    const before = await longRow.evaluate((el) => {
+      const name = el.querySelector<HTMLElement>(".workspace-name")!;
+      const row = el.getBoundingClientRect();
+      return {
+        rowWidth: row.width,
+        rowTop: row.top,
+        rowLeft: row.left,
+        rowHeight: row.height,
+        railWidth: el.closest(".sidebar")!.getBoundingClientRect().width,
+        nameClientWidth: name.clientWidth,
+        nameScrollWidth: name.scrollWidth,
+        paddingLeft: getComputedStyle(el).paddingLeft,
+      };
+    });
+    expect(before.nameScrollWidth).toBeGreaterThan(before.nameClientWidth);
+
+    await longRow.hover();
+    await page.waitForTimeout(20);
+    await page.locator(".workspace").hover();
+    await page.waitForTimeout(100);
+    await expect(page.locator(".workspace-row-overflow-overlay")).toHaveCount(0);
+
+    await longRow.hover();
+    const overlay = page.locator(".workspace-row-overflow-overlay");
+    await page.waitForTimeout(90);
+    await expect(overlay).toHaveCount(1);
+    await expect(overlay).toHaveClass(/is-open/);
+
+    const metrics = await overlay.evaluate((el) => {
+      const name = el.querySelector<HTMLElement>(".workspace-name")!;
+      const source = document.querySelector<HTMLElement>(".workspace-row[data-workspace-path$='ellipsis checks.md']")!;
+      const portal = document.querySelector("#workspace-row-overflow-portal-root");
+      const overlayRect = el.getBoundingClientRect();
+      return {
+        parentId: el.parentElement?.id || "",
+        portalParentIsBody: portal?.parentElement === document.body,
+        pointerEvents: getComputedStyle(el).pointerEvents,
+        zIndex: Number.parseInt(getComputedStyle(el).zIndex, 10),
+        sourceWidth: source.getBoundingClientRect().width,
+        overlayWidth: overlayRect.width,
+        overlayTop: overlayRect.top,
+        overlayLeft: overlayRect.left,
+        overlayHeight: overlayRect.height,
+        overlayPaddingLeft: getComputedStyle(el).paddingLeft,
+        backgroundColor: getComputedStyle(el).backgroundColor,
+        opacity: getComputedStyle(el).opacity,
+        textOverflow: getComputedStyle(name).textOverflow,
+        nameClientWidth: name.clientWidth,
+        nameScrollWidth: name.scrollWidth,
+      };
+    });
+    expect(metrics.parentId).toBe("workspace-row-overflow-portal-root");
+    expect(metrics.portalParentIsBody).toBe(true);
+    expect(metrics.pointerEvents).toBe("none");
+    expect(metrics.zIndex).toBeGreaterThan(200);
+    expect(metrics.sourceWidth).toBeLessThanOrEqual(before.railWidth);
+    expect(metrics.overlayWidth).toBeGreaterThan(before.rowWidth + 20);
+    expect(metrics.overlayWidth).toBeLessThanOrEqual(before.rowWidth + 190);
+    expect(Math.abs(metrics.overlayTop - before.rowTop)).toBeLessThanOrEqual(1);
+    expect(Math.abs(metrics.overlayLeft - before.rowLeft)).toBeLessThanOrEqual(1);
+    expect(Math.abs(metrics.overlayHeight - before.rowHeight)).toBeLessThanOrEqual(1);
+    expect(metrics.overlayPaddingLeft).toBe(before.paddingLeft);
+    expect(metrics.backgroundColor.startsWith("rgba(")).toBe(false);
+    expect(metrics.opacity).toBe("1");
+    expect(metrics.textOverflow).toBe("clip");
+
+    await page.locator(".workspace").hover();
+    await expect(overlay).toHaveCount(0);
+    const afterWidth = await longRow.evaluate((el) => el.getBoundingClientRect().width);
+    expect(afterWidth).toBe(before.rowWidth);
+    await expectNoHorizontalOverflow(page);
   });
 
   test("captures visual QA matrix when AIMD_THREE_COLUMN_SCREENSHOT_DIR is set", async ({ page }) => {

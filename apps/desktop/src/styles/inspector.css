@@ -59,11 +59,23 @@
 
 .inspector.is-collapsed {
   overflow: hidden;
+  cursor: pointer;
+  transition: background var(--t-fast) var(--ease),
+              box-shadow var(--t-fast) var(--ease);
+}
+
+.inspector.is-collapsed:hover,
+.inspector.is-collapsed:focus-visible {
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.48) 0%, transparent 34%),
+    linear-gradient(180deg, rgba(31, 22, 11, 0.045), rgba(31, 22, 11, 0.018)),
+    var(--surface-rail);
 }
 
 .inspector.is-collapsed .nav-section {
   align-items: center;
-  padding: 10px 6px;
+  justify-content: center;
+  padding: 0;
 }
 
 .inspector.is-collapsed .inspector-owner,
@@ -77,14 +89,22 @@
 .inspector.is-collapsed .inspector-title-row {
   display: flex;
   justify-content: center;
+  width: 100%;
   padding: 0;
 }
 
 .inspector.is-collapsed #doc-panel-collapse {
-  width: var(--size-control);
-  height: var(--size-control);
-  border-radius: var(--radius-control);
-  background: rgba(31, 22, 11, 0.06);
+  width: 100%;
+  height: 32px;
+  border-radius: 0;
+  background: transparent;
+}
+
+.inspector.is-collapsed:hover #doc-panel-collapse,
+.inspector.is-collapsed:focus-visible #doc-panel-collapse,
+.inspector.is-collapsed #doc-panel-collapse:hover {
+  background: transparent;
+  color: var(--ink);
 }
 
 @media (max-width: 1320px) and (min-width: 901px) {
@@ -94,7 +114,8 @@
 
   .panel[data-source-pressure="true"] .inspector .nav-section {
     align-items: center;
-    padding: 10px 6px;
+    justify-content: center;
+    padding: 0;
   }
 
   .panel[data-source-pressure="true"] .inspector .inspector-owner,
@@ -108,14 +129,15 @@
   .panel[data-source-pressure="true"] .inspector .inspector-title-row {
     display: flex;
     justify-content: center;
+    width: 100%;
     padding: 0;
   }
 
   .panel[data-source-pressure="true"] .inspector #doc-panel-collapse {
-    width: var(--size-control);
-    height: var(--size-control);
-    border-radius: var(--radius-control);
-    background: rgba(31, 22, 11, 0.06);
+    width: 100%;
+    height: 32px;
+    border-radius: 0;
+    background: transparent;
   }
 }
 

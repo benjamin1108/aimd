@@ -18,19 +18,21 @@
   color: var(--ink);
 }
 
+.section-toggle .section-toggle-close-icon {
+  display: block;
+  width: 12px;
+  height: 12px;
+}
+
 .section-toggle:active {
   transform: scale(0.96);
 }
 
-.workspace-section.is-collapsed,
 #outline-section.is-collapsed {
   flex: 0 0 auto !important;
   min-height: 0;
 }
 
-.workspace-section.is-collapsed .workspace-scroll,
-.workspace-section.is-collapsed #workspace-refresh,
-.workspace-section.is-collapsed #workspace-new-doc,
 #outline-section.is-collapsed .section-content {
   display: none;
 }

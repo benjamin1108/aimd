@@ -8,14 +8,12 @@ ${APP_TOPBAR_HTML}
 
       <aside class="sidebar" id="sidebar">
         <div class="sidebar-hr-resizer" id="sidebar-hr-resizer" aria-label="调整侧边栏宽度"></div>
-        <header class="sidebar-head">
-        </header>
 
         <nav class="sidebar-body" id="sidebar-body">
           <section class="nav-section workspace-section" id="workspace-section">
             <div class="section-label workspace-label">
               <span id="workspace-root-label">项目</span>
-              <button id="workspace-collapse" class="section-toggle" type="button" title="折叠项目" aria-expanded="true">⌃</button>
+              <button id="project-rail-collapse" class="section-toggle rail-collapse-toggle" type="button" title="折叠项目栏" aria-expanded="true">${ICONS.sidePanelClose}</button>
             </div>
             <div class="workspace-actions" aria-label="项目操作">
               <button id="workspace-open" class="icon-btn" type="button" title="打开目录">${ICONS.folder}</button>
@@ -63,6 +61,10 @@ ${APP_TOPBAR_HTML}
         <header class="document-tab-strip" id="document-tab-strip" hidden>
           <div class="tab-bar" id="tab-bar">
             <div class="open-tabs" id="open-tabs" role="tablist" aria-label="打开的文档"></div>
+            <div class="tab-nav-controls" aria-label="标签页切换">
+              <button class="tab-nav-btn tab-nav-btn--prev" id="open-tabs-prev" type="button" title="切换到上一个标签页" aria-label="切换到上一个标签页" hidden>${ICONS.chevron}</button>
+              <button class="tab-nav-btn tab-nav-btn--next" id="open-tabs-next" type="button" title="切换到下一个标签页" aria-label="切换到下一个标签页" hidden>${ICONS.chevron}</button>
+            </div>
           </div>
         </header>
 
@@ -422,7 +424,7 @@ ${APP_TOPBAR_HTML}
         <section class="nav-section nav-section--inspector" id="outline-section" hidden>
           <div class="inspector-title-row">
             <div class="inspector-owner" id="inspector-owner">未打开文档</div>
-            <button id="doc-panel-collapse" class="section-toggle" type="button" title="折叠检查器" aria-expanded="true">⌃</button>
+            <button id="doc-panel-collapse" class="section-toggle" type="button" title="折叠检查器" aria-expanded="true">${ICONS.sidePanelClose}</button>
           </div>
           <div class="doc-panel-head">
             <div class="doc-panel-tabs" id="doc-panel-tabs" role="tablist" aria-label="当前文档检查器">

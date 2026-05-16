@@ -87,7 +87,11 @@ export function renderGitPanel() {
     return;
   }
   if (!state.git.isRepo || !status) {
-    gitContentEl().innerHTML = "";
+    gitContentEl().innerHTML = `
+      <div class="git-empty">
+        ${root() ? "当前项目不是 Git 仓库" : "未打开项目目录"}
+      </div>
+    `;
     return;
   }
   const upstream = status.upstream
@@ -193,7 +197,6 @@ export function resetGitState() {
     error: "",
     selectedPath: "",
   };
-  state.sidebarDocTab = "outline";
   if (state.mainView === "git-diff") showDocumentView();
   renderDocPanelTabs();
   renderGitPanel();

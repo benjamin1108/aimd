@@ -18,7 +18,7 @@ export const STORAGE_LAST = "aimd.desktop.last";
 export const STORAGE_SESSION = "aimd.desktop.session";
 export const STORAGE_WORKSPACE_ROOT = "aimd.desktop.workspace.root";
 export const STORAGE_WORKSPACE_EXPANDED = "aimd.desktop.workspace.expanded";
-export const STORAGE_WORKSPACE_COLLAPSED = "aimd.desktop.workspace.collapsed";
+export const STORAGE_PROJECT_RAIL_COLLAPSED = "aimd.desktop.projectRail.collapsed";
 export const STORAGE_DOC_PANEL_COLLAPSED = "aimd.desktop.docPanel.collapsed";
 export const MAX_RECENTS = 8;
 export const ASSET_URI_PREFIX = "asset://";
@@ -36,6 +36,7 @@ export const ICONS = {
   chevron: `<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="m6 4 4 4-4 4"/></svg>`,
   chevronUp: `<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.55" stroke-linecap="round" stroke-linejoin="round"><path d="m4.5 9.5 3.5-3.5 3.5 3.5"/></svg>`,
   chevronDown: `<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.55" stroke-linecap="round" stroke-linejoin="round"><path d="m4.5 6.5 3.5 3.5 3.5-3.5"/></svg>`,
+  sidePanelClose: `<svg class="section-toggle-close-icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.45" stroke-linecap="round"><path d="m5.25 5.25 5.5 5.5M10.75 5.25l-5.5 5.5"/></svg>`,
   read: `<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12.5V4a1 1 0 0 1 1.2-1l4.3 1 4.3-1A1 1 0 0 1 13 4v8.5"/><path d="M7.5 4v9"/></svg>`,
   edit: `<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"><path d="M11.2 2.5 13.5 4.8 5.4 12.9l-3 .7.7-3z"/><path d="m10.2 3.5 2.3 2.3"/></svg>`,
   source: `<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"><path d="m5.5 4-3 4 3 4M10.5 4l3 4-3 4"/></svg>`,
@@ -88,7 +89,7 @@ export const state: {
   workspaceSelectedPath: string;
   workspaceLoading: boolean;
   workspaceError: string;
-  workspaceCollapsed: boolean;
+  projectRailCollapsed: boolean;
   docPanelCollapsed: boolean;
   sidebarDocTab: SidebarDocTab;
   git: {
@@ -141,7 +142,7 @@ export const state: {
   workspaceSelectedPath: "",
   workspaceLoading: false,
   workspaceError: "",
-  workspaceCollapsed: false,
+  projectRailCollapsed: false,
   docPanelCollapsed: false,
   sidebarDocTab: "outline",
   git: {

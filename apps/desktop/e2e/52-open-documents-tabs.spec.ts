@@ -149,7 +149,11 @@ async function replaceSourceMarkdown(page: Page, markdown: string) {
   const source = page.locator("#markdown");
   await page.locator("#mode-source").click();
   await expect(source).toHaveValue("# Alpha\n\nA body");
-  await source.fill(markdown);
+  await source.evaluate((element, value) => {
+    const textarea = element as HTMLTextAreaElement;
+    textarea.value = value;
+    textarea.dispatchEvent(new InputEvent("input", { bubbles: true, inputType: "insertText" }));
+  }, markdown);
   await expect(source).toHaveValue(markdown);
 }
 
@@ -222,7 +226,7 @@ test.describe("Open Documents tabs", () => {
     await expect(page.locator("#doc-title")).toHaveText("Beta");
   });
 
-  test("crowded tab strip reserves space for the horizontal scrollbar", async ({ page }) => {
+  test("crowded tab strip scrolls without reserving visible scrollbar space", async ({ page }) => {
     await installTabsMock(page);
     await page.setViewportSize({ width: 1280, height: 760 });
     await page.goto("/");
@@ -246,12 +250,77 @@ test.describe("Open Documents tabs", () => {
         tabBottom: tabRect.bottom,
         tabsBottom: tabsRect.bottom,
         stripBottom: stripRect.bottom,
+        paddingBottom: getComputedStyle(tabs).paddingBottom,
+        scrollbarWidth: getComputedStyle(tabs).scrollbarWidth,
       };
     });
     expect(metrics.tabsScroll).toBe(true);
     expect(metrics.tabTop).toBeGreaterThanOrEqual(metrics.tabsTop);
-    expect(metrics.tabBottom).toBeLessThanOrEqual(metrics.tabsBottom - 6);
+    expect(Math.abs(metrics.tabBottom - metrics.tabsBottom)).toBeLessThanOrEqual(1);
     expect(metrics.tabsBottom).toBeLessThanOrEqual(metrics.stripBottom);
+    expect(metrics.paddingBottom).toBe("0px");
+    expect(metrics.scrollbarWidth).toBe("none");
+  });
+
+  test("crowded tab strip exposes right-side navigation controls and activates adjacent tabs", async ({ page }) => {
+    await installTabsMock(page);
+    await page.setViewportSize({ width: 1280, height: 760 });
+    await page.goto("/");
+    await page.locator("#empty-open-workspace").click();
+
+    for (let index = 1; index <= 12; index += 1) {
+      await page.locator(".workspace-row", { hasText: `Long Tab Title ${String(index).padStart(2, "0")}.aimd` }).click();
+    }
+    await expect(page.locator(".open-tab")).toHaveCount(12);
+    const prev = page.locator("#open-tabs-prev");
+    const next = page.locator("#open-tabs-next");
+    await expect(prev).toBeVisible();
+    await expect(next).toBeVisible();
+
+    const activeVisibility = await page.locator(".open-tab.is-active").evaluate((tab) => {
+      const tabs = tab.closest<HTMLElement>(".open-tabs")!;
+      const tabsRect = tabs.getBoundingClientRect();
+      const activeRect = tab.getBoundingClientRect();
+      return {
+        left: activeRect.left,
+        right: activeRect.right,
+        tabsLeft: tabsRect.left,
+        tabsRight: tabsRect.right,
+      };
+    });
+    expect(activeVisibility.left).toBeGreaterThanOrEqual(activeVisibility.tabsLeft - 1);
+    expect(activeVisibility.right).toBeLessThanOrEqual(activeVisibility.tabsRight + 1);
+
+    const controlPosition = await page.evaluate(() => {
+      const prevRect = document.querySelector("#open-tabs-prev")!.getBoundingClientRect();
+      const nextRect = document.querySelector("#open-tabs-next")!.getBoundingClientRect();
+      const barRect = document.querySelector("#tab-bar")!.getBoundingClientRect();
+      return {
+        prevLeft: prevRect.left,
+        prevRight: prevRect.right,
+        nextLeft: nextRect.left,
+        nextRight: nextRect.right,
+        barRight: barRect.right,
+      };
+    });
+    expect(controlPosition.prevLeft).toBeLessThan(controlPosition.nextLeft);
+    expect(controlPosition.prevRight).toBeLessThanOrEqual(controlPosition.nextLeft + 2);
+    expect(Math.abs(controlPosition.nextRight - controlPosition.barRight)).toBeLessThanOrEqual(1);
+
+    await expect(next).toBeDisabled();
+    await expect(prev).toBeEnabled();
+    await prev.click();
+    await expect(page.locator("#doc-title")).toHaveText("Long Tab Title 11");
+    await expect(next).toBeEnabled();
+    await expect(page.locator(".open-tab.is-active")).toContainText("Long Tab Title 11");
+
+    await page.locator(".open-tab.is-active .open-tab-main").focus();
+    await page.keyboard.press("ArrowLeft");
+    await expect(page.locator("#doc-title")).toHaveText("Long Tab Title 10");
+
+    await page.locator(".open-tab", { hasText: "Long Tab Title 01" }).locator(".open-tab-main").click();
+    await expect(page.locator("#doc-title")).toHaveText("Long Tab Title 01");
+    await expect(prev).toBeDisabled();
   });
 
   test("Cmd+W on a dirty document tab shows close confirmation", async ({ page }) => {

@@ -1,4 +1,4 @@
-import { state } from "../core/state";
+import { ICONS, state, STORAGE_DOC_PANEL_COLLAPSED } from "../core/state";
 import {
   assetPanelEl,
   assetSectionEl,
@@ -16,9 +16,14 @@ import {
   outlineTabEl,
   sidebarWorkspaceDocResizerEl,
 } from "../core/dom";
-import { STORAGE_DOC_PANEL_COLLAPSED } from "../core/state";
 import type { SidebarDocTab } from "../core/types";
 import { activeTab, displayTabTitle } from "../document/open-document-state";
+
+function setDocPanelCollapsed(collapsed: boolean) {
+  state.docPanelCollapsed = collapsed;
+  window.localStorage.setItem(STORAGE_DOC_PANEL_COLLAPSED, String(state.docPanelCollapsed));
+  renderDocPanelTabs();
+}
 
 export function setSidebarDocTab(tab: SidebarDocTab) {
   const hasContext = Boolean(state.doc || state.mainView === "git-diff");
@@ -45,6 +50,13 @@ export function renderDocPanelTabs() {
   sidebarWorkspaceDocResizerEl().hidden = true;
   outlineSectionEl().classList.toggle("is-collapsed", state.docPanelCollapsed);
   inspectorEl().classList.toggle("is-collapsed", state.docPanelCollapsed);
+  inspectorEl().tabIndex = state.docPanelCollapsed ? 0 : -1;
+  inspectorEl().setAttribute("aria-label", state.docPanelCollapsed ? "展开当前文档检查器" : "当前文档检查器");
+  if (state.docPanelCollapsed) {
+    inspectorEl().setAttribute("role", "button");
+  } else {
+    inspectorEl().removeAttribute("role");
+  }
   const panel = inspectorEl().closest<HTMLElement>(".panel");
   panel?.setAttribute(
     "data-inspector",
@@ -55,7 +67,7 @@ export function renderDocPanelTabs() {
     state.mode === "source" && state.sidebarDocTab === "outline" ? "true" : "false",
   );
   docPanelCollapseEl().setAttribute("aria-expanded", String(!state.docPanelCollapsed));
-  docPanelCollapseEl().textContent = state.docPanelCollapsed ? "‹" : "›";
+  docPanelCollapseEl().innerHTML = state.docPanelCollapsed ? "‹" : ICONS.sidePanelClose;
   docPanelCollapseEl().title = state.docPanelCollapsed ? "展开检查器" : "折叠检查器";
   inspectorOwnerEl().textContent = activeDiffTab
     ? `Git Diff · ${activeDiffTab.title}`
@@ -97,10 +109,18 @@ export function bindDocPanelTabs(onGitOpen: () => void) {
   state.docPanelCollapsed = storedCollapse == null
     ? window.innerWidth <= 1100
     : storedCollapse === "true";
-  docPanelCollapseEl().addEventListener("click", () => {
-    state.docPanelCollapsed = !state.docPanelCollapsed;
-    window.localStorage.setItem(STORAGE_DOC_PANEL_COLLAPSED, String(state.docPanelCollapsed));
-    renderDocPanelTabs();
+  docPanelCollapseEl().addEventListener("click", (event) => {
+    event.stopPropagation();
+    setDocPanelCollapsed(!state.docPanelCollapsed);
+  });
+  inspectorEl().addEventListener("click", () => {
+    if (state.docPanelCollapsed) setDocPanelCollapsed(false);
+  });
+  inspectorEl().addEventListener("keydown", (event) => {
+    if (!state.docPanelCollapsed) return;
+    if (event.key !== "Enter" && event.key !== " ") return;
+    event.preventDefault();
+    setDocPanelCollapsed(false);
   });
   outlineTabEl().addEventListener("click", () => setSidebarDocTab("outline"));
   assetTabEl().addEventListener("click", () => setSidebarDocTab("assets"));

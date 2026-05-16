@@ -54,6 +54,8 @@ import { activateDocumentTab, applyDocument } from "./document/apply";
 import { debugLog, installDebugConsole, openDebugConsole, onDebugChange, setDebugMode } from "./debug/console";
 import { bindWorkspacePanel, createProjectDocument, openWorkspacePicker } from "./ui/workspace";
 import { bindDocPanelTabs, renderDocPanelTabs } from "./ui/doc-panel";
+import { bindProjectRailCollapse } from "./ui/project-rail";
+import { bindOpenTabsNavigationControls } from "./ui/tabs";
 import { bindGitPanel, refreshGitStatus } from "./ui/git";
 import {
   activateGitDiffTab,
@@ -70,6 +72,7 @@ import { syncActiveTabFromFacade } from "./document/open-document-state";
 installDebugConsole();
 bindSelectionBoundary("main");
 bindUpdater();
+bindProjectRailCollapse();
 if (isTauri()) {
   void listen<{ level?: string; traceId?: string; elapsedMs?: number; message?: string }>("aimd-pdf-log", (event) => {
     const payload = event.payload || {};
@@ -252,6 +255,7 @@ bindHealthPanel();
 bindFormatDocumentPanel();
 bindWorkspacePanel();
 bindDocPanelTabs(() => { void refreshGitStatus(); });
+bindOpenTabsNavigationControls();
 bindGitPanel();
 bindGitDiffView();
 bindWidthSwitch();
