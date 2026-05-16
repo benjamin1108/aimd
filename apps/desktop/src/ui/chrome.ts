@@ -77,31 +77,12 @@ function renderAppScope(doc: AimdDocument | null, inDiffView: boolean) {
 
 function renderDocumentStateBadges(doc: AimdDocument | null, inDiffView: boolean) {
   const container = docStateBadgesEl();
-  if (inDiffView) {
-    container.hidden = false;
-    container.innerHTML = `<span class="doc-state-badge" data-tone="info">只读</span>`;
-    return;
-  }
-  if (!doc) {
-    container.hidden = true;
-    container.innerHTML = "";
-    return;
-  }
-  const badges: Array<{ text: string; tone?: "warn" | "info" | "strong" }> = [];
-  const hasConflict = doc.hasGitConflicts || hasGitConflictMarkers(doc.markdown) || hasGitConflictMarkers(doc.html);
-  if (doc.dirty) badges.push({ text: "未保存", tone: "warn" });
-  if (doc.requiresAimdSave) badges.push({ text: "保存需选格式", tone: "info" });
-  if (hasConflict) badges.push({ text: "Git 冲突", tone: "warn" });
-  const tab = activeTab();
-  if (tab?.recoveryState === "disk-changed") badges.push({ text: "磁盘已变化", tone: "warn" });
-  container.hidden = badges.length === 0;
-  container.innerHTML = badges
-    .map((badge) => `<span class="doc-state-badge" data-tone="${badge.tone || "idle"}">${escapeHTML(badge.text)}</span>`)
-    .join("");
+  container.hidden = true;
+  container.innerHTML = "";
 }
 
-// 底部 status-pill 只承载稳定摘要和临时反馈；命令带里的 doc-state-badges
-// 负责长期可见的脏状态、冲突和保存格式提示。1.8s 后 success/info 会回退到
+// 底部 status-pill 承载稳定摘要和临时反馈。命令栏不再显示长期状态徽章，
+// 以保留空间给编辑工具、查找和模式切换。1.8s 后 success/info 会回退到
 // 当前 doc 的稳定态（脏 → 未保存的修改；干净 → 就绪）。
 //
 // state.statusTimer 同时充当"当前是否在临时反馈窗口期"的标志：updateChrome 看到
@@ -202,7 +183,7 @@ export function updateChrome() {
   starterActionsEl().hidden = true;
   documentTabStripEl().hidden = !hasCurrentTabContext;
   documentCommandStripEl().hidden = !hasCurrentTabContext;
-  docActionsEl().hidden = !hasCurrentTabContext;
+  docActionsEl().hidden = !hasCurrentTabContext || inDiffView;
   docToolbarEl().hidden = !hasCurrentTabContext;
   sidebarFootEl().hidden = true;
 
@@ -219,7 +200,7 @@ export function updateChrome() {
       : "未打开文档";
   }
   renderDocumentStateBadges(doc, inDiffView);
-  // 保存按钮在文档没有变化时禁用：用户的"按钮亮着但其实没活做"会变成第二种困惑。
+  // 保存菜单项在文档没有变化时禁用：用户的"按钮亮着但其实没活做"会变成第二种困惑。
   // 草稿状态(isDraft)即使 dirty=false 也要保留可点（点击会触发 saveDocumentAs 创建文件）。
   const canSave = Boolean(!inDiffView && doc && (doc.dirty || doc.isDraft));
   saveEl().disabled = !canSave;
@@ -231,9 +212,9 @@ export function updateChrome() {
   exportMarkdownEl().disabled = !doc || inDiffView || doc.format === "markdown";
   exportHtmlEl().disabled = !doc || inDiffView;
   exportPdfEl().disabled = !doc || inDiffView;
-  findToggleEl().disabled = !doc || inDiffView;
+  findToggleEl().disabled = !doc && !inDiffView;
   closeEl().disabled = !hasCurrentTabContext;
-  // 顶部的主按钮统一显示「保存」：草稿状态下点击仍走 saveDocumentAs 创建文件，
+  // 文档菜单里的保存项统一显示「保存」：草稿状态下点击仍走 saveDocumentAs 创建文件，
   // 但视觉/语义上对用户都是"保存"动作（与 sidebar-foot 一致）。
   saveLabelEl().textContent = "保存";
   modeReadEl().disabled = !doc || inDiffView;

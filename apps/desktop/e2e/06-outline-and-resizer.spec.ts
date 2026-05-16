@@ -100,6 +100,24 @@ test.describe("Outline navigation across modes", () => {
       expect(matched).toBe(1);
     });
   }
+
+  test("outline highlights the clicked item instead of defaulting to the first heading", async ({ page }) => {
+    await installTauriMock(page);
+    await page.goto("/");
+    await page.locator("#empty-open").click();
+
+    const items = page.locator(".outline-item");
+    await expect(items).toHaveCount(3);
+    await expect(page.locator(".outline-item.is-active")).toHaveCount(0);
+
+    await items.nth(1).click();
+    await expect(items.nth(1)).toHaveClass(/is-active/);
+    await expect(items.first()).not.toHaveClass(/is-active/);
+
+    await items.last().click();
+    await expect(items.last()).toHaveClass(/is-active/);
+    await expect(items.nth(1)).not.toHaveClass(/is-active/);
+  });
 });
 
 test.describe("Inspector asset tab", () => {

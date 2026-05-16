@@ -76,7 +76,7 @@ export const APP_TOPBAR_HTML = `
 
           <div class="app-menu-wrap">
             <button id="app-menu-toggle" class="secondary-btn app-action-btn" type="button" aria-haspopup="menu" aria-expanded="false">
-              <span class="secondary-btn-icon">${ICONS.settings}</span>
+              <span class="secondary-btn-icon">${ICONS.appGrid}</span>
               <span>应用</span>
               <span class="menu-chevron" aria-hidden="true">▾</span>
             </button>

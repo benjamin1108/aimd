@@ -122,13 +122,14 @@ test.describe("⋯ 菜单：去掉危险分组", () => {
   });
 });
 
-test.describe("保存按钮：干净时灰，脏时亮", () => {
+test.describe("保存菜单项：干净时灰，脏时亮", () => {
   // 状态文字唯一显示位是底部 #status-pill / #status，head 不再额外挂状态。
   // 奥卡姆剃刀：两套状态文字会让用户视线在 head 和 footer 之间来回跳。
-  test("已保存文档：#save disabled，底部 status 是'就绪'", async ({ page }) => {
+  test("已保存文档：三点菜单内 #save disabled，底部 status 是'就绪'", async ({ page }) => {
     await installMock(page, { dirty: false });
     await page.goto("/");
     await page.locator("#empty-open").click();
+    await page.locator("#more-menu-toggle").click();
     await expect(page.locator("#save")).toBeDisabled();
     await expect(page.locator("#status")).toHaveText("就绪");
     await expect(page.locator("#status-pill")).toHaveAttribute("data-tone", "idle");
@@ -141,6 +142,7 @@ test.describe("保存按钮：干净时灰，脏时亮", () => {
     await page.locator("#mode-source").click();
     const textarea = page.locator("#markdown");
     await textarea.fill("# 修改后\n");
+    await page.locator("#more-menu-toggle").click();
     await expect(page.locator("#save")).toBeEnabled();
     await expect(page.locator("#status")).toHaveText("未保存的修改");
     await expect(page.locator("#status-pill")).toHaveAttribute("data-tone", "warn");
@@ -152,6 +154,7 @@ test.describe("保存按钮：干净时灰，脏时亮", () => {
     await page.locator("#empty-open").click();
     await page.locator("#mode-source").click();
     await page.locator("#markdown").fill("# 修改后\n");
+    await page.locator("#more-menu-toggle").click();
     await page.locator("#save").click();
     await expect(page.locator("#status")).toHaveText("已保存");
     await expect(page.locator("#status")).toHaveText("就绪", { timeout: 3000 });

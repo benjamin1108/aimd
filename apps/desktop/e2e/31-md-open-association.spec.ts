@@ -399,6 +399,7 @@ test.describe("31. MD 按需升级方案", () => {
     }, { timeout: 5000 });
     await expect(page.locator("#doc-path")).toContainText("保存时需选择格式");
 
+    await page.locator("#more-menu-toggle").click();
     await page.locator("#save").click();
     await expect(page.locator("#save-format-panel")).toBeVisible();
     await page.locator("#save-format-aimd").click();

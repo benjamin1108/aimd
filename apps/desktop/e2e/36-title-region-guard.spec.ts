@@ -194,20 +194,24 @@ test.describe("Title region: command-strip actions never get pushed off-viewport
     });
 
     const layout = await page.evaluate(() => {
-      const save = document.querySelector("#save") as HTMLElement;
+      const find = document.querySelector("#find-toggle") as HTMLElement;
+      const mode = document.querySelector(".toolbar-group--mode") as HTMLElement;
       const menu = document.querySelector("#more-menu-toggle") as HTMLElement;
       const strip = document.querySelector("#document-command-strip") as HTMLElement;
-      const saveBox = save.getBoundingClientRect();
+      const findBox = find.getBoundingClientRect();
+      const modeBox = mode.getBoundingClientRect();
       const menuBox = menu.getBoundingClientRect();
       const stripBox = strip.getBoundingClientRect();
       return {
-        saveRight: saveBox.right,
+        findRight: findBox.right,
+        modeRight: modeBox.right,
         menuRight: menuBox.right,
         stripRight: stripBox.right,
         vw: window.innerWidth,
       };
     });
-    expect(layout.saveRight).toBeLessThanOrEqual(layout.vw + 1);
+    expect(layout.findRight).toBeLessThanOrEqual(layout.vw + 1);
+    expect(layout.modeRight).toBeLessThanOrEqual(layout.vw + 1);
     expect(layout.menuRight).toBeLessThanOrEqual(layout.vw + 1);
     expect(layout.stripRight).toBeLessThanOrEqual(layout.vw + 1);
   });

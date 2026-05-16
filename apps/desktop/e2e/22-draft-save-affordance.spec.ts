@@ -50,8 +50,8 @@ async function installMock(page: Page) {
   });
 }
 
-test.describe("A. 当前文档头部承载 dirty draft 保存入口", () => {
-  test("已保存文档：topbar 保留新建入口，当前文档保存按钮禁用", async ({ page }) => {
+test.describe("A. 当前文档三点菜单承载 dirty draft 保存入口", () => {
+  test("已保存文档：topbar 保留新建入口，当前文档保存菜单项禁用", async ({ page }) => {
     await installMock(page);
     await page.goto("/");
 
@@ -64,12 +64,13 @@ test.describe("A. 当前文档头部承载 dirty draft 保存入口", () => {
     await expect(page.locator("#doc-title")).toHaveText("已保存文档");
 
     await expect(page.locator("#global-new-toggle")).toBeVisible();
+    await page.locator("#more-menu-toggle").click();
     await expect(page.locator("#save")).toBeVisible();
     await expect(page.locator("#save")).toBeDisabled();
     await expect(page.locator("#sidebar-foot")).toBeHidden();
   });
 
-  test("dirty 草稿：当前文档保存按钮显示并能保存", async ({ page }) => {
+  test("dirty 草稿：当前文档保存菜单项显示并能保存", async ({ page }) => {
     await installMock(page);
     await page.goto("/");
 
@@ -78,6 +79,7 @@ test.describe("A. 当前文档头部承载 dirty draft 保存入口", () => {
 
     // newDocument 自带 dirty=true（草稿即"已输入"语义），因此即刻满足条件。
     await expect(page.locator("#global-new-toggle")).toBeVisible();
+    await page.locator("#more-menu-toggle").click();
     await expect(page.locator("#save")).toBeVisible();
     await expect(page.locator("#save")).toBeEnabled();
     await expect(page.locator("#save")).toContainText("保存");
@@ -109,6 +111,7 @@ test.describe("A. 当前文档头部承载 dirty draft 保存入口", () => {
     await page.goto("/");
 
     await page.locator("#empty-new").click();
+    await page.locator("#more-menu-toggle").click();
     await expect(page.locator("#save")).toBeEnabled();
 
     // 模拟 saveDocumentAs 流程通过：替换 choose_save_aimd_file + save_aimd_as

@@ -57,6 +57,7 @@ ${APP_TOPBAR_HTML}
           <span id="doc-title">AIMD Desktop</span>
           <span id="doc-path">未打开文档</span>
         </div>
+        <div id="doc-state-badges" class="doc-state-badges" aria-label="当前文档状态" hidden></div>
         <div class="starter-actions" id="starter-actions" hidden></div>
 
         <header class="document-tab-strip" id="document-tab-strip" hidden>
@@ -67,17 +68,34 @@ ${APP_TOPBAR_HTML}
 
         <header class="document-command-strip" id="document-command-strip" hidden>
           <div class="doc-toolbar" id="doc-toolbar">
-            <div class="toolbar-group toolbar-group--mode">
-              <div class="mode-switch" role="tablist">
-                <button id="mode-read" class="mode-btn" role="tab" aria-selected="true" type="button" disabled>
-                  <span>预览</span>
-                </button>
-                <button id="mode-edit" class="mode-btn" role="tab" aria-selected="false" type="button" disabled>
-                  <span>可视编辑</span>
-                </button>
-                <button id="mode-source" class="mode-btn" role="tab" aria-selected="false" type="button" disabled>
-                  <span>Markdown</span>
-                </button>
+            <div class="format-toolbar" id="format-toolbar" hidden>
+              <div class="ft-group">
+                <button class="ft-btn" data-cmd="bold" type="button" title="粗体 (⌘B)">${ICONS.bold}</button>
+                <button class="ft-btn" data-cmd="italic" type="button" title="斜体 (⌘I)">${ICONS.italic}</button>
+                <button class="ft-btn" data-cmd="strike" type="button" title="删除线">${ICONS.strike}</button>
+              </div>
+              <span class="ft-sep"></span>
+              <div class="ft-group">
+                <button class="ft-btn" data-cmd="h1" type="button" title="标题 1">${ICONS.h1}</button>
+                <button class="ft-btn" data-cmd="h2" type="button" title="标题 2">${ICONS.h2}</button>
+                <button class="ft-btn" data-cmd="h3" type="button" title="标题 3">${ICONS.h3}</button>
+                <button class="ft-btn ft-btn--text" data-cmd="paragraph" type="button" title="正文">正文</button>
+              </div>
+              <span class="ft-sep"></span>
+              <div class="ft-group">
+                <button class="ft-btn" data-cmd="ul" type="button" title="无序列表">${ICONS.ul}</button>
+                <button class="ft-btn" data-cmd="ol" type="button" title="有序列表">${ICONS.ol}</button>
+                <button class="ft-btn" data-cmd="quote" type="button" title="引用">${ICONS.quote}</button>
+              </div>
+              <span class="ft-sep"></span>
+              <div class="ft-group">
+                <button class="ft-btn" data-cmd="code" type="button" title="行内代码">${ICONS.code}</button>
+                <button class="ft-btn" data-cmd="codeblock" type="button" title="代码块">${ICONS.source}</button>
+                <button class="ft-btn" data-cmd="table" type="button" title="插入表格">${ICONS.table}</button>
+                <button class="ft-btn" data-cmd="task" type="button" title="任务列表">${ICONS.check}</button>
+                <button class="ft-btn" data-cmd="link" type="button" title="链接">${ICONS.link}</button>
+                <button class="ft-btn" data-cmd="image" type="button" title="插入图片">${ICONS.image}</button>
+                <button class="ft-btn ft-btn--text" data-cmd="image-alt" type="button" title="图片 alt">Alt</button>
               </div>
             </div>
 
@@ -104,21 +122,32 @@ ${APP_TOPBAR_HTML}
               </div>
             </div>
 
-            <div id="doc-state-badges" class="doc-state-badges" aria-label="当前文档状态" hidden></div>
+            <div class="toolbar-group toolbar-group--mode">
+              <div class="mode-switch" role="tablist">
+                <button id="mode-read" class="mode-btn" role="tab" aria-selected="true" type="button" disabled>
+                  <span>预览</span>
+                </button>
+                <button id="mode-edit" class="mode-btn" role="tab" aria-selected="false" type="button" title="可视编辑" aria-label="可视编辑" disabled>
+                  <span>编辑</span>
+                </button>
+                <button id="mode-source" class="mode-btn" role="tab" aria-selected="false" type="button" title="Markdown" aria-label="Markdown" disabled>
+                  <span>MD</span>
+                </button>
+              </div>
+            </div>
 
             <div class="head-actions command-actions" id="doc-actions" hidden>
-              <button id="save" class="primary-btn command-save-btn" type="button" disabled>
-                <span class="primary-btn-icon">${ICONS.save}</span>
-                <span id="save-label">保存</span>
-              </button>
               <div class="more-menu-wrap">
-                <button id="more-menu-toggle" class="secondary-btn document-menu-btn" type="button" title="当前文档操作" aria-haspopup="menu" aria-expanded="false">
-                  <span class="secondary-btn-icon">${ICONS.document}</span>
-                  <span>文档</span>
-                  <span class="menu-chevron" aria-hidden="true">▾</span>
+                <button id="more-menu-toggle" class="ghost-btn icon-only document-menu-btn" type="button" title="当前文档操作" aria-label="当前文档操作" aria-haspopup="menu" aria-expanded="false">
+                  <span class="vertical-dots" aria-hidden="true"><span></span><span></span><span></span></span>
                 </button>
                 <div id="more-menu" class="action-menu" role="menu" hidden>
                   <div class="action-menu-title">文档</div>
+                  <button id="save" class="action-menu-item" type="button" disabled>
+                    <span class="action-menu-icon">${ICONS.save}</span>
+                    <span id="save-label">保存</span>
+                    <small>⌘S</small>
+                  </button>
                   <button id="save-as" class="action-menu-item" type="button" disabled>
                     <span class="action-menu-icon">${ICONS.save}</span>
                     <span>另存为...</span>
@@ -165,37 +194,6 @@ ${APP_TOPBAR_HTML}
             </div>
           </div>
         </header>
-
-        <div class="format-toolbar" id="format-toolbar" hidden>
-          <div class="ft-group">
-            <button class="ft-btn" data-cmd="bold" type="button" title="粗体 (⌘B)">${ICONS.bold}</button>
-            <button class="ft-btn" data-cmd="italic" type="button" title="斜体 (⌘I)">${ICONS.italic}</button>
-            <button class="ft-btn" data-cmd="strike" type="button" title="删除线">${ICONS.strike}</button>
-          </div>
-          <span class="ft-sep"></span>
-          <div class="ft-group">
-            <button class="ft-btn" data-cmd="h1" type="button" title="标题 1">${ICONS.h1}</button>
-            <button class="ft-btn" data-cmd="h2" type="button" title="标题 2">${ICONS.h2}</button>
-            <button class="ft-btn" data-cmd="h3" type="button" title="标题 3">${ICONS.h3}</button>
-            <button class="ft-btn ft-btn--text" data-cmd="paragraph" type="button" title="正文">正文</button>
-          </div>
-          <span class="ft-sep"></span>
-          <div class="ft-group">
-            <button class="ft-btn" data-cmd="ul" type="button" title="无序列表">${ICONS.ul}</button>
-            <button class="ft-btn" data-cmd="ol" type="button" title="有序列表">${ICONS.ol}</button>
-            <button class="ft-btn" data-cmd="quote" type="button" title="引用">${ICONS.quote}</button>
-          </div>
-          <span class="ft-sep"></span>
-          <div class="ft-group">
-            <button class="ft-btn" data-cmd="code" type="button" title="行内代码">${ICONS.code}</button>
-            <button class="ft-btn" data-cmd="codeblock" type="button" title="代码块">${ICONS.source}</button>
-            <button class="ft-btn" data-cmd="table" type="button" title="插入表格">${ICONS.table}</button>
-            <button class="ft-btn" data-cmd="task" type="button" title="任务列表">${ICONS.check}</button>
-            <button class="ft-btn" data-cmd="link" type="button" title="链接">${ICONS.link}</button>
-            <button class="ft-btn" data-cmd="image" type="button" title="插入图片">${ICONS.image}</button>
-            <button class="ft-btn ft-btn--text" data-cmd="image-alt" type="button" title="图片 alt">Alt</button>
-          </div>
-        </div>
 
         <!-- BUG-013: 自定义链接输入浮层，替代 WKWebView 不支持的 window.prompt -->
         <div id="link-popover" class="link-popover" hidden>
@@ -422,7 +420,10 @@ ${APP_TOPBAR_HTML}
       <aside class="inspector" id="inspector" aria-label="当前文档检查器">
         <div class="inspector-hr-resizer" id="inspector-hr-resizer" aria-label="调整检查器宽度"></div>
         <section class="nav-section nav-section--inspector" id="outline-section" hidden>
-          <div class="inspector-owner" id="inspector-owner">未打开文档</div>
+          <div class="inspector-title-row">
+            <div class="inspector-owner" id="inspector-owner">未打开文档</div>
+            <button id="doc-panel-collapse" class="section-toggle" type="button" title="折叠检查器" aria-expanded="true">⌃</button>
+          </div>
           <div class="doc-panel-head">
             <div class="doc-panel-tabs" id="doc-panel-tabs" role="tablist" aria-label="当前文档检查器">
               <button id="sidebar-tab-outline" class="doc-panel-tab is-active" type="button" role="tab" aria-selected="true" aria-controls="outline-panel">大纲</button>
@@ -430,7 +431,6 @@ ${APP_TOPBAR_HTML}
               <button id="sidebar-tab-assets" class="doc-panel-tab" type="button" role="tab" aria-selected="false" aria-controls="asset-panel">资源</button>
               <button id="sidebar-tab-health" class="doc-panel-tab" type="button" role="tab" aria-selected="false" aria-controls="health-panel" hidden>健康</button>
             </div>
-            <button id="doc-panel-collapse" class="section-toggle" type="button" title="折叠检查器" aria-expanded="true">⌃</button>
           </div>
           <div class="section-content inspector-scroll">
             <div id="outline-panel" role="tabpanel">

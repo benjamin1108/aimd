@@ -53,6 +53,10 @@
   --tone-info: #3a4f6e;
   --tone-loading: #5b6470;
   --tone-danger: #c0392b;
+  --nav-active-bg: rgba(47, 111, 99, 0.1);
+  --nav-active-bg-hover: rgba(47, 111, 99, 0.14);
+  --nav-active-border: rgba(47, 111, 99, 0.18);
+  --nav-active-fg: var(--tone-success);
 
   /* Lines & shadows */
   --hairline: rgba(31, 22, 11, 0.075);

@@ -2,7 +2,7 @@ import { state } from "../core/state";
 import {
   findBarEl, findInputEl, replaceInputEl, findCountEl,
   findPrevEl, findNextEl, replaceOneEl, replaceAllEl, findCloseEl, findReplaceGroupEl,
-  findToggleEl, markdownEl, readerEl, inlineEditorEl, previewEl,
+  findToggleEl, markdownEl, readerEl, inlineEditorEl, previewEl, gitDiffContentEl,
 } from "../core/dom";
 import { setStatus, updateChrome } from "../ui/chrome";
 import { flushInline, insertAtCursor } from "./inline";
@@ -12,6 +12,13 @@ let activeIndex = -1;
 export function bindSearch() {
   findToggleEl().addEventListener("click", () => openFindBar(false));
   findCloseEl().addEventListener("click", closeFindBar);
+  document.addEventListener("pointerdown", (event) => {
+    if (findBarEl().hidden) return;
+    const target = event.target as Node | null;
+    if (!target) return;
+    if (findBarEl().contains(target) || findToggleEl().contains(target)) return;
+    closeFindBar();
+  });
   findInputEl().addEventListener("input", () => {
     activeIndex = -1;
     updateFindCount();
@@ -30,8 +37,8 @@ export function bindSearch() {
 }
 
 export function openFindBar(showReplace = false) {
-  if (!state.doc) return;
-  const canReplace = showReplace && state.mode === "source";
+  if (!canSearchCurrentView()) return;
+  const canReplace = showReplace && state.mainView !== "git-diff" && state.mode === "source";
   findToggleEl().classList.add("is-active");
   findToggleEl().setAttribute("aria-expanded", "true");
   findBarEl().hidden = false;
@@ -68,11 +75,11 @@ function findNext() {
 
 function jumpToMatch(direction: 1 | -1, keepFindFocus = false) {
   const query = findInputEl().value;
-  if (!query || !state.doc) {
+  if (!query || !canSearchCurrentView()) {
     updateFindCount();
     return;
   }
-  if (state.mode === "edit" && !flushInline().ok) return;
+  if (state.mainView !== "git-diff" && state.mode === "edit" && !flushInline().ok) return;
   const matches = collectMatches(query);
   if (matches.length === 0) {
     activeIndex = -1;
@@ -115,12 +122,17 @@ function collectMatches(query: string): Match[] {
 }
 
 function currentSearchText(): string {
+  if (state.mainView === "git-diff") return currentTextRoot().textContent || "";
   if (state.mode === "source") return markdownEl().value;
   const root = currentTextRoot();
   return root.textContent || "";
 }
 
 function selectMatch(match: Match) {
+  if (state.mainView === "git-diff") {
+    selectTextRangeInRoot(currentTextRoot(), match);
+    return;
+  }
   if (state.mode === "source") {
     markdownEl().focus();
     markdownEl().setSelectionRange(match.start, match.end);
@@ -131,7 +143,10 @@ function selectMatch(match: Match) {
     return;
   }
 
-  const root = currentTextRoot();
+  selectTextRangeInRoot(currentTextRoot(), match);
+}
+
+function selectTextRangeInRoot(root: HTMLElement, match: Match) {
   const range = rangeForTextOffsets(root, match.start, match.end);
   if (!range) return;
   const sel = window.getSelection();
@@ -142,6 +157,7 @@ function selectMatch(match: Match) {
 }
 
 function currentTextRoot(): HTMLElement {
+  if (state.mainView === "git-diff") return gitDiffContentEl();
   if (state.mode === "edit") return inlineEditorEl();
   if (state.mode === "source") return previewEl();
   return readerEl();
@@ -218,6 +234,10 @@ function updateFindCount(index?: number, total?: number) {
   const count = total ?? matches.length;
   const current = index ?? (count > 0 && activeIndex >= 0 ? activeIndex + 1 : 0);
   findCountEl().textContent = `${current}/${count}`;
+}
+
+function canSearchCurrentView(): boolean {
+  return Boolean(state.doc || state.mainView === "git-diff");
 }
 
 function escapeRegExp(value: string) {

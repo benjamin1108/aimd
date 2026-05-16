@@ -180,19 +180,26 @@ export function renderOutline() {
   }
   const minLevel = Math.min(...state.outline.map((n) => n.level));
   outlineListEl().innerHTML = state.outline
-    .map((node, index) => {
+    .map((node) => {
       const indent = node.level - minLevel;
-      return `<button class="outline-item ${index === 0 ? "is-active" : ""}" data-id="${escapeAttr(node.id)}" data-indent="${indent}" type="button" title="${escapeAttr(node.text)}"><span class="outline-bullet"></span><span class="outline-text">${escapeHTML(node.text)}</span></button>`;
+      return `<button class="outline-item" data-id="${escapeAttr(node.id)}" data-indent="${indent}" type="button" title="${escapeAttr(node.text)}"><span class="outline-bullet"></span><span class="outline-text">${escapeHTML(node.text)}</span></button>`;
     })
     .join("");
   outlineListEl().querySelectorAll<HTMLButtonElement>(".outline-item").forEach((btn) => {
     btn.addEventListener("click", () => {
       const id = btn.dataset.id!;
+      setActiveOutlineItem(btn);
       const target = currentScrollPane().querySelector(`#${CSS.escape(id)}`);
       target?.scrollIntoView({ behavior: "smooth", block: "start" });
     });
   });
   renderDocPanelTabs();
+}
+
+function setActiveOutlineItem(activeButton: HTMLButtonElement) {
+  outlineListEl().querySelectorAll<HTMLButtonElement>(".outline-item").forEach((item) => {
+    item.classList.toggle("is-active", item === activeButton);
+  });
 }
 
 export function currentScrollPane(): HTMLElement {

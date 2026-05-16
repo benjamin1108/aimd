@@ -258,8 +258,10 @@ test.describe("Phase 4 navigation language and stable status", () => {
     await expect(page.locator("#app-scope-primary")).toHaveText("项目 / Daily");
     await expect(page.locator("#app-scope-secondary")).toHaveText(".../project/Daily.md");
     await expect(page.locator("#mode-read")).toHaveText("预览");
-    await expect(page.locator("#mode-edit")).toHaveText("可视编辑");
-    await expect(page.locator("#mode-source")).toHaveText("Markdown");
+    await expect(page.locator("#mode-edit")).toHaveText("编辑");
+    await expect(page.locator("#mode-edit")).toHaveAttribute("aria-label", "可视编辑");
+    await expect(page.locator("#mode-source")).toHaveText("MD");
+    await expect(page.locator("#mode-source")).toHaveAttribute("aria-label", "Markdown");
 
     await page.locator("#more-menu-toggle").click();
     await expect(page.locator("#health-check")).toBeHidden();
@@ -299,10 +301,12 @@ test.describe("Phase 4 navigation language and stable status", () => {
 
     await page.locator("#mode-source").click();
     await page.locator("#markdown").fill("# Daily\n\nChanged");
-    await expect(page.locator("#doc-state-badges")).toContainText("未保存");
+    await expect(page.locator("#doc-state-badges")).toBeHidden();
+    await expect(page.locator("#status")).toHaveText("未保存的修改");
 
     await page.locator("#markdown").fill("# Daily\n\n![local](asset://img-001)");
-    await expect(page.locator("#doc-state-badges")).toContainText("保存需选格式");
+    await expect(page.locator("#doc-state-badges")).toBeHidden();
+    await expect(page.locator("#status")).toHaveText("保存时需选择格式");
 
     await page.locator("#workspace-close").click();
     await expect(page.locator("#workspace-root-label")).toHaveText("项目");
@@ -312,12 +316,14 @@ test.describe("Phase 4 navigation language and stable status", () => {
     await page.locator("#global-new-toggle").click();
     await page.locator("#global-new-draft").click();
     await expect(page.locator(".open-tab.is-active")).toContainText("草稿");
-    await expect(page.locator("#doc-state-badges")).toContainText("未保存");
+    await expect(page.locator("#doc-state-badges")).toBeHidden();
+    await expect(page.locator("#status")).toContainText("未保存");
 
     await openProject(page);
     await openDocumentFromProject(page, "Conflict.aimd");
     await expect(page.locator(".open-tab.is-active")).toContainText("AIMD");
-    await expect(page.locator("#doc-state-badges")).toContainText("Git 冲突");
+    await expect(page.locator("#doc-state-badges")).toBeHidden();
+    await expect(page.locator("#status")).toContainText("Git 冲突");
   });
 
   test("distinguishes Git project review from the active document", async ({ page }) => {
@@ -371,8 +377,10 @@ test.describe("Phase 4 navigation language and stable status", () => {
     await expect(page.getByRole("tab", { name: /切换到 Daily/ })).toBeVisible();
     await expect(page.getByRole("button", { name: /关闭标签页：Daily/ })).toBeVisible();
     await expect(page.locator("#mode-read")).toHaveText("预览");
-    await expect(page.locator("#mode-edit")).toHaveText("可视编辑");
-    await expect(page.locator("#mode-source")).toHaveText("Markdown");
+    await expect(page.locator("#mode-edit")).toHaveText("编辑");
+    await expect(page.locator("#mode-edit")).toHaveAttribute("aria-label", "可视编辑");
+    await expect(page.locator("#mode-source")).toHaveText("MD");
+    await expect(page.locator("#mode-source")).toHaveAttribute("aria-label", "Markdown");
 
     const metrics = await page.evaluate(() => ({
       bodyOverflow: document.documentElement.scrollWidth - document.documentElement.clientWidth,

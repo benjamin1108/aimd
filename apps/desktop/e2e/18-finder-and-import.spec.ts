@@ -277,6 +277,7 @@ test.describe("2. Open Markdown as document", () => {
       return pill && pill.getAttribute("data-tone") === "warn";
     }, { timeout: 3000 });
 
+    await page.locator("#more-menu-toggle").click();
     await page.locator("#save").click();
 
     // doc-path 仍是 .md（未升级）

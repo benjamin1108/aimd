@@ -172,6 +172,7 @@ test.describe("Insert image then hop modes", () => {
     // ⌘S without waiting out the debounce. saveDocument calls flushInline
     // when state.mode === "edit" so the freshly inserted image must be in
     // the markdown payload.
+    await page.locator("#more-menu-toggle").click();
     await page.locator("#save").click();
 
     // Allow the invoke promise to resolve.

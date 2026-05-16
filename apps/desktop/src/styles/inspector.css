@@ -46,6 +46,9 @@
 }
 
 .inspector .section-content {
+  flex: 1 1 0;
+  min-height: 0;
+  overflow-y: auto;
   padding: 0 8px 8px;
   margin: 0 -8px;
 }
@@ -66,11 +69,12 @@
 .inspector.is-collapsed .inspector-owner,
 .inspector.is-collapsed .doc-panel-tabs,
 .inspector.is-collapsed .doc-panel-tab,
+.inspector.is-collapsed .doc-panel-head,
 .inspector.is-collapsed .section-content {
   display: none;
 }
 
-.inspector.is-collapsed .doc-panel-head {
+.inspector.is-collapsed .inspector-title-row {
   display: flex;
   justify-content: center;
   padding: 0;
@@ -96,11 +100,12 @@
   .panel[data-source-pressure="true"] .inspector .inspector-owner,
   .panel[data-source-pressure="true"] .inspector .doc-panel-tabs,
   .panel[data-source-pressure="true"] .inspector .doc-panel-tab,
+  .panel[data-source-pressure="true"] .inspector .doc-panel-head,
   .panel[data-source-pressure="true"] .inspector .section-content {
     display: none;
   }
 
-  .panel[data-source-pressure="true"] .inspector .doc-panel-head {
+  .panel[data-source-pressure="true"] .inspector .inspector-title-row {
     display: flex;
     justify-content: center;
     padding: 0;
@@ -114,9 +119,19 @@
   }
 }
 
+.inspector-title-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) var(--size-control-sm);
+  align-items: center;
+  gap: 6px;
+  min-height: var(--size-control-sm);
+  padding: 0 6px 7px;
+  flex: 0 0 auto;
+}
+
 .inspector-owner {
   min-height: 20px;
-  padding: 0 6px 7px;
+  padding: 0;
   color: var(--ink-faint);
   font-size: 11px;
   line-height: 1.25;
@@ -151,8 +166,8 @@
 }
 
 .outline-item.is-active {
-  background: rgba(47, 111, 99, 0.1);
-  color: var(--tone-success);
+  background-color: var(--nav-active-bg);
+  color: var(--nav-active-fg);
   font-weight: 680;
 }
 
@@ -168,7 +183,7 @@
 }
 
 .outline-item:hover .outline-bullet { background: var(--ink-muted); }
-.outline-item.is-active .outline-bullet { background: var(--tone-success); }
+.outline-item.is-active .outline-bullet { background: var(--nav-active-fg); }
 
 .outline-text {
   white-space: nowrap;

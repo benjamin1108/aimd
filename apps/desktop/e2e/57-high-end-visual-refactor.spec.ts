@@ -311,6 +311,7 @@ test.describe("high-end visual refactor contract", () => {
     await installHighEndMock(page);
     await page.setViewportSize({ width: 1440, height: 900 });
     await openProjectAndDoc(page, true);
+    await page.locator("#more-menu-toggle").click();
 
     const sizes = await page.evaluate(() => {
       const one = (selector: string) => {
@@ -318,7 +319,7 @@ test.describe("high-end visual refactor contract", () => {
         return { width: rect.width, height: rect.height };
       };
       return {
-        primary: one("#save"),
+        saveMenuItem: one("#save"),
         more: one("#more-menu-toggle"),
         tabClose: one(".open-tab-close"),
         inspectorCollapse: one("#doc-panel-collapse"),
@@ -326,7 +327,7 @@ test.describe("high-end visual refactor contract", () => {
         projectIcon: one("#workspace-open"),
       };
     });
-    expect(sizes.primary.height).toBeGreaterThanOrEqual(32);
+    expect(sizes.saveMenuItem.height).toBeGreaterThanOrEqual(30);
     expect(sizes.more.width).toBeGreaterThanOrEqual(32);
     expect(sizes.tabClose.width).toBeGreaterThanOrEqual(28);
     expect(sizes.inspectorCollapse.width).toBeGreaterThanOrEqual(28);
@@ -374,7 +375,8 @@ test.describe("high-end visual refactor contract", () => {
       "Remote",
       ">>>>>>> branch",
     ].join("\n"));
-    await expect(page.locator("#doc-state-badges")).toContainText("Git 冲突");
+    await expect(page.locator("#doc-state-badges")).toBeHidden();
+    await expect(page.locator("#status")).toContainText("Git 冲突");
     await page.locator("#mode-read").click();
     await page.locator("#check-updates").evaluate((el) => {
       document.querySelector<HTMLElement>("#update-panel")!.hidden = false;
@@ -388,17 +390,19 @@ test.describe("high-end visual refactor contract", () => {
       const rect = (selector: string) => document.querySelector(selector)!.getBoundingClientRect();
       const intersects = (a: DOMRect, b: DOMRect) => a.left < b.right && a.right > b.left && a.top < b.bottom && a.bottom > b.top;
       const tab = rect(".open-tab.is-active");
-      const save = rect("#save");
+      const find = rect("#find-toggle");
+      const mode = rect(".toolbar-group--mode");
       const more = rect("#more-menu-toggle");
-      const chip = rect(".doc-state-badge");
+      const status = rect("#status-pill");
       const tabStrip = rect("#document-tab-strip");
       const strip = rect("#document-command-strip");
       const surface = rect(".workspace-body");
       const fill = getComputedStyle(document.querySelector("#update-progress-fill")!);
       return {
-        tabSaveOverlap: intersects(tab, save),
-        saveMoreOverlap: intersects(save, more),
-        chipHeight: chip.height,
+        tabCommandOverlap: intersects(tab, strip),
+        findModeOverlap: intersects(find, mode),
+        modeMoreOverlap: intersects(mode, more),
+        statusHeight: status.height,
         tabHeight: rect(".open-tab").height,
         tabStripBottom: tabStrip.bottom,
         commandStripTop: strip.top,
@@ -408,10 +412,11 @@ test.describe("high-end visual refactor contract", () => {
         progressTransform: fill.transform,
       };
     });
-    expect(metrics.tabSaveOverlap).toBe(false);
-    expect(metrics.saveMoreOverlap).toBe(false);
+    expect(metrics.tabCommandOverlap).toBe(false);
+    expect(metrics.findModeOverlap).toBe(false);
+    expect(metrics.modeMoreOverlap).toBe(false);
     expect(metrics.commandStripTop).toBeGreaterThanOrEqual(metrics.tabStripBottom - 1);
-    expect(metrics.chipHeight).toBeGreaterThanOrEqual(20);
+    expect(metrics.statusHeight).toBeGreaterThanOrEqual(20);
     expect(metrics.tabHeight).toBeGreaterThanOrEqual(34);
     expect(Math.abs(metrics.surfaceTop - metrics.stripBottom)).toBeLessThanOrEqual(1);
     expect(metrics.progressTransition).toContain("transform");
@@ -425,8 +430,10 @@ test.describe("high-end visual refactor contract", () => {
     for (const size of [{ width: 760, height: 700 }, { width: 600, height: 700 }]) {
       await page.setViewportSize(size);
       await openProjectAndDoc(page);
-      await expect(page.locator("#save")).toBeVisible();
       await expect(page.locator("#more-menu-toggle")).toBeVisible();
+      await page.locator("#more-menu-toggle").click();
+      await expect(page.locator("#more-menu #save")).toBeVisible();
+      await page.keyboard.press("Escape");
       await expectNoHorizontalOverflow(page);
       await maybeCapture(page, `${size.width}x${size.height}-document`);
     }

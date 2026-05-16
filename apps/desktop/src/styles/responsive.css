@@ -97,10 +97,8 @@
     padding: 7px 10px 0;
   }
   .document-command-strip {
-    grid-template-columns: minmax(0, 1fr);
-    gap: 6px;
     min-height: 0;
-    padding: 6px 10px 8px;
+    padding: 6px 10px;
   }
   .tab-bar,
   .doc-toolbar {
@@ -111,17 +109,15 @@
     width: auto;
     justify-content: flex-end;
   }
-  .head-actions .primary-btn,
   .document-menu-btn {
     flex: 0 0 auto;
   }
   .doc-toolbar {
-    flex-wrap: wrap;
-    justify-content: flex-start;
+    grid-template-columns: minmax(0, 1fr) auto auto auto;
     gap: 6px;
-    padding: 0 0 8px;
+    padding: 0;
   }
-  .toolbar-group--mode { flex: 0 1 auto; min-width: 0; }
+  .toolbar-group--mode { min-width: 0; }
   .mode-switch {
     flex: 0 1 auto;
     min-width: 0;
@@ -132,16 +128,9 @@
     padding: 0 8px;
     justify-content: center;
   }
-  .doc-state-badges {
-    max-width: calc(100vw - 52px);
-    min-height: 18px;
-  }
-  .doc-state-badge {
-    height: 16px;
-    font-size: 10px;
-  }
   .find-bar {
-    left: 0;
+    left: auto;
+    right: 0;
     width: min(286px, calc(100vw - 20px));
     max-width: calc(100vw - 20px);
   }

@@ -258,15 +258,17 @@ async function expectCommandStripAndTabsStable(page: Page) {
     const box = (selector: string) => document.querySelector(selector)?.getBoundingClientRect();
     const intersects = (a?: DOMRect, b?: DOMRect) => Boolean(a && b
       && a.left < b.right && a.right > b.left && a.top < b.bottom && a.bottom > b.top);
-    const save = box("#save");
+    const find = box("#find-toggle");
+    const mode = box(".toolbar-group--mode");
     const more = box("#more-menu-toggle");
     const tab = box(".open-tab");
     const close = box(".open-tab-close");
     const tabStrip = box("#document-tab-strip");
     const strip = box("#document-command-strip");
     return {
-      saveMoreOverlap: intersects(save, more),
-      tabSaveOverlap: intersects(tab, save),
+      findModeOverlap: intersects(find, mode),
+      modeMoreOverlap: intersects(mode, more),
+      tabCommandOverlap: intersects(tab, strip),
       tabStripBottom: tabStrip?.bottom || 0,
       commandStripTop: strip?.top || 0,
       tabHeight: tab?.height || 0,
@@ -275,8 +277,9 @@ async function expectCommandStripAndTabsStable(page: Page) {
       stripHeight: strip?.height || 0,
     };
   });
-  expect(metrics.saveMoreOverlap).toBe(false);
-  expect(metrics.tabSaveOverlap).toBe(false);
+  expect(metrics.findModeOverlap).toBe(false);
+  expect(metrics.modeMoreOverlap).toBe(false);
+  expect(metrics.tabCommandOverlap).toBe(false);
   expect(metrics.commandStripTop).toBeGreaterThanOrEqual(metrics.tabStripBottom - 1);
   expect(metrics.tabHeight).toBeGreaterThanOrEqual(30);
   expect(metrics.tabHeight).toBeLessThanOrEqual(36);
@@ -310,7 +313,8 @@ async function setupVisualState(page: Page, stateName: VisualState) {
     await openDoc(page, "Daily with an intentionally long project filename");
     await page.locator("#mode-source").click();
     await page.locator("#markdown").fill("# Daily with an intentionally long project filename for ellipsis checks\n\n![local](asset://img-001)");
-    await expect(page.locator("#doc-state-badges")).toContainText("保存需选格式");
+    await expect(page.locator("#doc-state-badges")).toBeHidden();
+    await expect(page.locator("#status")).toContainText("保存时需选择格式");
     return;
   }
   if (stateName === "aimd-git-conflict") {
@@ -337,6 +341,23 @@ test.describe("three-column CSS production polish", () => {
     await expectDesktopThreeColumns(page);
     await expectCommandStripAndTabsStable(page);
     await expectNoHorizontalOverflow(page);
+
+    const inspectorChrome = await page.evaluate(() => {
+      const owner = document.querySelector("#inspector-owner")!.getBoundingClientRect();
+      const collapse = document.querySelector("#doc-panel-collapse")!.getBoundingClientRect();
+      const tabs = document.querySelector("#doc-panel-tabs")!.getBoundingClientRect();
+      const section = document.querySelector("#outline-section")!.getBoundingClientRect();
+      return {
+        ownerCenterY: owner.top + owner.height / 2,
+        collapseCenterY: collapse.top + collapse.height / 2,
+        collapseBottom: collapse.bottom,
+        tabsTop: tabs.top,
+        tabsCenterOffset: Math.abs((tabs.left + tabs.width / 2) - (section.left + section.width / 2)),
+      };
+    });
+    expect(Math.abs(inspectorChrome.ownerCenterY - inspectorChrome.collapseCenterY)).toBeLessThanOrEqual(2);
+    expect(inspectorChrome.collapseBottom).toBeLessThanOrEqual(inspectorChrome.tabsTop);
+    expect(inspectorChrome.tabsCenterOffset).toBeLessThanOrEqual(2);
   });
 
   test("medium desktop collapses the inspector before controls squeeze", async ({ page }) => {
@@ -358,8 +379,10 @@ test.describe("three-column CSS production polish", () => {
       await page.goto("/");
       await openProject(page);
       await openDoc(page, "Daily with an intentionally long project filename");
-      await expect(page.locator("#save")).toBeVisible();
       await expect(page.locator("#more-menu-toggle")).toBeVisible();
+      await page.locator("#more-menu-toggle").click();
+      await expect(page.locator("#more-menu #save")).toBeVisible();
+      await page.keyboard.press("Escape");
       await expectNoHorizontalOverflow(page);
     }
   });

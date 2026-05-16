@@ -37,6 +37,19 @@ async function installTabsMock(page: Page) {
         format: "aimd",
       }],
     ]);
+    for (let index = 1; index <= 12; index += 1) {
+      const title = `Long Tab Title ${String(index).padStart(2, "0")}`;
+      const path = `${seed.root}/${title}.aimd`;
+      docs.set(path, {
+        path,
+        title,
+        markdown: `# ${title}\n\nTab body ${index}`,
+        html: `<h1>${title}</h1><p>Tab body ${index}</p>`,
+        assets: [],
+        dirty: false,
+        format: "aimd",
+      });
+    }
     const runtime = {
       discardChoice: "cancel" as "save" | "discard" | "cancel",
       confirms: [] as string[],
@@ -171,6 +184,7 @@ test.describe("Open Documents tabs", () => {
     await expect(page.locator("#status")).toHaveText("就绪");
 
     await page.locator(".open-tab", { hasText: "Alpha" }).locator(".open-tab-main").click();
+    await page.locator("#more-menu-toggle").click();
     await page.locator("#save").click();
     await expect(page.locator(".open-tab.is-dirty", { hasText: "Alpha" })).toHaveCount(0);
     const saves = await page.evaluate(() => (window as any).__aimdTabsMock.saves());
@@ -206,6 +220,38 @@ test.describe("Open Documents tabs", () => {
     await expect(page.locator("#workspace-tree")).toHaveText("打开目录");
     await expect(page.locator(".open-tab")).toHaveCount(2);
     await expect(page.locator("#doc-title")).toHaveText("Beta");
+  });
+
+  test("crowded tab strip reserves space for the horizontal scrollbar", async ({ page }) => {
+    await installTabsMock(page);
+    await page.setViewportSize({ width: 1280, height: 760 });
+    await page.goto("/");
+    await page.locator("#empty-open-workspace").click();
+
+    for (let index = 1; index <= 12; index += 1) {
+      await page.locator(".workspace-row", { hasText: `Long Tab Title ${String(index).padStart(2, "0")}.aimd` }).click();
+    }
+    await expect(page.locator(".open-tab")).toHaveCount(12);
+
+    const metrics = await page.locator(".open-tabs").evaluate((tabs) => {
+      const tab = tabs.querySelector<HTMLElement>(".open-tab")!;
+      const strip = tabs.closest<HTMLElement>(".document-tab-strip")!;
+      const tabsRect = tabs.getBoundingClientRect();
+      const tabRect = tab.getBoundingClientRect();
+      const stripRect = strip.getBoundingClientRect();
+      return {
+        tabsScroll: tabs.scrollWidth > tabs.clientWidth,
+        tabTop: tabRect.top,
+        tabsTop: tabsRect.top,
+        tabBottom: tabRect.bottom,
+        tabsBottom: tabsRect.bottom,
+        stripBottom: stripRect.bottom,
+      };
+    });
+    expect(metrics.tabsScroll).toBe(true);
+    expect(metrics.tabTop).toBeGreaterThanOrEqual(metrics.tabsTop);
+    expect(metrics.tabBottom).toBeLessThanOrEqual(metrics.tabsBottom - 6);
+    expect(metrics.tabsBottom).toBeLessThanOrEqual(metrics.stripBottom);
   });
 
   test("Cmd+W on a dirty document tab shows close confirmation", async ({ page }) => {

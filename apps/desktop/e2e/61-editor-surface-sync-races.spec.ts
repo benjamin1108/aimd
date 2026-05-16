@@ -215,6 +215,11 @@ async function activateTab(page: Page, title: string) {
   await page.locator(".open-tab", { hasText: title }).locator(".open-tab-main").click();
 }
 
+async function clickSaveMenuItem(page: Page) {
+  await page.locator("#more-menu-toggle").click();
+  await page.locator("#save").click();
+}
+
 async function appendSource(page: Page, text: string) {
   await page.locator("#mode-source").click();
   await page.locator("#markdown").evaluate((el: HTMLTextAreaElement, value: string) => {
@@ -287,7 +292,7 @@ test("B: entering visual edit while render is pending keeps the editor non-edita
   await expect(page.locator("#inline-editor")).toContainText("SOURCE_SENTINEL");
   await expect(page.locator("#inline-editor")).not.toContainText("VISUAL_SENTINEL");
 
-  await page.locator("#save").click();
+  await clickSaveMenuItem(page);
   await expect.poll(() => page.evaluate(() => (window as any).__surfaceSyncMock.saves())).toHaveLength(1);
   const saved = await page.evaluate(() => (window as any).__surfaceSyncMock.saves().at(-1).markdown as string);
   expect(saved).toContain("SOURCE_SENTINEL");
@@ -345,7 +350,7 @@ test("D: task checkbox markdown mutation stays source-model synchronized before 
     el.textContent = "Paragraph D VISUAL_D";
     el.dispatchEvent(new InputEvent("input", { bubbles: true, inputType: "insertText", data: " VISUAL_D" }));
   });
-  await page.locator("#save").click();
+  await clickSaveMenuItem(page);
   await expect.poll(() => page.evaluate(() => (window as any).__surfaceSyncMock.saves())).toHaveLength(1);
   const saved = await page.evaluate(() => (window as any).__surfaceSyncMock.saves().at(-1).markdown as string);
 
@@ -389,7 +394,7 @@ test("F: saving from source, edit, and read leaves markdown, HTML, dirty state, 
 
   await appendSource(page, "SOURCE_SAVE_SENTINEL");
   await waitForRendered(page, "SOURCE_SAVE_SENTINEL");
-  await page.locator("#save").click();
+  await clickSaveMenuItem(page);
   await expect.poll(() => page.evaluate(() => (window as any).__surfaceSyncMock.saves().length)).toBe(1);
   await expectAllSurfacesContain(page, "SOURCE_SAVE_SENTINEL");
 
@@ -398,14 +403,14 @@ test("F: saving from source, edit, and read leaves markdown, HTML, dirty state, 
     el.textContent = "Paragraph D EDIT_SAVE_SENTINEL";
     el.dispatchEvent(new InputEvent("input", { bubbles: true, inputType: "insertText", data: " EDIT_SAVE_SENTINEL" }));
   });
-  await page.locator("#save").click();
+  await clickSaveMenuItem(page);
   await expect.poll(() => page.evaluate(() => (window as any).__surfaceSyncMock.saves().length)).toBe(2);
   await expectAllSurfacesContain(page, "EDIT_SAVE_SENTINEL");
 
   await page.locator("#mode-read").click();
   await page.locator('#reader input[type="checkbox"]').click();
   await waitForRendered(page, "- [x] Task one");
-  await page.locator("#save").click();
+  await clickSaveMenuItem(page);
   await expect.poll(() => page.evaluate(() => (window as any).__surfaceSyncMock.saves().length)).toBe(3);
 
   const stateAfterSave = await tabVersionState(page, A_PATH);

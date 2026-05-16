@@ -402,7 +402,7 @@ test.describe("Editor core capabilities", () => {
     await expect(page.locator("#export-pdf")).not.toBeDisabled();
     await expect(page.locator("#format-document")).toContainText("一键格式化");
     await expect(page.locator("#format-document")).not.toBeDisabled();
-    await expect(page.locator("#more-menu .action-menu-item")).toHaveCount(8);
+    await expect(page.locator("#more-menu .action-menu-item")).toHaveCount(9);
     await expect(page.locator("#more-menu")).not.toContainText("从网页导入");
     await expect(page.locator("#more-menu")).not.toContainText("检查更新");
     await expect(page.locator("#more-menu")).not.toContainText("关于 AIMD");
@@ -500,6 +500,7 @@ test.describe("Editor core capabilities", () => {
     await page.locator("#mode-source").click();
     await page.locator("#markdown").fill("# Save Remote\n\n![remote](https://example.com/a.png)\n");
     await expect(page.locator("#save")).not.toBeDisabled();
+    await page.locator("#more-menu-toggle").click();
     await page.locator("#save").click();
 
     await expect(page.locator("#status")).toContainText("已保存");

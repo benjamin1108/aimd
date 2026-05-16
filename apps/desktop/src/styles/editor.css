@@ -1,18 +1,25 @@
-/* Format toolbar (above inline editor) + inline contenteditable styles */
+/* Inline format toolbar + inline contenteditable styles */
 
 .format-toolbar {
-  grid-row: 3;
-  display: flex;
+  display: inline-flex;
   align-items: center;
-  flex-wrap: wrap;
-  gap: 4px;
-  padding: 6px 18px;
-  border-bottom: 1px solid var(--hairline);
-  background: var(--surface-toolbar);
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.44);
+  flex-wrap: nowrap;
+  gap: 2px;
+  min-width: 0;
+  max-width: 100%;
+  overflow: auto hidden;
+  padding: 0;
+  border-bottom: 0;
+  background: transparent;
+  box-shadow: none;
+  scrollbar-width: none;
 }
 
-.format-toolbar[hidden] { display: none; }
+.format-toolbar::-webkit-scrollbar {
+  display: none;
+}
+
+.format-toolbar[hidden] { display: none !important; }
 
 .ft-group {
   display: inline-flex;
@@ -21,13 +28,15 @@
   padding: 2px;
   border-radius: var(--radius-control);
   background: rgba(31, 22, 11, 0.04);
+  flex: 0 0 auto;
 }
 
 .ft-sep {
   width: 1px;
   height: 18px;
-  margin: 0 6px;
+  margin: 0 4px;
   background: var(--hairline-strong);
+  flex: 0 0 auto;
 }
 
 .ft-btn {

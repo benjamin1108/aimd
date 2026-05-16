@@ -289,8 +289,20 @@ body.resizing-v * {
 }
 
 .workspace-row.is-active {
-  background: rgba(31, 22, 11, 0.09);
-  color: var(--ink);
+  background-color: var(--nav-active-bg);
+  color: var(--nav-active-fg);
+  font-weight: 680;
+}
+
+.workspace-row.is-active .workspace-node-icon,
+.workspace-row.is-active .workspace-twist {
+  color: var(--nav-active-fg);
+}
+
+.workspace-row.is-active .workspace-format-tag {
+  border-color: rgba(47, 111, 99, 0.16);
+  background: rgba(47, 111, 99, 0.08);
+  color: var(--nav-active-fg);
 }
 
 .workspace-row svg {

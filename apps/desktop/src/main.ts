@@ -175,7 +175,7 @@ $("#clear-recent").addEventListener("click", clearRecentDocuments);
 modeReadEl().addEventListener("click", () => setMode("read"));
 modeEditEl().addEventListener("click", () => setMode("edit"));
 modeSourceEl().addEventListener("click", () => setMode("source"));
-saveEl().addEventListener("click", saveDocument);
+saveEl().addEventListener("click", () => { closeActionMenus(); void saveDocument(); });
 saveAsEl().addEventListener("click", () => { closeActionMenus(); void saveDocumentAs(); });
 formatDocumentEl().addEventListener("click", () => { closeActionMenus(); void formatCurrentDocument(); });
 $("#package-local-images").addEventListener("click", () => { closeActionMenus(); void packageLocalImages(); });

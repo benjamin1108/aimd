@@ -2,8 +2,10 @@
  * 38-design-polish.spec.ts
  *
  * 钉住设计打磨这一轮的视觉/IA 决策，避免下一轮回归：
- * - 顶部 ⋯ 改 ghost-btn（无 secondary-btn class），保存按钮 primary-btn 视觉权重明确高于 ⋯
- * - 模式切换段控件改纯文字（不再渲染 .mode-btn-icon SVG）
+ * - 文档命令栏合并为：Markdown 编辑栏 / 查找 / 预览-编辑-MD / 竖向三点。
+ * - 保存收进竖向三点菜单，命令栏不再外露保存主按钮。
+ * - 查找使用浮层，点击外部自动关闭，不占据命令栏高度。
+ * - 模式切换段控件改短文字（不再渲染 .mode-btn-icon SVG）
  * - ⋯ 菜单不再用"危险"分组（关闭文档不是破坏性操作）
  * - 旧导览菜单 / 状态点 / 按钮不再出现。
  * - source 模式不为 frontmatter 常驻显示 #source-banner，避免源码/预览标题栏错位
@@ -54,26 +56,67 @@ async function installTauriMock(page: Page, opts: { withTour?: boolean } = {}) {
   }, tour);
 }
 
+async function expectUsesNavActiveStyle(page: Page, selector: string) {
+  await expect.poll(() => page.evaluate((targetSelector) => {
+    const target = document.querySelector<HTMLElement>(targetSelector);
+    if (!target) return false;
+    const probe = document.createElement("div");
+    probe.style.backgroundColor = "var(--nav-active-bg)";
+    probe.style.color = "var(--nav-active-fg)";
+    document.body.append(probe);
+    const expected = window.getComputedStyle(probe);
+    const actual = window.getComputedStyle(target);
+    const matches = actual.backgroundColor === expected.backgroundColor
+      && actual.color === expected.color;
+    probe.remove();
+    return matches;
+  }, selector)).toBe(true);
+}
+
 test.describe("顶部工具栏视觉权重", () => {
-  test("文档菜单使用带标签的 secondary 按钮而非裸省略号", async ({ page }) => {
+  test("命令栏顺序为编辑栏 / 查找 / 模式 / 竖向三点", async ({ page }) => {
     await installTauriMock(page);
     await page.goto("/");
     await page.locator("#empty-open").click();
-    await expect(page.locator("#doc-actions")).toBeVisible();
+    await page.locator("#mode-edit").click();
+    await expect(page.locator("#format-toolbar")).toBeVisible();
+
+    const directChildren = await page.locator("#doc-toolbar").evaluate((toolbar) =>
+      Array.from(toolbar.children).map((child) => ({
+        id: child.id,
+        cls: child.className,
+      })),
+    );
+    expect(directChildren.map((child) => child.id || child.cls)).toEqual([
+      "format-toolbar",
+      "find-cluster",
+      "toolbar-group toolbar-group--mode",
+      "doc-actions",
+    ]);
+
+    await expect(page.locator("#format-toolbar .ft-btn")).toHaveCount(17);
 
     const more = page.locator("#more-menu-toggle");
-    await expect(more).toHaveClass(/secondary-btn/);
+    await expect(more).toHaveClass(/ghost-btn/);
+    await expect(more).toHaveClass(/icon-only/);
     await expect(more).toHaveClass(/document-menu-btn/);
-    await expect(more).toContainText("文档");
-    await expect(more).not.toHaveClass(/icon-only/);
+    await expect(more).not.toHaveClass(/secondary-btn/);
+    await expect(more).not.toContainText("文档");
+    await expect(more.locator(".vertical-dots span")).toHaveCount(3);
   });
 
-  test("保存按钮保留 primary-btn 主色权重", async ({ page }) => {
+  test("保存收进竖向三点菜单，命令栏不再外露保存按钮", async ({ page }) => {
     await installTauriMock(page);
     await page.goto("/");
     await page.locator("#empty-open").click();
+    await expect(page.locator(".command-save-btn")).toHaveCount(0);
+
+    await page.locator("#more-menu-toggle").click();
     const save = page.locator("#save");
-    await expect(save).toHaveClass(/primary-btn/);
+    await expect(save).toBeVisible();
+    await expect(save).toHaveClass(/action-menu-item/);
+    await expect(save).not.toHaveClass(/primary-btn/);
+    await expect(save).toContainText("保存");
   });
 
   test("查找使用极简图标入口和紧凑浮层", async ({ page }) => {
@@ -89,6 +132,7 @@ test.describe("顶部工具栏视觉权重", () => {
 
     await find.click();
     await expect(page.locator("#find-bar")).toBeVisible();
+    await expectUsesNavActiveStyle(page, "#find-toggle");
     const metrics = await page.evaluate(() => {
       const toggle = document.querySelector("#find-toggle")!.getBoundingClientRect();
       const bar = document.querySelector("#find-bar")!.getBoundingClientRect();
@@ -107,11 +151,14 @@ test.describe("顶部工具栏视觉权重", () => {
     expect(metrics.barTop).toBeGreaterThanOrEqual(metrics.toggleBottom);
     expect(metrics.prevHasIcon).toBe(true);
     expect(metrics.prevText).toBe("");
+
+    await page.locator("#reader").click({ position: { x: 10, y: 10 } });
+    await expect(page.locator("#find-bar")).toBeHidden();
   });
 });
 
 test.describe("模式切换 — 纯文字分段控件", () => {
-  test("预览 / 可视编辑 / Markdown 三个按钮不渲染 SVG 图标", async ({ page }) => {
+  test("预览 / 编辑 / MD 三个按钮不渲染 SVG 图标，同时保留完整语义", async ({ page }) => {
     await installTauriMock(page);
     await page.goto("/");
     await page.locator("#empty-open").click();
@@ -122,8 +169,11 @@ test.describe("模式切换 — 纯文字分段控件", () => {
 
     // 文字仍然在
     await expect(page.locator("#mode-read")).toContainText("预览");
-    await expect(page.locator("#mode-edit")).toContainText("可视编辑");
-    await expect(page.locator("#mode-source")).toContainText("Markdown");
+    await expect(page.locator("#mode-edit")).toHaveText("编辑");
+    await expect(page.locator("#mode-edit")).toHaveAttribute("aria-label", "可视编辑");
+    await expect(page.locator("#mode-source")).toHaveText("MD");
+    await expect(page.locator("#mode-source")).toHaveAttribute("aria-label", "Markdown");
+    await expectUsesNavActiveStyle(page, "#mode-read");
   });
 });
 

@@ -165,6 +165,23 @@ async function openWorkspaceDocument(page: Page) {
   await expect(page.locator("#reader")).toContainText("Document body");
 }
 
+async function expectUsesNavActiveStyle(page: Page, selector: string) {
+  await expect.poll(() => page.evaluate((targetSelector) => {
+    const target = document.querySelector<HTMLElement>(targetSelector);
+    if (!target) return false;
+    const probe = document.createElement("div");
+    probe.style.backgroundColor = "var(--nav-active-bg)";
+    probe.style.color = "var(--nav-active-fg)";
+    document.body.append(probe);
+    const expected = window.getComputedStyle(probe);
+    const actual = window.getComputedStyle(target);
+    const matches = actual.backgroundColor === expected.backgroundColor
+      && actual.color === expected.color;
+    probe.remove();
+    return matches;
+  }, selector)).toBe(true);
+}
+
 test.describe("Git workspace panel", () => {
   test("keeps fixed inspector tabs for a non-Git workspace document", async ({ page }) => {
     await installGitWorkspaceMock(page, "none");
@@ -187,8 +204,15 @@ test.describe("Git workspace panel", () => {
     await expect(page.locator("#sidebar-tab-outline")).toHaveAttribute("aria-selected", "true");
     await expect(page.locator("#outline-panel")).toBeVisible();
 
+    const tabsBeforeGitContent = await page.locator("#sidebar-tab-outline").boundingBox();
     await page.locator("#sidebar-tab-git").click();
     await expect(page.locator("#git-panel")).toBeVisible();
+    await expect(page.locator(".git-file-row[data-path='apps/foo.ts']")).toBeVisible();
+    await expectUsesNavActiveStyle(page, "#sidebar-tab-git");
+    await expectUsesNavActiveStyle(page, ".git-file-row[data-path='apps/foo.ts']");
+    const tabsAfterGitContent = await page.locator("#sidebar-tab-outline").boundingBox();
+    expect(tabsBeforeGitContent && tabsAfterGitContent).toBeTruthy();
+    expect(Math.abs(tabsAfterGitContent!.y - tabsBeforeGitContent!.y)).toBeLessThanOrEqual(1);
     await expect(page.locator(".git-branch")).toContainText("main");
     await expect(page.locator(".git-meta")).toContainText("origin/main ↑1 ↓2");
     const branchBox = await page.locator(".git-branch").boundingBox();
@@ -209,14 +233,18 @@ test.describe("Git workspace panel", () => {
     await page.locator(".git-file-row[data-path='apps/foo.ts']").locator("[data-git-action='select']").click();
     await expect(page.locator("#git-diff-view")).toBeVisible();
     await expect(page.locator("#doc-toolbar")).toBeVisible();
-    await expect(page.locator("#mode-read")).toBeDisabled();
-    await expect(page.locator("#mode-edit")).toBeDisabled();
-    await expect(page.locator("#mode-source")).toBeDisabled();
-    await expect(page.locator("#find-toggle")).toBeDisabled();
-    await expect(page.locator("#save")).toBeDisabled();
+    await expect(page.locator(".toolbar-group--mode")).toBeHidden();
+    await expect(page.locator("#mode-read")).toBeHidden();
+    await expect(page.locator("#mode-edit")).toBeHidden();
+    await expect(page.locator("#mode-source")).toBeHidden();
+    await expect(page.locator("#find-toggle")).toBeEnabled();
+    await expect(page.locator("#doc-actions")).toBeHidden();
+    await expect(page.locator("#more-menu-toggle")).toBeHidden();
+    await expect(page.locator("#save")).toBeHidden();
     await expect(page.locator("#format-toolbar")).toBeHidden();
     await expect(page.locator("#git-diff-back")).toHaveCount(0);
     await expect(page.locator(".open-tab.is-active")).toContainText("foo.ts");
+    await expectUsesNavActiveStyle(page, ".open-tab.is-active");
     await expect(page.locator(".open-tab.is-active")).toContainText("Git");
     await expect(page.locator("#doc-title")).toHaveText("foo.ts");
     await expect(page.locator("#doc-path")).toHaveText("Git Diff · apps");
@@ -227,6 +255,14 @@ test.describe("Git workspace panel", () => {
     await expect(page.locator(".git-diff-line.is-meta").first()).toContainText("diff --git");
     const overflows = await page.locator(".git-diff-code").first().evaluate((el) => el.scrollWidth > el.clientWidth);
     expect(overflows).toBeTruthy();
+
+    await page.locator("#find-toggle").click();
+    await expect(page.locator("#find-bar")).toBeVisible();
+    await expect(page.locator(".find-replace-group")).toBeHidden();
+    await page.locator("#find-input").fill("changed line");
+    await page.keyboard.press("Enter");
+    await expect(page.locator("#find-count")).toHaveText("1/1");
+    await expect.poll(() => page.evaluate(() => String(window.getSelection()))).toContain("changed line");
 
     await page.locator(".git-file-row[data-path='apps/foo.ts']").locator("[data-git-action='select']").click();
     await expect(page.locator(".open-tab", { hasText: "foo.ts" })).toHaveCount(1);

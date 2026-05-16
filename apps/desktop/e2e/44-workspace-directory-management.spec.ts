@@ -206,6 +206,19 @@ test.describe("Workspace directory management", () => {
     await page.locator(".workspace-row", { hasText: "Report.aimd" }).click();
     await expect(page.locator("#doc-title")).toHaveText("Report");
     await expect(page.locator(".workspace-row.is-active", { hasText: "Report.aimd" })).toBeVisible();
+    await expect(page.locator(".outline-item")).toHaveCount(1);
+    await expect(page.locator(".outline-item.is-active")).toHaveCount(0);
+    await page.locator(".outline-item").first().click();
+    await expect(page.locator(".outline-item").first()).toHaveClass(/is-active/);
+    await expect.poll(() => page.evaluate(() => {
+      const outline = document.querySelector(".outline-item.is-active");
+      const workspace = document.querySelector(".workspace-row.is-active");
+      if (!outline || !workspace) return false;
+      const outlineStyle = window.getComputedStyle(outline);
+      const workspaceStyle = window.getComputedStyle(workspace);
+      return outlineStyle.backgroundColor === workspaceStyle.backgroundColor
+        && outlineStyle.color === workspaceStyle.color;
+    })).toBe(true);
 
     await page.locator("#workspace-new-doc").click();
     await page.locator("#project-new-folder").click();
@@ -228,6 +241,7 @@ test.describe("Workspace directory management", () => {
 
     await page.locator("#mode-source").click();
     await page.locator("#markdown").fill("# Daily Renamed\n\nSaved after rename");
+    await page.locator("#more-menu-toggle").click();
     await page.locator("#save").click();
     const saveCalls = await page.evaluate(() => (window as any).__aimdWorkspaceMock.saveMarkdownCalls());
     expect(saveCalls.at(-1)).toMatchObject({
