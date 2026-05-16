@@ -1,0 +1,62 @@
+@layer tokens {
+:root {
+  --text-primary: var(--ink);
+  --text-strong: var(--ink-strong);
+  --text-muted: var(--ink-muted);
+  --text-faint: var(--ink-faint);
+  --text-inverse: var(--ink-on-accent);
+  --text-disabled: color-mix(in srgb, var(--ink-muted) 62%, transparent);
+
+  --surface-app: var(--surface-window);
+  --surface-raised: var(--surface-panel-raised);
+  --surface-sunken: var(--surface-panel-recessed);
+  --surface-workspace: var(--surface-document-soft);
+  --surface-editor: var(--surface-source);
+  --surface-overlay: var(--surface-popover-core);
+  --border-subtle: var(--hairline);
+  --border-strong: var(--hairline-strong);
+  --focus-ring: rgba(42, 96, 160, 0.5);
+  --focus-ring-soft: rgba(42, 96, 160, 0.08);
+  --focus-ring-strong: rgba(42, 96, 160, 0.38);
+
+  --danger: var(--tone-danger);
+  --warning: var(--tone-warn);
+  --success: var(--tone-success);
+  --info: var(--tone-info);
+  --border-danger: var(--tone-danger-border);
+  --border-warning: var(--tone-warn-border);
+  --border-success: var(--tone-success-border);
+  --border-info: var(--tone-info-border);
+
+  --git-added-bg: rgba(74, 129, 74, 0.16);
+  --git-added-text: #2f6332;
+  --git-added-border: rgba(74, 129, 74, 0.24);
+  --git-removed-bg: rgba(164, 70, 56, 0.14);
+  --git-removed-text: #8f3128;
+  --git-removed-border: rgba(164, 70, 56, 0.22);
+  --git-modified-bg: rgba(49, 95, 121, 0.12);
+  --git-modified-text: #315f79;
+  --git-modified-border: rgba(49, 95, 121, 0.24);
+
+  --markdown-heading: #7f342a;
+  --markdown-code-fence: #7a5a12;
+  --markdown-code: #4a5f35;
+  --markdown-quote: #6d5b8c;
+  --markdown-list: #315f79;
+  --markdown-table: #775326;
+  --markdown-image: #8b3f64;
+  --markdown-search-highlight: rgba(255, 214, 102, 0.45);
+  --markdown-metadata-bg: color-mix(in srgb, var(--surface-document-soft) 86%, var(--tone-info) 14%);
+  --markdown-metadata-border: var(--git-modified-border);
+  --markdown-metadata-rail: color-mix(in srgb, var(--git-modified-text) 42%, transparent);
+
+  --scrollbar-thumb: var(--hairline-strong);
+  --selection-bg: rgba(47, 111, 99, 0.18);
+  --selection-text: var(--ink-strong);
+  --workspace-row-overflow-bg: var(--surface-popover-core);
+  --workspace-row-overflow-fg: var(--ink);
+  --workspace-row-overflow-shadow: var(--shadow-control);
+  --workspace-row-overflow-active-bg: var(--surface-popover-core);
+  --workspace-row-overflow-active-fg: var(--nav-active-fg);
+}
+}

@@ -51,19 +51,3 @@ export function visualEditorSurfaceProfile(): RenderedSurfaceProfile {
     paintVersionKey: "edit",
   };
 }
-
-export function gitDiffSurfaceProfile(root: HTMLElement): RenderedSurfaceProfile {
-  return {
-    kind: "git-diff",
-    root,
-    contentEditable: false,
-    stripFrontmatter: false,
-    sourceAnnotations: false,
-    hydrateMarkdownImages: true,
-    taskToggle: false,
-    codeCopy: true,
-    linkOpen: "modifier",
-    imageLightbox: true,
-    syncOutlineIds: true,
-  };
-}

@@ -1,0 +1,67 @@
+@layer base {
+/* Global selection boundary: document-like content is selectable, app chrome is not. */
+
+body,
+.app-frame,
+.panel,
+.sidebar,
+.workspace,
+.document-tab-strip,
+.document-command-strip,
+.doc-toolbar,
+.format-toolbar,
+.workspace-foot,
+.settings-shell,
+.settings-panel,
+.settings-nav,
+.settings-head,
+.settings-actions,
+.action-menu,
+.link-popover,
+.web-clip-panel,
+.health-panel,
+.format-preview-panel,
+.debug-modal,
+button,
+[role="button"],
+[role="tab"],
+svg {
+  -webkit-user-select: none;
+  user-select: none;
+}
+
+#reader,
+#inline-editor,
+#markdown,
+#markdown-highlight,
+#preview,
+#git-diff-scroll,
+.git-diff-code,
+.git-diff-line,
+.debug-list,
+.debug-entry pre,
+#format-preview-text,
+.health-list,
+.health-list *,
+.field input,
+.field select,
+input,
+textarea,
+select,
+[contenteditable="true"],
+[data-select-all-scope],
+[data-selectable],
+code,
+pre {
+  -webkit-user-select: text;
+  user-select: text;
+}
+
+input,
+textarea,
+select,
+[contenteditable="true"] {
+  -webkit-user-select: text;
+  user-select: text;
+}
+}

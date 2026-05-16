@@ -1,14 +1,16 @@
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import { invoke } from "@tauri-apps/api/core";
-import "../styles.css";
+import "../styles/entries/settings.css";
 
 import { cloneSettings, coerceModelRetryCount, coerceModelTimeoutSeconds, DEFAULT_AI_SETTINGS, DEFAULT_UI_SETTINGS, DEFAULT_WEB_CLIP_SETTINGS, DEFAULT_FORMAT_SETTINGS, loadAppSettings, saveAppSettings, defaultModelForProvider, defaultWebClipModelForProvider, type AppSettings } from "../core/settings";
-import type { ModelProvider, ProviderCredential, WebClipOutputLanguage, UiSettings, FormatSettings, FormatOutputLanguage } from "../core/types";
+import type { ModelProvider, ProviderCredential, WebClipOutputLanguage, UiSettings, FormatSettings, FormatOutputLanguage, UiTheme } from "../core/types";
 import { setupGitIntegration } from "./git-integration";
 import { settingsTemplateHTML } from "./template";
 import { bindSelectionBoundary } from "../ui/selection";
 import { bindApiKeyMask } from "./api-key-mask";
 import { customModelValue, renderModelOptionsFor, type ModelConnectionTestResult } from "./model-controls";
+import { applyThemePreference, bindSystemThemePreference } from "../ui/theme";
+import { bindSettingsTabs } from "./tabs";
 
 declare global {
   interface Window {
@@ -18,6 +20,7 @@ declare global {
 
 const root = document.querySelector<HTMLDivElement>("#settings-app");
 if (!root) throw new Error("设置页缺少 #settings-app 挂载点");
+document.body.dataset.aimdEntry = "settings";
 root.innerHTML = settingsTemplateHTML();
 bindSelectionBoundary("settings");
 
@@ -38,6 +41,7 @@ const apiKeyRevealEl = $<HTMLButtonElement>("#api-key-reveal");
 const apiKeyErrorEl = $<HTMLElement>("#api-key-error");
 const apiBaseEl = $<HTMLInputElement>("#api-base");
 const uiDebugModeEl = $<HTMLInputElement>("#ui-debug-mode");
+const uiThemeEl = $<HTMLSelectElement>("#ui-theme");
 const webClipLlmEnabledEl = $<HTMLInputElement>("#webclip-llm-enabled");
 const webClipProviderEl = $<HTMLSelectElement>("#webclip-provider");
 const webClipModelSelectEl = $<HTMLSelectElement>("#webclip-model-select");
@@ -80,36 +84,12 @@ let webClipModelDraft: Record<ModelProvider, string> = {
 };
 let formatConfig: FormatSettings = { ...DEFAULT_FORMAT_SETTINGS };
 let uiConfig: UiSettings = { ...DEFAULT_UI_SETTINGS };
+bindSystemThemePreference(() => uiConfig.theme);
 
-function normalizeSectionId(sectionId: string | undefined): string {
-  if (!sectionId) return "general";
-  for (const sec of sections) {
-    if (sec.dataset.section === sectionId) return sectionId;
-  }
-  return "general";
-}
-
-function switchTab(sectionId: string | undefined) {
-  const targetSectionId = normalizeSectionId(sectionId);
-  navItems.forEach((btn) => {
-    const active = btn.dataset.section === targetSectionId;
-    btn.classList.toggle("is-active", active);
-    btn.setAttribute("aria-selected", String(active));
-  });
-  sections.forEach((sec) => {
-    const active = sec.dataset.section === targetSectionId;
-    sec.classList.toggle("is-active", active);
-    sec.hidden = !active;
-  });
+const { switchTab } = bindSettingsTabs(navItems, sections, (targetSectionId) => {
   resetModelBtn.hidden = targetSectionId !== "model";
   testConnectionBtn.disabled = testingConnection || targetSectionId !== "model";
   if (targetSectionId === "git") void gitIntegration.refresh();
-}
-
-navItems.forEach((btn) => {
-  btn.addEventListener("click", () => {
-    switchTab(btn.dataset.section);
-  });
 });
 
 function readCredFromForm(): ProviderCredential {
@@ -130,6 +110,7 @@ function readModelRetry(el: HTMLInputElement, fallback: number): number { return
 function captureFormToDraft() {
   draft[activeProvider] = readCredFromForm();
   uiConfig.debugMode = uiDebugModeEl.checked;
+  uiConfig.theme = uiThemeEl.value as UiTheme;
   const webClipProvider = webClipProviderEl.value as ModelProvider;
   const webClipModel = webClipModelSelectEl.value === customModelValue()
     ? (webClipModelEl.value.trim() || defaultWebClipModelForProvider({ activeProvider, providers: draft }, webClipProvider))
@@ -214,8 +195,11 @@ function fill(settings: AppSettings) {
   };
   uiConfig = {
     debugMode: settings.ui?.debugMode ?? false,
+    theme: settings.ui?.theme ?? DEFAULT_UI_SETTINGS.theme,
   };
   uiDebugModeEl.checked = uiConfig.debugMode;
+  uiThemeEl.value = uiConfig.theme;
+  applyThemePreference(uiConfig.theme);
   webClipLlmEnabledEl.checked = webClipConfig.llmEnabled;
   webClipProviderEl.value = webClipConfig.provider;
   renderModelOptionsFor(webClipModelSelectEl, webClipModelEl, webClipConfig.provider, webClipConfig.model);
@@ -262,6 +246,7 @@ function readSettings(): AppSettings {
     },
     ui: {
       debugMode: uiConfig.debugMode,
+      theme: uiConfig.theme,
     },
   };
 }
@@ -299,7 +284,7 @@ apiKeyEl.addEventListener("input", () => {
   syncSaveButton();
 });
 
-[apiBaseEl, modelEl, uiDebugModeEl, webClipLlmEnabledEl, webClipModelEl, webClipOutputLanguageEl, webClipModelTimeoutEl, webClipModelRetryEl, formatProviderEl, formatModelEl, formatOutputLanguageEl, formatModelTimeoutEl, formatModelRetryEl].forEach((el) => {
+[apiBaseEl, modelEl, uiDebugModeEl, uiThemeEl, webClipLlmEnabledEl, webClipModelEl, webClipOutputLanguageEl, webClipModelTimeoutEl, webClipModelRetryEl, formatProviderEl, formatModelEl, formatOutputLanguageEl, formatModelTimeoutEl, formatModelRetryEl].forEach((el) => {
   el.addEventListener("input", () => {
     clearConnectionTestState();
     syncSaveButton();
@@ -308,6 +293,12 @@ apiKeyEl.addEventListener("input", () => {
     clearConnectionTestState();
     syncSaveButton();
   });
+});
+
+uiThemeEl.addEventListener("change", () => {
+  uiConfig.theme = uiThemeEl.value as UiTheme;
+  applyThemePreference(uiConfig.theme);
+  syncSaveButton();
 });
 
 async function bootstrap() {
@@ -365,7 +356,8 @@ webClipProviderEl.addEventListener("change", () => {
     : webClipModelSelectEl.value;
   webClipModelDraft[previousProvider] = previousModel;
   draft[activeProvider] = readCredFromForm();
-  uiConfig.debugMode = uiDebugModeEl.checked;
+    uiConfig.debugMode = uiDebugModeEl.checked;
+    uiConfig.theme = uiThemeEl.value as UiTheme;
   const provider = webClipProviderEl.value as ModelProvider;
   const model = webClipModelDraft[provider] || defaultWebClipModelForProvider({ activeProvider, providers: draft }, provider);
   webClipConfig = {

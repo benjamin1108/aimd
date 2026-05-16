@@ -1,0 +1,15 @@
+@layer tokens {
+:root {
+  --motion-enabled: 1;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  :root {
+    --motion-enabled: 0;
+    --t-fast: 1ms;
+    --t-med: 1ms;
+    --t-slow: 1ms;
+    --workspace-row-overflow-duration: 1ms;
+  }
+}
+}

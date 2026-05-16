@@ -1,0 +1,343 @@
+@layer components {
+/* Doc toolbar contents — mode switch, action menu, source-mode metadata
+   banner, starter / quick actions. */
+.toolbar-group {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+.toolbar-select-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  color: var(--ink-muted);
+  font-size: 12px;
+  font-weight: 600;
+}
+.toolbar-select {
+  height: var(--size-control);
+  min-width: 78px;
+  border: 1px solid var(--hairline-strong);
+  border-radius: var(--radius-control-sm);
+  padding: 0 28px 0 10px;
+  background: var(--surface-control);
+  color: var(--ink);
+  font: 12.5px/1 var(--font-sans);
+  outline: none;
+}
+.toolbar-select:focus {
+  border-color: var(--hairline-focus-muted);
+  box-shadow: 0 0 0 3px var(--focus-ring-soft);
+}
+.toolbar-select:focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 2px;
+}
+.more-menu-wrap {
+  position: static;
+  flex: 0 0 auto;
+  min-width: 30px;
+}
+.secondary-btn.icon-only {
+  width: var(--size-control);
+  padding: 0;
+  font-size: 18px;
+  line-height: 1;
+}
+
+/* Source-mode exceptional banner. Frontmatter is rendered as document metadata,
+   not as a persistent textarea banner. */
+.source-banner {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0 0 10px;
+  padding: 8px 12px;
+  border: 1px solid var(--hairline);
+  border-radius: var(--radius-control);
+  background: var(--tone-info-surface);
+  color: var(--tone-info);
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+.source-banner[hidden] { display: none !important; }
+
+.source-banner-icon {
+  display: grid;
+  place-items: center;
+  width: 16px;
+  height: 16px;
+  flex: 0 0 auto;
+}
+
+.source-banner-text {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.source-banner-text strong {
+  color: var(--ink-strong);
+  font-weight: 600;
+}
+
+.starter-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+/* Mode switch (segmented) — text-only, icons removed for visual calm.
+   Three short labels carry hierarchy via weight + a subtle elevated
+   background on the active segment. */
+
+.mode-switch {
+  display: inline-flex;
+  padding: 3px;
+  border-radius: var(--radius-control);
+  background: var(--surface-muted);
+  box-shadow: inset 0 1px 0 var(--highlight-edge-soft);
+}
+
+.mode-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  height: var(--size-control-sm);
+  min-width: 46px;
+  padding: 0 9px;
+  border-radius: var(--radius-control-sm);
+  color: var(--ink-muted);
+  font-size: 12px;
+  font-weight: 500;
+  letter-spacing: 0;
+  transition: background var(--t-fast) var(--ease),
+              color var(--t-fast) var(--ease),
+              box-shadow var(--t-fast) var(--ease);
+}
+
+.mode-btn-icon { display: none; }
+
+.mode-btn:hover:not(:disabled):not(.active) {
+  color: var(--ink);
+}
+
+.mode-btn.active {
+  background-color: var(--nav-active-bg);
+  color: var(--nav-active-fg);
+  font-weight: 600;
+  box-shadow:
+    0 1px 0 var(--highlight-edge-muted) inset,
+    inset 0 0 0 1px var(--nav-active-border);
+}
+
+.mode-btn:disabled {
+  opacity: 0.45;
+}
+
+.quick-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+
+.command-find-btn {
+  width: var(--size-control);
+  height: var(--size-control);
+  border-radius: var(--radius-control-sm);
+  color: var(--ink-muted);
+}
+
+.command-find-btn .secondary-btn-icon svg {
+  width: 15px;
+  height: 15px;
+}
+
+.command-find-btn:hover:not(:disabled) {
+  background: var(--surface-muted);
+  color: var(--ink-strong);
+}
+
+.command-find-btn.is-active,
+.command-find-btn.is-active:hover:not(:disabled) {
+  background-color: var(--nav-active-bg);
+  color: var(--nav-active-fg);
+  box-shadow: inset 0 0 0 1px var(--nav-active-border);
+}
+
+.find-bar {
+  position: absolute;
+  top: calc(100% + 6px);
+  right: 0;
+  z-index: var(--z-popover);
+  display: grid;
+  gap: 5px;
+  min-width: 0;
+  width: min(286px, calc(100vw - 24px));
+  padding: 5px;
+  border: 1px solid var(--surface-popover-border);
+  border-radius: var(--radius-control-sm);
+  background: var(--surface-popover-core);
+  box-shadow: var(--popover-shadow-raised);
+  transform-origin: 20px -6px;
+  animation: findPopoverIn var(--t-fast) var(--ease-out-mass);
+}
+
+.find-bar.is-replace {
+  width: min(306px, calc(100vw - 24px));
+}
+
+.find-bar[hidden] { display: none !important; }
+
+.find-row {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  min-width: 0;
+  min-height: 30px;
+  padding: 0 3px 0 7px;
+  border-radius: 7px;
+  background: var(--surface-popover-row);
+}
+
+@keyframes findPopoverIn {
+  from { opacity: 0; transform: translateY(-3px) scale(0.985); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+@media (prefers-reduced-motion: reduce) { .find-bar { animation: none; } }
+
+.find-bar-icon {
+  display: inline-grid;
+  place-items: center;
+  flex: 0 0 16px;
+  width: 16px;
+  height: 16px;
+  color: var(--ink-faint);
+}
+
+.find-bar-icon svg {
+  width: 12px;
+  height: 12px;
+}
+
+.find-input {
+  width: 0;
+  min-width: 56px;
+  max-width: none;
+  flex: 1 1 auto;
+  height: 28px;
+  border: 0;
+  border-radius: 7px;
+  padding: 0 6px;
+  background: transparent;
+  color: var(--ink);
+  font: 12px/1 var(--font-sans);
+  outline: none;
+}
+
+.replace-input {
+  min-width: 0;
+  flex: 1 1 auto;
+}
+
+.find-input:focus {
+  box-shadow: none;
+}
+
+.find-input:focus-visible,
+.replace-input:focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 2px;
+}
+
+.find-count {
+  min-width: 32px;
+  flex: 0 0 auto;
+  color: var(--ink-muted);
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-weight: 650;
+  text-align: center;
+}
+
+.find-nav {
+  width: 1px;
+  height: 16px;
+  margin: 0 2px;
+  background: var(--hairline-soft);
+}
+
+.find-icon-btn {
+  display: inline-grid;
+  place-items: center;
+  flex: 0 0 var(--size-control-xs);
+  width: var(--size-control-xs);
+  height: var(--size-control-xs);
+  border-radius: 6px;
+  color: var(--ink-muted);
+  transition: background var(--t-fast) var(--ease),
+              color var(--t-fast) var(--ease),
+              transform var(--t-fast) var(--ease);
+}
+
+.find-icon-btn:hover:not(:disabled) {
+  background: var(--surface-muted-strong);
+  color: var(--ink-strong);
+}
+
+.find-icon-btn:active:not(:disabled) {
+  transform: scale(0.96);
+}
+
+.find-replace-group {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto auto;
+  align-items: center;
+  gap: 4px;
+  min-width: 0;
+  min-height: 30px;
+  padding: 0 3px 0 7px;
+  border-radius: 7px;
+  background: var(--surface-popover-row);
+}
+
+.find-replace-group[hidden] {
+  display: none !important;
+}
+
+.find-icon-btn svg {
+  width: 12px;
+  height: 12px;
+}
+
+.find-close-btn svg {
+  width: 11px;
+  height: 11px;
+}
+
+.find-text-btn {
+  height: 24px;
+  padding: 0 7px;
+  border-radius: 6px;
+  color: var(--ink-muted);
+  font-size: 11.5px;
+  font-weight: 620;
+  white-space: nowrap;
+  transition: background var(--t-fast) var(--ease),
+              color var(--t-fast) var(--ease),
+              transform var(--t-fast) var(--ease);
+}
+
+.find-text-btn:hover:not(:disabled) {
+  background: var(--surface-muted-strong);
+  color: var(--ink-strong);
+}
+
+.find-text-btn:active:not(:disabled) {
+  transform: scale(0.97);
+}
+}

@@ -1,0 +1,75 @@
+@layer components {
+/* Persistent app-level entry row: brand, scope, global new/open, app menu. */
+
+.app-topbar {
+  position: relative;
+  z-index: var(--z-app-topbar);
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 16px;
+  min-height: 58px;
+  padding: 10px 14px 10px 16px;
+  border-bottom: 1px solid var(--hairline);
+  background: var(--surface-app-topbar);
+  backdrop-filter: blur(16px);
+  min-width: 0;
+}
+
+.app-scope {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  overflow: hidden;
+  color: var(--ink-muted);
+  font-size: 12px;
+  white-space: nowrap;
+}
+
+.app-scope strong,
+.app-scope span {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.app-scope strong {
+  flex: 0 1 auto;
+  color: var(--ink-strong);
+  font-weight: 650;
+}
+
+.app-scope span:last-child {
+  flex: 1 1 auto;
+}
+
+.app-scope-sep {
+  flex: 0 0 auto;
+  color: var(--ink-faint);
+}
+
+.app-actions {
+  display: inline-flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+  min-width: 0;
+}
+
+.app-menu-wrap {
+  position: relative;
+  flex: 0 0 auto;
+}
+
+.app-action-btn {
+  height: 33px;
+  padding: 0 12px;
+}
+
+.app-action-btn .secondary-btn-icon svg,
+.app-topbar .ghost-btn svg {
+  width: 15px;
+  height: 15px;
+}
+}

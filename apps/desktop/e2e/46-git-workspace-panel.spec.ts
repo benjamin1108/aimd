@@ -250,6 +250,8 @@ test.describe("Git workspace panel", () => {
     await expect(page.locator("#doc-title")).toHaveText("foo.ts");
     await expect(page.locator("#doc-path")).toHaveText("Git Diff · apps");
     await expect(page.locator(".git-diff-scope")).toHaveCount(0);
+    await expect(page.locator("#git-diff-rendered-surface")).toHaveCount(0);
+    await expect(page.locator("#git-diff-view")).not.toContainText("Markdown 渲染预览");
     await expect(page.locator(".git-diff-line.is-add")).toContainText("+changed line");
     await expect(page.locator(".git-diff-line.is-del")).toContainText("-old line");
     await expect(page.locator(".git-diff-line.is-hunk")).toContainText("@@");

@@ -10,7 +10,9 @@ import type {
   WebClipOutputLanguage,
   FormatSettings,
   FormatOutputLanguage,
+  UiTheme,
 } from "./types";
+import { normalizeTheme } from "../ui/theme";
 
 export type AppSettings = {
   ai: AiSettings;
@@ -59,6 +61,7 @@ export const DEFAULT_FORMAT_SETTINGS: FormatSettings = {
 
 export const DEFAULT_UI_SETTINGS: UiSettings = {
   debugMode: false,
+  theme: "system",
 };
 
 function normalizeProvider(value: unknown): ModelProvider {
@@ -188,6 +191,7 @@ export function coerceUiSettings(raw: unknown): UiSettings {
   const obj = raw as Record<string, unknown>;
   return {
     debugMode: obj.debugMode === true,
+    theme: normalizeTheme(obj.theme),
   };
 }
 

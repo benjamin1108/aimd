@@ -181,13 +181,29 @@ fn default_false() -> bool {
     false
 }
 
-#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+fn default_theme() -> String {
+    "system".to_string()
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct UiSettings {
     #[serde(default)]
     pub show_asset_panel: bool,
     #[serde(default = "default_false")]
     pub debug_mode: bool,
+    #[serde(default = "default_theme")]
+    pub theme: String,
+}
+
+impl Default for UiSettings {
+    fn default() -> Self {
+        Self {
+            show_asset_panel: false,
+            debug_mode: false,
+            theme: default_theme(),
+        }
+    }
 }
 
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
@@ -269,6 +285,12 @@ fn normalize_app_settings(settings: &mut AppSettings) {
     );
     settings.format.model_retry_count =
         normalize_model_retry_count(settings.format.model_retry_count);
+    if !matches!(
+        settings.ui.theme.as_str(),
+        "system" | "light" | "dark" | "high-contrast"
+    ) {
+        settings.ui.theme = default_theme();
+    }
 }
 
 fn settings_path(app: &AppHandle) -> Result<PathBuf, String> {

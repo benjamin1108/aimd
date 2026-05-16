@@ -248,6 +248,18 @@ test.describe("设置：双栏 IA + API Key 半遮罩", () => {
     await expect(page.locator("#save-settings")).toBeEnabled();
   });
 
+  test("网页导入大模型开关保持标准 checkbox 尺寸", async ({ page }) => {
+    await installMock(page);
+    await page.goto("/settings.html");
+    await page.locator(".settings-nav-item[data-section='webclip']").click();
+
+    const box = await page.locator("#webclip-llm-enabled").boundingBox();
+    expect(box).toBeTruthy();
+    expect(box!.width).toBeLessThanOrEqual(18);
+    expect(box!.height).toBeLessThanOrEqual(18);
+    await expect(page.locator(".webclip-llm-toggle .field-hint")).toContainText("网页正文发送给所选模型");
+  });
+
   test("内容超长时 .settings-content 撑开滚动而非把页脚顶出可视区", async ({ page }) => {
     await installMock(page);
     await page.setViewportSize({ width: 760, height: 480 });

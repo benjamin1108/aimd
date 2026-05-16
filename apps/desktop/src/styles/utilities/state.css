@@ -1,0 +1,26 @@
+@layer utilities {
+body.resizing-h,
+body.resizing-h * {
+  cursor: ew-resize !important;
+  user-select: none !important;
+}
+
+body.resizing-v,
+body.resizing-v * {
+  cursor: ns-resize !important;
+  user-select: none !important;
+}
+
+.panel[data-shell="launch"] {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.panel[data-shell="launch"] .sidebar,
+.panel[data-shell="launch"] .inspector {
+  display: none;
+}
+
+.panel[data-shell="launch"] .workspace {
+  grid-column: 1 / -1;
+}
+}

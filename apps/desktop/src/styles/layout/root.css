@@ -1,0 +1,12 @@
+@layer layout {
+body[data-aimd-entry="desktop"] {
+  background:
+    radial-gradient(120% 90% at 12% -10%, var(--bg-window-1) 0%, transparent 60%),
+    radial-gradient(140% 90% at 110% 110%, var(--bg-window-3) 0%, transparent 60%),
+    var(--bg-window-2);
+}
+
+body[data-aimd-entry="settings"] {
+  background: var(--surface-panel);
+}
+}

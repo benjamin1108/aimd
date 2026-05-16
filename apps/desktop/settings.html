@@ -4,16 +4,27 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>AIMD 设置</title>
-    <style>
+    <style data-aimd-preboot-style>
+      @layer reset, tokens, base, layout, surfaces, components, overlays, utilities, responsive;
+      @layer tokens {
+        :root {
+          --settings-preboot-bg: Canvas;
+          --settings-preboot-text: CanvasText;
+          --settings-preboot-muted: GrayText;
+          --settings-preboot-danger: Mark;
+          --settings-preboot-font: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+        }
+      }
+      @layer base {
       .settings-preboot {
         box-sizing: border-box;
         display: grid;
         align-content: center;
-        min-height: 100vh;
+        min-height: 100dvh;
         padding: 32px;
-        background: #f7f4ee;
-        color: #201a14;
-        font: 14px/1.5 -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+        background: var(--settings-preboot-bg);
+        color: var(--settings-preboot-text);
+        font: 14px/1.5 var(--settings-preboot-font);
       }
       .settings-preboot h1 {
         margin: 0 0 8px;
@@ -23,14 +34,24 @@
       .settings-preboot p {
         margin: 0;
         max-width: 520px;
-        color: #6f655c;
+        color: var(--settings-preboot-muted);
       }
       .settings-preboot--error p + p {
         margin-top: 8px;
-        color: #9b342e;
+        color: var(--settings-preboot-danger);
         overflow-wrap: anywhere;
       }
+      }
     </style>
+    <script>
+      (() => {
+        const prefersDark = window.matchMedia?.("(prefers-color-scheme: dark)").matches;
+        const theme = prefersDark ? "dark" : "light";
+        document.documentElement.dataset.themePreference = "system";
+        document.documentElement.dataset.theme = theme;
+        document.documentElement.style.colorScheme = theme;
+      })();
+    </script>
     <script>
       (() => {
         const messageFor = (reason) => {
@@ -68,7 +89,7 @@
       })();
     </script>
   </head>
-  <body>
+  <body data-aimd-entry="settings">
     <div id="settings-app">
       <main class="settings-preboot" aria-live="polite">
         <h1>AIMD 设置</h1>

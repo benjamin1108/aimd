@@ -207,6 +207,30 @@ test.describe("Phase 4 navigation language and stable status", () => {
     await installNavigationMock(page);
   });
 
+  test("keeps launch workspace full width when rails auto-collapse", async ({ page }) => {
+    await page.setViewportSize({ width: 900, height: 620 });
+    await page.goto("/");
+    const metrics = await page.evaluate(() => {
+      const panel = document.querySelector<HTMLElement>("#panel");
+      const workspace = document.querySelector(".workspace")?.getBoundingClientRect();
+      const launchGrid = document.querySelector(".launch-grid")?.getBoundingClientRect();
+      return {
+        shell: panel?.dataset.shell || "",
+        projectRail: panel?.dataset.projectRail || "",
+        inspector: panel?.dataset.inspector || "",
+        panelColumns: panel ? getComputedStyle(panel).gridTemplateColumns : "",
+        workspaceWidth: workspace?.width || 0,
+        launchGridWidth: launchGrid?.width || 0,
+      };
+    });
+    expect(metrics.shell).toBe("launch");
+    expect(metrics.projectRail).toBe("collapsed");
+    expect(metrics.inspector).toBe("collapsed");
+    expect(metrics.panelColumns.split(" ")).toHaveLength(1);
+    expect(metrics.workspaceWidth).toBeGreaterThan(820);
+    expect(metrics.launchGridWidth).toBeGreaterThan(760);
+  });
+
   test("uses scoped labels for project, document modes, commands, and close confirmation", async ({ page }) => {
     await page.goto("/");
 
@@ -410,9 +434,14 @@ test.describe("Phase 4 navigation language and stable status", () => {
       const box = document.querySelector(".launch-card-icon")?.getBoundingClientRect();
       const recent = document.querySelector("#recent-section")?.getBoundingClientRect();
       const side = document.querySelector(".launch-side")?.getBoundingClientRect();
+      const create = document.querySelector("#empty-new")?.getBoundingClientRect();
+      const open = document.querySelector("#empty-open")?.getBoundingClientRect();
       return {
         icon: box ? { width: box.width, height: box.height } : { width: 0, height: 0 },
         sideRecentDelta: recent && side ? Math.abs(side.top - recent.top) : 999,
+        createLeft: create?.left || 0,
+        openLeft: open?.left || 0,
+        recentLeft: recent?.left || 0,
       };
     });
     await openProject(page);
@@ -472,6 +501,8 @@ test.describe("Phase 4 navigation language and stable status", () => {
     expect(metrics.topbarIcon).toEqual({ width: 15, height: 15 });
     expect(metrics.projectIcon).toEqual({ width: 15, height: 15 });
     expect(launchMetrics.icon).toEqual({ width: 31, height: 31 });
+    expect(launchMetrics.createLeft).toBeLessThan(launchMetrics.recentLeft);
+    expect(launchMetrics.openLeft).toBeLessThan(launchMetrics.recentLeft);
     expect(launchMetrics.sideRecentDelta).toBeLessThanOrEqual(2);
     expect(projectLaunchMetrics.inspectorDisplay).toBe("none");
     expect(projectLaunchMetrics.emptyWidth).toBeGreaterThan(760);

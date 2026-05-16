@@ -1,0 +1,124 @@
+@layer layout {
+/* Frame & floating panel */
+
+.app-frame {
+  display: flex;
+  width: 100%;
+  height: 100dvh;
+  padding: 16px;
+}
+
+.panel {
+  position: relative;
+  display: grid;
+  --project-rail-width: clamp(220px, 18vw, 300px);
+  --inspector-rail-width: clamp(260px, 20vw, 360px);
+  --workspace-min-width: 560px;
+  grid-template-columns:
+    var(--project-rail-width)
+    minmax(var(--workspace-min-width), 1fr)
+    var(--inspector-rail-width);
+  /* Pin the row to the panel height. Without this, an `auto` implicit row
+     sizes to max-content and the workspace+sidebar stretch past the
+     viewport — `overflow: hidden` only clips, the inner panes never
+     learn they need to scroll. */
+  grid-template-rows: auto minmax(0, 1fr);
+  width: 100%;
+  height: 100%;
+  border: 1px solid var(--surface-shell-border);
+  border-radius: var(--radius-shell);
+  background:
+    linear-gradient(135deg, var(--surface-shell-sheen), transparent 36%),
+    var(--surface-app-tray);
+  box-shadow: var(--shadow-panel);
+  overflow: hidden;
+  isolation: isolate;
+}
+
+.panel[data-inspector="collapsed"] {
+  grid-template-columns:
+    var(--project-rail-width)
+    minmax(var(--workspace-min-width), 1fr)
+    var(--rail-collapsed-width);
+}
+
+.panel[data-project-rail="collapsed"] {
+  grid-template-columns:
+    var(--rail-collapsed-width)
+    minmax(var(--workspace-min-width), 1fr)
+    var(--inspector-rail-width);
+}
+
+.panel[data-project-rail="collapsed"][data-inspector="collapsed"] {
+  grid-template-columns:
+    var(--rail-collapsed-width)
+    minmax(var(--workspace-min-width), 1fr)
+    var(--rail-collapsed-width);
+}
+
+.panel[data-shell="document"][data-has-doc="false"]:not([data-main-view="git-diff"]) {
+  grid-template-columns:
+    var(--project-rail-width)
+    minmax(0, 1fr);
+}
+
+.panel[data-shell="document"][data-has-doc="false"][data-project-rail="collapsed"]:not([data-main-view="git-diff"]) {
+  grid-template-columns:
+    var(--rail-collapsed-width)
+    minmax(0, 1fr);
+}
+
+.app-topbar {
+  grid-column: 1 / -1;
+  grid-row: 1;
+}
+
+.sidebar,
+.workspace,
+.inspector {
+  grid-row: 2;
+}
+
+.panel > * {
+  min-width: 0;
+  min-height: 0;
+}
+
+.panel[data-shell="launch"] {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.panel[data-shell="launch"][data-project-rail],
+.panel[data-shell="launch"][data-inspector],
+.panel[data-shell="launch"][data-project-rail][data-inspector] {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.panel[data-shell="launch"] .sidebar,
+.panel[data-shell="launch"] .inspector {
+  display: none;
+}
+
+.panel[data-shell="launch"] .workspace {
+  grid-column: 1 / -1;
+}
+
+.panel[data-shell="document"][data-has-doc="false"]:not([data-main-view="git-diff"]) .inspector {
+  display: none;
+}
+
+.panel.dragging-file::after {
+  content: "松开以打开 .aimd 或导入 Markdown";
+  position: absolute;
+  inset: 18px;
+  display: grid;
+  place-items: center;
+  border: 1.5px dashed var(--surface-drop-target-border);
+  border-radius: 18px;
+  background: var(--surface-drop-target);
+  color: var(--ink);
+  font: 600 15px/1.2 var(--font-display);
+  letter-spacing: 0;
+  z-index: var(--z-popover);
+}
+}

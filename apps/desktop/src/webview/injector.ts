@@ -5,14 +5,13 @@ import { absoluteHTTPURL, extractImagePayloadsFromHTML, prefetchProxyImages, rew
 import { waitForDocumentShell } from "./injector-dom";
 import { fallbackExtractArticle } from "./injector-fallback";
 import { WEB_CLIP_STYLE } from "./injector-style";
+import { createWebClipLifecycle } from "./injector-lifecycle";
 import { createSafeHTMLSetter } from "./injector-trusted-html";
 import type { AimdDocument, DiagnosticLevel, ExtractDiagnostic } from "./injector-types";
-
 (async () => {
   const installState = window as any;
   if (installState.__aimdWebClipInstalled || installState.__aimdWebClipInstalling) return;
   installState.__aimdWebClipInstalling = true;
-
   try {
     await waitForDocumentShell();
   } catch (err) {
@@ -21,12 +20,10 @@ import type { AimdDocument, DiagnosticLevel, ExtractDiagnostic } from "./injecto
   }
   installState.__aimdWebClipInstalled = true;
   installState.__aimdWebClipInstalling = false;
-
   const diagnostics: ExtractDiagnostic[] = [];
   let currentDoc: AimdDocument | null = null;
   let extracting = false;
   const startupParams = readStartupParams();
-
   const record = (level: DiagnosticLevel, message: string, data?: unknown) => {
     diagnostics.push({ level, message, data });
     const args = data === undefined ? [`[web-clip:extractor] ${message}`] : [`[web-clip:extractor] ${message}`, data];
@@ -36,7 +33,6 @@ import type { AimdDocument, DiagnosticLevel, ExtractDiagnostic } from "./injecto
     else console.error(...args);
   };
   const safeSetHTML = createSafeHTMLSetter(record);
-
   void setupImageProxyForPage({
     startupRequestId: startupParams.requestId,
     getRequestId,
@@ -46,12 +42,16 @@ import type { AimdDocument, DiagnosticLevel, ExtractDiagnostic } from "./injecto
     invokeFn: invoke,
   });
 
-  const style = document.createElement("style");
-  style.textContent = WEB_CLIP_STYLE;
-  document.head.appendChild(style);
-
   const shell = document.createElement("div");
   shell.className = "aimd-clip-shell";
+  shell.setAttribute("role", "dialog");
+  shell.setAttribute("aria-modal", "true");
+  shell.setAttribute("aria-label", "AIMD 网页导入");
+  shell.dataset.theme = readThemeFromHost();
+  const lifecycle = createWebClipLifecycle(installState, shell);
+  const shadowRoot = shell.attachShadow({ mode: "open" });
+  const style = document.createElement("style");
+  style.textContent = WEB_CLIP_STYLE;
 
   const clipBar = document.createElement("div");
   clipBar.className = "aimd-clip-bar";
@@ -110,7 +110,7 @@ import type { AimdDocument, DiagnosticLevel, ExtractDiagnostic } from "./injecto
   const previewInner = document.createElement("div");
   previewInner.className = "aimd-clip-preview-inner";
   previewPanel.appendChild(previewInner);
-  shell.append(clipBar, startPanel, workPanel, previewPanel);
+  shadowRoot.append(style, clipBar, startPanel, workPanel, previewPanel);
 
   function createButton(text: string, className: string, action: string) {
     const button = document.createElement("button");
@@ -136,8 +136,16 @@ import type { AimdDocument, DiagnosticLevel, ExtractDiagnostic } from "./injecto
     workPanel.replaceChildren(card);
   }
 
+  function readThemeFromHost(): "light" | "dark" | "high-contrast" {
+    const theme = document.documentElement.dataset.theme;
+    if (theme === "dark" || theme === "high-contrast") return theme;
+    if (theme === "light") return "light";
+    return window.matchMedia?.("(prefers-color-scheme: dark)").matches ? "dark" : "light";
+  }
+
   function mount() {
     if (document.body && !document.body.contains(shell)) {
+      lifecycle.captureFocus();
       document.body.appendChild(shell);
       if (startupParams.requestId) setRequestId(startupParams.requestId);
       if (startupParams.url) setTargetURL(startupParams.url);
@@ -180,26 +188,28 @@ import type { AimdDocument, DiagnosticLevel, ExtractDiagnostic } from "./injecto
 
   mount();
 
-  await listen<AimdDocument | { requestId?: string; doc?: AimdDocument }>("web_clip_preview_ready", (event) => {
+  lifecycle.addUnlistener(await listen<AimdDocument | { requestId?: string; doc?: AimdDocument }>("web_clip_preview_ready", (event) => {
     const payload = event.payload as AimdDocument | { requestId?: string; doc?: AimdDocument };
     currentDoc = ("doc" in payload && payload.doc) ? payload.doc : payload as AimdDocument;
+    lifecycle.restoreBodyScroll();
     workPanel.hidden = true;
     previewPanel.hidden = false;
     safeSetHTML(previewInner, rewriteAssetURLs(currentDoc.html, currentDoc.assets || [], safeSetHTML, convertFileSrc));
     loadBtn.textContent = "使用草稿";
     loadBtn.dataset.action = "accept";
     loadBtn.disabled = false;
-  });
+  }));
 
-  await listen<{ error?: string }>("web_clip_preview_failed", (event) => {
+  lifecycle.addUnlistener(await listen<{ error?: string }>("web_clip_preview_failed", (event) => {
+    lifecycle.restoreBodyScroll();
     workPanel.hidden = false;
     resetWorkPanel("提取失败", event.payload?.error || "未知错误");
     loadBtn.textContent = "提取";
     loadBtn.dataset.action = "extract";
     loadBtn.disabled = false;
-  });
+  }));
 
-  loadBtn.addEventListener("click", () => {
+  lifecycle.addDomListener(loadBtn, "click", () => {
     const action = loadBtn.dataset.action;
     if (action === "load") {
       loadURLFromInput(urlInput);
@@ -210,38 +220,40 @@ import type { AimdDocument, DiagnosticLevel, ExtractDiagnostic } from "./injecto
       return;
     }
     if (action === "accept" && currentDoc) {
-      void invoke("web_clip_accept", { requestId: getRequestId() || null, doc: currentDoc });
+      void invoke("web_clip_accept", { requestId: getRequestId() || null, doc: currentDoc })
+        .finally(lifecycle.cleanup);
     }
   });
 
-  homeLoadBtn.addEventListener("click", () => {
+  lifecycle.addDomListener(homeLoadBtn, "click", () => {
     loadURLFromInput(homeUrlInput);
   });
 
-  urlInput.addEventListener("keydown", (event) => {
+  lifecycle.addDomListener(urlInput, "keydown", (event) => {
     if (event.key === "Enter") {
       event.preventDefault();
       loadBtn.click();
     }
   });
 
-  urlInput.addEventListener("input", () => {
+  lifecycle.addDomListener(urlInput, "input", () => {
     homeUrlInput.value = urlInput.value;
   });
 
-  homeUrlInput.addEventListener("input", () => {
+  lifecycle.addDomListener(homeUrlInput, "input", () => {
     urlInput.value = homeUrlInput.value;
   });
 
-  homeUrlInput.addEventListener("keydown", (event) => {
+  lifecycle.addDomListener(homeUrlInput, "keydown", (event) => {
     if (event.key === "Enter") {
       event.preventDefault();
       homeLoadBtn.click();
     }
   });
 
-  cancelBtn.addEventListener("click", () => {
-    void invoke("close_extractor_window", { requestId: getRequestId() || null });
+  lifecycle.addDomListener(cancelBtn, "click", () => {
+    void invoke("close_extractor_window", { requestId: getRequestId() || null })
+      .finally(lifecycle.cleanup);
   });
 
   function normalizeURL(value: string): string | null {
@@ -410,7 +422,7 @@ import type { AimdDocument, DiagnosticLevel, ExtractDiagnostic } from "./injecto
     previewPanel.hidden = true;
     resetWorkPanel();
     workPanel.hidden = false;
-    document.body.style.overflow = "hidden";
+    lifecycle.lockBodyScroll();
 
     const startedAt = performance.now();
     try {
@@ -463,6 +475,7 @@ import type { AimdDocument, DiagnosticLevel, ExtractDiagnostic } from "./injecto
       await invoke("web_clip_raw_extracted", { payload: { ...getPayloadBase(), success: false, error: err.message || "Unknown error", diagnostics } });
     } finally {
       extracting = false;
+      if (!currentDoc) lifecycle.restoreBodyScroll();
     }
   }
 

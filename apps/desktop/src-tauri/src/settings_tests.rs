@@ -40,6 +40,7 @@ fn missing_ui_defaults_to_quiet_ui() {
     normalize_app_settings(&mut settings);
     assert!(!settings.ui.show_asset_panel);
     assert!(!settings.ui.debug_mode);
+    assert_eq!(settings.ui.theme, "system");
     assert_eq!(settings.web_clip.model, default_dashscope_model());
     assert_eq!(settings.web_clip.model_timeout_seconds, 300);
     assert_eq!(settings.web_clip.model_retry_count, 2);
@@ -135,10 +136,24 @@ fn ui_debug_mode_round_trips() {
     let settings: AppSettings = serde_json::from_value(serde_json::json!({
         "ui": {
             "showAssetPanel": true,
-            "debugMode": true
+            "debugMode": true,
+            "theme": "dark"
         }
     }))
     .unwrap();
     assert!(settings.ui.show_asset_panel);
     assert!(settings.ui.debug_mode);
+    assert_eq!(settings.ui.theme, "dark");
+}
+
+#[test]
+fn ui_theme_invalid_defaults_to_system() {
+    let mut settings: AppSettings = serde_json::from_value(serde_json::json!({
+        "ui": {
+            "theme": "solarized"
+        }
+    }))
+    .unwrap();
+    normalize_app_settings(&mut settings);
+    assert_eq!(settings.ui.theme, "system");
 }

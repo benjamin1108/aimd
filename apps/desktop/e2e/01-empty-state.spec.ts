@@ -22,9 +22,11 @@ test.describe("Empty state — running outside Tauri", () => {
 
     await expect(page.locator(".brand-name")).toHaveText("AIMD");
     await expect(page.locator("#empty")).toBeVisible();
-    await expect(page.locator("#empty .launch-head h2")).toHaveText("开始");
+    await expect(page.locator("#empty .launch-main h2")).toHaveText("继续处理文档");
 
-    await expect(page.locator("#starter-actions")).toBeVisible();
+    await expect(page.locator("#empty-new")).toBeVisible();
+    await expect(page.locator("#empty-open")).toBeVisible();
+    await expect(page.locator("#starter-actions")).toBeHidden();
     await expect(page.locator("#doc-actions")).toBeHidden();
 
     await expect(page.locator("#format-toolbar")).toBeHidden();
@@ -41,8 +43,8 @@ test.describe("Empty state — running outside Tauri", () => {
   test("launchpad exposes new/open actions", async ({ page }) => {
     await page.goto("/");
     await expect(page.locator(".brand-mark")).toHaveText("A");
-    await expect(page.locator("#empty-new")).toContainText("新建文档");
-    await expect(page.locator("#empty-open")).toContainText("打开");
+    await expect(page.locator("#empty-new")).toContainText("空白 AIMD 草稿");
+    await expect(page.locator("#empty-open")).toContainText("打开 AIMD / Markdown");
     await expect(page.locator("#empty-import")).not.toBeAttached();
   });
 

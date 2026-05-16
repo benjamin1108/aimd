@@ -190,6 +190,7 @@ export type DocumentHealthReport = {
 export type ModelProvider = "dashscope" | "gemini";
 export type WebClipOutputLanguage = "zh-CN" | "en";
 export type FormatOutputLanguage = "zh-CN" | "en";
+export type UiTheme = "system" | "light" | "dark" | "high-contrast";
 
 // 单 provider 的凭证集合：模型 / API Key / 可选的 API Base。每个 provider 独立持有，
 // 切 provider 时不串台。
@@ -224,6 +225,7 @@ export type FormatSettings = {
 
 export type UiSettings = {
   debugMode: boolean;
+  theme: UiTheme;
 };
 
 export type SidebarDocTab = "outline" | "assets" | "git" | "health";
@@ -272,8 +274,6 @@ export type GitFileDiff = {
   unstagedDiff: string;
   isBinary: boolean;
   truncated?: boolean;
-  renderedMarkdown?: string;
-  renderedHtml?: string;
 };
 
 export type GitDiffTab = {

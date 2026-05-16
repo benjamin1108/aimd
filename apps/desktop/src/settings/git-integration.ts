@@ -52,7 +52,7 @@ type LineState = "ok" | "missing" | "notConfigured" | "notApplicable" | "error" 
 
 export function gitIntegrationSectionHTML() {
   return `
-    <section class="settings-section" data-section="git" role="tabpanel" aria-labelledby="settings-tab-git" hidden>
+    <section id="settings-panel-git" class="settings-section" data-section="git" role="tabpanel" aria-labelledby="settings-tab-git" hidden>
       <header class="settings-section-head">
         <h2>Git 集成</h2>
         <p>安装、检测、修复和卸载 AIMD 的 .aimd diff / merge driver。</p>

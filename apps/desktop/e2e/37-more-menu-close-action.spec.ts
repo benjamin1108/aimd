@@ -94,8 +94,8 @@ test.describe("⋯ 菜单关闭文档入口", () => {
     await page.locator("#more-menu-toggle").click();
     await expect(page.locator("#more-menu")).toBeVisible();
 
-    // 点击文档标题区（菜单外）应关闭菜单
-    await page.locator("#doc-title").click();
+    // 点击菜单外的工作区空白处应关闭菜单
+    await page.mouse.click(24, 220);
     await expect(page.locator("#more-menu")).toBeHidden();
   });
 });

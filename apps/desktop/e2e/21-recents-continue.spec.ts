@@ -1,8 +1,8 @@
 /**
- * e2e: recents "继续" item click scenarios
+ * e2e: recent item click scenarios
  *
- * This spec targets the bug report: "clicking the first recent item (badge='继续')
- * does not open the document."  We cover five distinct startup scenarios.
+ * This spec targets the bug report: clicking a recent item does not open the
+ * document after window-path focus bookkeeping gets stale.
  */
 import { test, expect, Page } from "@playwright/test";
 
@@ -161,10 +161,10 @@ test("场景A: 冷启动无session, 点继续项, 文档应该打开", async ({ 
   await page.goto("/");
 
   // 空状态：没有 session snapshot，也没有 last，所以 restoreSession 不做事
-  // recents[0] 应该渲染成"继续"徽章
+  // recents[0] 应该渲染 AIMD 格式徽章，点击仍走继续打开路径
   const recentButton = page.locator(".recent-item").first();
   await expect(recentButton).toBeVisible();
-  await expect(recentButton.locator(".recent-item-badge")).toHaveText("继续");
+  await expect(recentButton.locator(".recent-item-badge")).toHaveText("AIMD");
 
   // 点击"继续"
   await recentButton.click();
@@ -209,10 +209,10 @@ test("场景B: session恢复后关闭文档, 再点继续, 文档应该被重新
   await clickClose(page);
   await expect(page.locator("#empty")).toBeVisible();
 
-  // 点"继续"（recents[0]，badge="继续"）
+  // 点最近项（recents[0]）
   const recentButton = page.locator(".recent-item").first();
   await expect(recentButton).toBeVisible();
-  await expect(recentButton.locator(".recent-item-badge")).toHaveText("继续");
+  await expect(recentButton.locator(".recent-item-badge")).toHaveText("AIMD");
   await recentButton.click();
 
   // 期望：文档被重新打开（关键回归断言）
@@ -273,7 +273,7 @@ test("场景D: 打开B再关闭, recents里点A, A应该被打开", async ({ pag
 
   // 打开 B
   const buttonB = page.locator(".recent-item").nth(1);
-  await expect(buttonB.locator(".recent-item-badge")).toHaveText("打开");
+  await expect(buttonB.locator(".recent-item-badge")).toHaveText("AIMD");
   await buttonB.click();
   await expect(page.locator("#doc-title")).toHaveText("另一份文档", { timeout: 5000 });
 
@@ -325,7 +325,7 @@ test("场景E: 路径含中文和空格的recents项可以正确点击打开", a
 
   const recentButton = page.locator(".recent-item").first();
   await expect(recentButton).toBeVisible();
-  await expect(recentButton.locator(".recent-item-badge")).toHaveText("继续");
+  await expect(recentButton.locator(".recent-item-badge")).toHaveText("AIMD");
 
   // 点击应该触发 open_aimd，不应该抛错
   await recentButton.click();
@@ -336,9 +336,9 @@ test("场景E: 路径含中文和空格的recents项可以正确点击打开", a
 });
 
 // ---------------------------------------------------------------------------
-// 额外场景：验证渲染 recents 列表时，index=0 的徽章是"继续"，其余是"打开"
+// 额外场景：验证 recents 列表显示文档格式徽章
 // ---------------------------------------------------------------------------
-test("recents列表徽章渲染: index=0是继续, 其余是打开", async ({ page }) => {
+test("recents列表徽章渲染文档格式", async ({ page }) => {
   await installMock(page, {
     recents: JSON.stringify([MOCK_PATH, MOCK_PATH_B]),
     session: null,
@@ -349,8 +349,8 @@ test("recents列表徽章渲染: index=0是继续, 其余是打开", async ({ pa
 
   const items = page.locator(".recent-item");
   await expect(items).toHaveCount(2);
-  await expect(items.nth(0).locator(".recent-item-badge")).toHaveText("继续");
-  await expect(items.nth(1).locator(".recent-item-badge")).toHaveText("打开");
+  await expect(items.nth(0).locator(".recent-item-badge")).toHaveText("AIMD");
+  await expect(items.nth(1).locator(".recent-item-badge")).toHaveText("AIMD");
 });
 
 // ---------------------------------------------------------------------------

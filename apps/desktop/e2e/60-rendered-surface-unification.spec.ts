@@ -225,7 +225,7 @@ async function exerciseLinkAndImageBehavior(page: Page, root: string) {
   await page.keyboard.press("Escape");
 }
 
-test("all rendered markdown surfaces share one pipeline and interaction contract", async ({ page }) => {
+test("document rendered markdown surfaces share one pipeline and interaction contract", async ({ page }) => {
   await installRenderedSurfaceMock(page);
   await page.goto("/");
   await page.locator("#empty-open-workspace").click();
@@ -270,13 +270,8 @@ test("all rendered markdown surfaces share one pipeline and interaction contract
 
   await page.locator("#sidebar-tab-git").click();
   await page.locator(".git-file-row[data-path='docs/surface.md']").locator("[data-git-action='select']").click();
-  await expect(page.locator("#git-diff-rendered-surface")).toBeVisible();
-  await expectDocumentSurface(page, "#git-diff-rendered-surface", {
-    frontmatter: true,
-    codeCopy: true,
-    sourceRefs: false,
-    aimdAsset: false,
-    localMarkdownImage: true,
-  });
-  await exerciseLinkAndImageBehavior(page, "#git-diff-rendered-surface");
+  await expect(page.locator("#git-diff-view")).toBeVisible();
+  await expect(page.locator("#git-diff-rendered-surface")).toHaveCount(0);
+  await expect(page.locator("#git-diff-view")).not.toContainText("Markdown 渲染预览");
+  await expect(page.locator(".git-diff-line.is-add", { hasText: "+[Text link](https://example.com/text)" })).toHaveCount(1);
 });

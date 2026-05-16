@@ -4,12 +4,50 @@ import { setStatus } from "./chrome";
 import { saveRecentPaths, renderRecentList } from "./recents";
 
 let activeContextMenu: HTMLElement | null = null;
+let activeContextCleanup: (() => void) | null = null;
 
 export function dismissContextMenu() {
+  activeContextCleanup?.();
+  activeContextCleanup = null;
   if (activeContextMenu) {
     activeContextMenu.remove();
     activeContextMenu = null;
   }
+}
+
+function positionMenu(menu: HTMLElement, x: number, y: number, fallbackWidth: number, fallbackHeight: number) {
+  menu.style.left = `${x}px`;
+  menu.style.top = `${y}px`;
+  document.body.appendChild(menu);
+  activeContextMenu = menu;
+  const menuW = menu.offsetWidth || fallbackWidth;
+  const menuH = menu.offsetHeight || fallbackHeight;
+  menu.style.left = `${Math.min(x, window.innerWidth - menuW - 4)}px`;
+  menu.style.top = `${Math.min(y, window.innerHeight - menuH - 4)}px`;
+}
+
+function bindContextDismiss(menu: HTMLElement) {
+  let registered = false;
+  const onDismiss = (e: MouseEvent | KeyboardEvent) => {
+    if (e instanceof KeyboardEvent) {
+      if (e.key === "Escape") dismissContextMenu();
+      return;
+    }
+    if (!(e.target as HTMLElement).closest("[data-file-ctx-menu]")) dismissContextMenu();
+  };
+  const cleanup = () => {
+    if (!registered) return;
+    document.removeEventListener("keydown", onDismiss as EventListener, { capture: true });
+    document.removeEventListener("click", onDismiss as EventListener, { capture: true });
+    registered = false;
+  };
+  activeContextCleanup = cleanup;
+  setTimeout(() => {
+    if (activeContextMenu !== menu || activeContextCleanup !== cleanup) return;
+    document.addEventListener("click", onDismiss as EventListener, { capture: true });
+    document.addEventListener("keydown", onDismiss as EventListener, { capture: true });
+    registered = true;
+  }, 0);
 }
 
 export function showFileContextMenu(x: number, y: number, path: string) {
@@ -61,38 +99,8 @@ export function showFileContextMenu(x: number, y: number, path: string) {
     menu.appendChild(btn);
   });
 
-  menu.style.left = `${x}px`;
-  menu.style.top = `${y}px`;
-  document.body.appendChild(menu);
-  activeContextMenu = menu;
-
-  const menuW = menu.offsetWidth || 180;
-  const menuH = menu.offsetHeight || 120;
-  const left = Math.min(x, window.innerWidth - menuW - 4);
-  const top = Math.min(y, window.innerHeight - menuH - 4);
-  menu.style.left = `${left}px`;
-  menu.style.top = `${top}px`;
-
-  const onDismiss = (e: MouseEvent | KeyboardEvent) => {
-    if (e instanceof KeyboardEvent) {
-      if (e.key === "Escape") {
-        dismissContextMenu();
-        document.removeEventListener("keydown", onDismiss as EventListener, { capture: true });
-        document.removeEventListener("click", onDismiss as EventListener, { capture: true });
-      }
-      return;
-    }
-    if (!(e.target as HTMLElement).closest("[data-file-ctx-menu]")) {
-      dismissContextMenu();
-      document.removeEventListener("keydown", onDismiss as EventListener, { capture: true });
-      document.removeEventListener("click", onDismiss as EventListener, { capture: true });
-    }
-  };
-
-  setTimeout(() => {
-    document.addEventListener("click", onDismiss as EventListener, { capture: true });
-    document.addEventListener("keydown", onDismiss as EventListener, { capture: true });
-  }, 0);
+  positionMenu(menu, x, y, 180, 120);
+  bindContextDismiss(menu);
 }
 
 export function showContextMenu(
@@ -121,34 +129,6 @@ export function showContextMenu(
     menu.appendChild(btn);
   });
 
-  menu.style.left = `${x}px`;
-  menu.style.top = `${y}px`;
-  document.body.appendChild(menu);
-  activeContextMenu = menu;
-
-  const menuW = menu.offsetWidth || 190;
-  const menuH = menu.offsetHeight || 160;
-  menu.style.left = `${Math.min(x, window.innerWidth - menuW - 4)}px`;
-  menu.style.top = `${Math.min(y, window.innerHeight - menuH - 4)}px`;
-
-  const onDismiss = (e: MouseEvent | KeyboardEvent) => {
-    if (e instanceof KeyboardEvent) {
-      if (e.key === "Escape") {
-        dismissContextMenu();
-        document.removeEventListener("keydown", onDismiss as EventListener, { capture: true });
-        document.removeEventListener("click", onDismiss as EventListener, { capture: true });
-      }
-      return;
-    }
-    if (!(e.target as HTMLElement).closest("[data-file-ctx-menu]")) {
-      dismissContextMenu();
-      document.removeEventListener("keydown", onDismiss as EventListener, { capture: true });
-      document.removeEventListener("click", onDismiss as EventListener, { capture: true });
-    }
-  };
-
-  setTimeout(() => {
-    document.addEventListener("click", onDismiss as EventListener, { capture: true });
-    document.addEventListener("keydown", onDismiss as EventListener, { capture: true });
-  }, 0);
+  positionMenu(menu, x, y, 190, 160);
+  bindContextDismiss(menu);
 }

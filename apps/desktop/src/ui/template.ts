@@ -326,6 +326,46 @@ ${APP_TOPBAR_HTML}
                 <h2>继续处理文档</h2>
                 <p class="launch-copy">从最近打开的文档继续，或开始新的内容。</p>
 
+                <div class="launch-command-block">
+                  <div class="launch-group-label">创建</div>
+                  <div class="launch-command-list">
+                    <button id="empty-new" class="launch-command-card" type="button">
+                      <span class="launch-card-icon">${ICONS.plus}</span>
+                      <span class="launch-card-copy">
+                        <span class="launch-card-title">空白 AIMD 草稿</span>
+                        <span class="launch-card-meta">从一页空白文档开始</span>
+                      </span>
+                    </button>
+                    <button id="empty-import-web" class="launch-command-card" type="button">
+                      <span class="launch-card-icon">${ICONS.link}</span>
+                      <span class="launch-card-copy">
+                        <span class="launch-card-title">从网页导入</span>
+                        <span class="launch-card-meta">提取网页内容为草稿</span>
+                      </span>
+                    </button>
+                  </div>
+
+                  <div class="launch-group-label">打开</div>
+                  <div class="launch-command-list">
+                    <button id="empty-open" class="launch-command-card" type="button">
+                      <span class="launch-card-icon">${ICONS.openDocument}</span>
+                      <span class="launch-card-copy">
+                        <span class="launch-card-title">打开 AIMD / Markdown</span>
+                        <span class="launch-card-meta">选择本地文档继续编辑</span>
+                      </span>
+                    </button>
+                    <button id="empty-open-workspace" class="launch-command-card" type="button">
+                      <span class="launch-card-icon">${ICONS.folder}</span>
+                      <span class="launch-card-copy">
+                        <span class="launch-card-title">打开项目目录</span>
+                        <span class="launch-card-meta">浏览并编辑项目文件</span>
+                      </span>
+                    </button>
+                  </div>
+                </div>
+              </div>
+
+              <div class="launch-side">
                 <section class="recent-section" id="recent-section" hidden>
                   <div class="recent-head">
                     <div class="recent-title">最近打开</div>
@@ -333,44 +373,6 @@ ${APP_TOPBAR_HTML}
                   </div>
                   <div id="recent-list" class="recent-list"></div>
                 </section>
-              </div>
-
-              <div class="launch-side">
-                <div class="launch-group-label">创建</div>
-                <div class="launch-command-list">
-                  <button id="empty-new" class="launch-command-card" type="button">
-                    <span class="launch-card-icon">${ICONS.plus}</span>
-                    <span class="launch-card-copy">
-                      <span class="launch-card-title">空白 AIMD 草稿</span>
-                      <span class="launch-card-meta">从一页空白文档开始</span>
-                    </span>
-                  </button>
-                  <button id="empty-import-web" class="launch-command-card" type="button">
-                    <span class="launch-card-icon">${ICONS.link}</span>
-                    <span class="launch-card-copy">
-                      <span class="launch-card-title">从网页导入</span>
-                      <span class="launch-card-meta">提取网页内容为草稿</span>
-                    </span>
-                  </button>
-                </div>
-
-                <div class="launch-group-label">打开</div>
-                <div class="launch-command-list">
-                  <button id="empty-open" class="launch-command-card" type="button">
-                    <span class="launch-card-icon">${ICONS.openDocument}</span>
-                    <span class="launch-card-copy">
-                      <span class="launch-card-title">打开 AIMD / Markdown</span>
-                      <span class="launch-card-meta">选择本地文档继续编辑</span>
-                    </span>
-                  </button>
-                  <button id="empty-open-workspace" class="launch-command-card" type="button">
-                    <span class="launch-card-icon">${ICONS.folder}</span>
-                    <span class="launch-card-copy">
-                      <span class="launch-card-title">打开项目目录</span>
-                      <span class="launch-card-meta">浏览并编辑项目文件</span>
-                    </span>
-                  </button>
-                </div>
               </div>
             </div>
           </article>

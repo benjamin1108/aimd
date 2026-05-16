@@ -1,0 +1,63 @@
+@layer overlays {
+/* Image lightbox — fullscreen image preview overlay */
+
+.aimd-lightbox {
+  position: fixed;
+  inset: 0;
+  z-index: var(--z-lightbox);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--lightbox-scrim);
+  animation: lightboxIn 160ms var(--ease);
+  cursor: zoom-out;
+}
+
+@keyframes lightboxIn {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .aimd-lightbox {
+    animation: none;
+  }
+}
+
+.aimd-lightbox-img {
+  max-width: 90vw;
+  max-height: 90dvh;
+  object-fit: contain;
+  border-radius: var(--radius-control);
+  box-shadow: var(--lightbox-image-shadow);
+  cursor: default;
+  user-select: none;
+}
+
+.aimd-lightbox-close {
+  position: absolute;
+  top: 18px;
+  right: 22px;
+  display: grid;
+  place-items: center;
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  background: var(--lightbox-control-bg);
+  color: var(--lightbox-control-fg);
+  font-size: 18px;
+  line-height: 1;
+  cursor: pointer;
+  border: 0;
+  transition: background var(--t-fast) var(--ease);
+}
+
+.aimd-lightbox-close:hover {
+  background: var(--lightbox-control-hover-bg);
+}
+
+#reader img,
+.preview img {
+  cursor: zoom-in;
+}
+}

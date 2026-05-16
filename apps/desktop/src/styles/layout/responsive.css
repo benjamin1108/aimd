@@ -1,0 +1,225 @@
+@layer responsive {
+/* Responsive collapse — explicit rail behavior.
+   Wide desktop keeps three columns. Medium keeps the project rail and turns
+   the inspector into a stable narrow affordance before the editor surface starts
+   squeezing. Narrow tablet keeps the project rail as the same narrow affordance; mobile hides both rails
+   and keeps document commands in the workspace header. */
+
+@media (max-width: 1180px) {
+  .panel {
+    --project-rail-width: clamp(210px, 18vw, 260px);
+    --inspector-rail-width: clamp(236px, 22vw, 300px);
+    --workspace-min-width: 500px;
+  }
+}
+
+@media (max-width: 1320px) and (min-width: 901px) {
+  .panel[data-mode="source"][data-source-pressure="true"]:not([data-shell="launch"]) {
+    grid-template-columns:
+      var(--project-rail-width)
+      minmax(0, 1fr)
+      var(--rail-collapsed-width);
+  }
+
+  .panel[data-mode="source"][data-source-pressure="true"][data-project-rail="collapsed"]:not([data-shell="launch"]) {
+    grid-template-columns:
+      var(--rail-collapsed-width)
+      minmax(0, 1fr)
+      var(--rail-collapsed-width);
+  }
+}
+
+@media (max-width: 1100px) {
+  .panel {
+    --project-rail-width: 214px;
+    --workspace-min-width: 0px;
+  }
+
+  .panel:not([data-shell="launch"]) {
+    grid-template-columns: var(--project-rail-width) minmax(0, 1fr) var(--rail-collapsed-width);
+  }
+
+  .panel[data-project-rail="collapsed"]:not([data-shell="launch"]) {
+    grid-template-columns: var(--rail-collapsed-width) minmax(0, 1fr) var(--rail-collapsed-width);
+  }
+
+  .panel[data-inspector="expanded"]:not([data-shell="launch"]) {
+    grid-template-columns: var(--project-rail-width) minmax(0, 1fr) var(--inspector-rail-width);
+  }
+
+  .panel[data-project-rail="collapsed"][data-inspector="expanded"]:not([data-shell="launch"]) {
+    grid-template-columns: var(--rail-collapsed-width) minmax(0, 1fr) var(--inspector-rail-width);
+  }
+
+  .panel[data-shell="document"][data-has-doc="false"]:not([data-main-view="git-diff"]) {
+    grid-template-columns: var(--project-rail-width) minmax(0, 1fr);
+  }
+
+  .panel[data-shell="document"][data-has-doc="false"][data-project-rail="collapsed"]:not([data-main-view="git-diff"]) {
+    grid-template-columns: var(--rail-collapsed-width) minmax(0, 1fr);
+  }
+}
+
+@media (max-width: 1020px) {
+  .reader { padding: 32px 36px 60px; }
+}
+
+@media (max-width: 900px) {
+  .panel:not([data-shell="launch"]) {
+    grid-template-columns: minmax(0, 1fr) var(--rail-collapsed-width);
+  }
+
+  .panel[data-project-rail="expanded"]:not([data-shell="launch"]) {
+    grid-template-columns: var(--project-rail-width) minmax(0, 1fr) var(--rail-collapsed-width);
+  }
+
+  .panel[data-inspector="expanded"]:not([data-shell="launch"]) {
+    grid-template-columns: minmax(0, 1fr) var(--inspector-rail-width);
+  }
+
+  .panel[data-project-rail="collapsed"]:not([data-shell="launch"]) {
+    grid-template-columns: var(--rail-collapsed-width) minmax(0, 1fr) var(--rail-collapsed-width);
+  }
+
+  .panel[data-project-rail="expanded"][data-inspector="expanded"]:not([data-shell="launch"]) {
+    grid-template-columns: var(--project-rail-width) minmax(0, 1fr) var(--inspector-rail-width);
+  }
+
+  .panel[data-project-rail="collapsed"][data-inspector="expanded"]:not([data-shell="launch"]) {
+    grid-template-columns: var(--rail-collapsed-width) minmax(0, 1fr) var(--inspector-rail-width);
+  }
+
+  .panel[data-shell="document"][data-has-doc="false"]:not([data-main-view="git-diff"]) {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .panel[data-shell="document"][data-has-doc="false"][data-project-rail="collapsed"]:not([data-main-view="git-diff"]) {
+    grid-template-columns: var(--rail-collapsed-width) minmax(0, 1fr);
+  }
+  .panel[data-shell="document"][data-has-doc="false"][data-project-rail="expanded"]:not([data-main-view="git-diff"]) {
+    grid-template-columns: var(--project-rail-width) minmax(0, 1fr);
+  }
+
+  .panel[data-shell="launch"],
+  .panel[data-shell="launch"][data-project-rail],
+  .panel[data-shell="launch"][data-inspector],
+  .panel[data-shell="launch"][data-project-rail][data-inspector] {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .reader { padding: 28px 28px 56px; }
+}
+
+/* 桌面窄窗口下保留源码 / 预览双栏：让作者还能即时看到渲染结果。
+   只在 mobile/non-pointer 设备上把预览折叠掉。 */
+@media (max-width: 760px) {
+  .editor-split { grid-template-columns: minmax(0, 1fr); }
+  .preview-pane { display: none; }
+}
+
+@media (max-width: 760px) {
+  .app-frame { padding: 8px; }
+  .panel,
+  .panel:not([data-shell="launch"]),
+  .panel[data-shell],
+  .panel[data-project-rail],
+  .panel[data-inspector],
+  .panel[data-project-rail][data-inspector],
+  .panel[data-shell][data-project-rail],
+  .panel[data-shell][data-inspector],
+  .panel[data-shell][data-project-rail][data-inspector] {
+    grid-template-columns: minmax(0, 1fr);
+    border-radius: 12px;
+  }
+  .app-topbar {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 8px;
+    padding: 9px 12px;
+  }
+  .app-actions {
+    width: 100%;
+    justify-content: flex-end;
+  }
+  .app-action-btn {
+    flex: 1 1 auto;
+  }
+  .app-scope {
+    width: 100%;
+  }
+  .sidebar,
+  .inspector { display: none; }
+  .document-tab-strip {
+    padding: 7px 10px 0;
+  }
+  .document-command-strip {
+    min-height: 0;
+    padding: 6px 10px;
+  }
+  .tab-bar,
+  .doc-toolbar {
+    width: 100%;
+  }
+  .starter-actions,
+  .head-actions {
+    width: auto;
+    justify-content: flex-end;
+  }
+  .document-menu-btn {
+    flex: 0 0 auto;
+  }
+  .doc-toolbar {
+    display: flex;
+    align-items: center;
+    justify-content: flex-start;
+    grid-template-columns: minmax(0, 1fr) auto auto auto;
+    gap: 6px;
+    padding: 0;
+  }
+  .doc-toolbar > .format-toolbar {
+    flex: 1 1 auto;
+    min-width: 0;
+  }
+  .find-cluster,
+  .toolbar-group--mode,
+  .command-actions {
+    flex: 0 0 auto;
+  }
+  .toolbar-group--mode {
+    min-width: max-content;
+  }
+  .mode-switch {
+    flex: 0 0 auto;
+    min-width: max-content;
+  }
+  .mode-btn {
+    flex: 0 0 36px;
+    min-width: 36px;
+    padding: 0 6px;
+    justify-content: center;
+  }
+  .find-bar {
+    left: auto;
+    right: 0;
+    width: min(286px, calc(100vw - 20px));
+    max-width: calc(100vw - 20px);
+  }
+  .find-bar.is-replace {
+    width: min(306px, calc(100vw - 20px));
+    max-width: calc(100vw - 20px);
+  }
+  .find-input {
+    width: 0;
+  }
+  .find-replace-group {
+    width: 100%;
+  }
+  .empty-state {
+    padding: 24px 18px 24px;
+  }
+  .launch-grid {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 18px;
+  }
+  .launch-side {
+    margin-top: 0;
+  }
+}
+}

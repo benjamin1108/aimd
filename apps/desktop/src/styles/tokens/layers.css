@@ -1,0 +1,12 @@
+@layer tokens {
+:root {
+  --z-shell: 1;
+  --z-sticky: 30;
+  --z-action-menu: var(--z-menu);
+  --z-context-menu: var(--z-menu);
+  --z-tree-portal: 210;
+  --z-app-topbar: 130;
+  --z-webclip: var(--z-modal);
+  --z-devtools: 260;
+}
+}

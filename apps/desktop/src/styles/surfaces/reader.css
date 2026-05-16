@@ -1,0 +1,417 @@
+@layer surfaces {
+/* Reader frame + editor split + .aimd typography + scrollbar polish +
+   inline frontmatter card. Everything that makes the document body look
+   like a document. */
+
+.app-frame[data-width="normal"] { --reader-max: 880px; }
+.app-frame[data-width="wide"]   { --reader-max: 1120px; }
+.app-frame[data-width="ultra"]  { --reader-max: 100%; }
+
+.reader {
+  min-width: 0;
+  min-height: 0;
+  /* Without `width: 100%`, an auto-sized grid item with `margin: 0 auto`
+     shrinks to its content's preferred width and re-centers each time the
+     content grows. The reader (and inline editor) would visibly slide left
+     as the body fills out. Pinning width to 100% pairs with `max-width`
+     to give a stable horizontal frame regardless of content length. */
+  width: 100%;
+  height: 100%;
+  max-width: var(--reader-max);
+  margin: 0 auto;
+  padding: 38px 58px 82px;
+  overflow-y: auto;
+  scrollbar-width: thin;
+  scrollbar-color: var(--hairline-strong) transparent;
+}
+
+.reader.preview {
+  border-left: 1px solid var(--hairline);
+  margin: 0;
+  max-width: none;
+  padding: 28px 36px 60px;
+  background: var(--surface-document-soft);
+}
+
+/* Editor split */
+
+.editor-split {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  grid-template-rows: minmax(0, 1fr);
+  min-height: 0;
+  height: 100%;
+}
+
+.editor-pane,
+.preview-pane {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+
+.pane-tag {
+  flex: 0 0 auto;
+  align-self: flex-start;
+  padding: 7px 14px;
+  width: 100%;
+  border-bottom: 1px solid var(--hairline);
+  background: var(--surface-toolbar);
+  color: var(--ink-muted);
+  font-family: var(--font-mono);
+  font-size: 10.5px;
+  font-weight: 500;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.preview-pane .pane-tag {
+  background: var(--surface-table-head);
+}
+
+.source-editor-shell {
+  position: relative;
+  display: flex;
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow: hidden;
+  background: var(--surface-source);
+}
+
+.markdown-highlight {
+  display: none;
+}
+
+#markdown {
+  display: block;
+  flex: 1 1 auto;
+  width: 100%;
+  height: 100%;
+  min-width: 0;
+  min-height: 0;
+  margin: 0;
+  padding: 22px 28px 36px 32px;
+  border: 0;
+  font-family: var(--font-mono);
+  font-size: 13px;
+  line-height: 1.7;
+  letter-spacing: 0;
+  tab-size: 2;
+  white-space: pre-wrap;
+  overflow-wrap: normal;
+  word-break: normal;
+  overflow: auto;
+  resize: none;
+  outline: 0;
+  background: var(--surface-source);
+  color: var(--ink);
+  -webkit-text-fill-color: currentColor;
+  caret-color: var(--accent);
+  scrollbar-width: thin;
+  scrollbar-color: var(--hairline-strong) transparent;
+}
+
+#markdown:focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: -2px;
+}
+
+.preview-pane #preview {
+  flex: 1 1 auto;
+  min-height: 0;
+}
+
+#markdown::selection {
+  background: var(--selection-source-bg);
+}
+
+.md-heading { color: var(--markdown-heading); font-weight: 700; }
+.md-code-fence { color: var(--markdown-code-fence); font-weight: 600; }
+.md-code { color: var(--markdown-code); }
+.md-quote { color: var(--markdown-quote); }
+.md-list { color: var(--markdown-list); }
+.md-table { color: var(--markdown-table); }
+.md-image { color: var(--markdown-image); }
+
+/* Markdown content (.aimd) typography */
+
+.aimd {
+  color: var(--ink);
+  font-size: 14.5px;
+  line-height: 1.78;
+  /* Long unbreakable runs (e.g. `aaaa…`, URLs, hashes) inside <p>/<li>/<a>
+     would otherwise overflow horizontally. Because `.reader` sets
+     `overflow-y: auto`, the spec promotes `overflow-x` to `auto` too,
+     producing a horizontal scrollbar that the user cannot get rid of.
+     `anywhere` lets the layout break inside the run when needed and also
+     contributes to min-content width so flex/grid parents shrink correctly.
+     <pre> keeps its UA `white-space: pre`, so code blocks still scroll. */
+  overflow-wrap: anywhere;
+}
+
+.aimd > *:first-child { margin-top: 0; }
+.aimd > *:last-child  { margin-bottom: 0; }
+
+.aimd h1, .aimd h2, .aimd h3, .aimd h4 {
+  font-family: var(--font-display);
+  color: var(--ink-strong);
+  letter-spacing: 0;
+  line-height: 1.25;
+}
+
+.aimd h1 {
+  margin: 0 0 18px;
+  font-size: 28px;
+  font-weight: 700;
+  letter-spacing: 0;
+}
+
+.aimd h2 {
+  margin: 36px 0 12px;
+  padding-top: 18px;
+  border-top: 1px solid var(--hairline);
+  font-size: 19px;
+  font-weight: 600;
+}
+
+.aimd h3 {
+  margin: 24px 0 8px;
+  font-size: 15.5px;
+  font-weight: 600;
+}
+
+.aimd h4 {
+  margin: 18px 0 6px;
+  font-size: 13.5px;
+  font-weight: 600;
+  color: var(--ink-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.aimd p, .aimd ul, .aimd ol, .aimd blockquote {
+  margin: 0 0 14px;
+}
+
+.aimd ul, .aimd ol { padding-left: 22px; }
+.aimd li + li { margin-top: 4px; }
+
+.aimd a {
+  color: var(--ink-strong);
+  text-decoration: none;
+  border-bottom: 1px solid var(--hairline-strong);
+  cursor: pointer;
+  transition: border-color var(--t-fast) var(--ease);
+}
+.aimd a:hover { border-bottom-color: var(--ink); }
+.aimd a[data-external-media-link] {
+  border-bottom: 0;
+}
+.aimd:not(.inline-editor) a[data-external-link]::after {
+  content: "↗";
+  margin-left: 0.18em;
+  font-size: 0.72em;
+  vertical-align: 0.16em;
+  color: var(--ink-muted);
+}
+
+.aimd strong { font-weight: 600; color: var(--ink-strong); }
+
+.aimd em { font-style: italic; }
+
+.aimd blockquote {
+  margin: 18px 0;
+  padding: 4px 16px;
+  border-left: 2px solid var(--hairline-strong);
+  color: var(--ink-muted);
+  font-style: normal;
+}
+
+.aimd hr {
+  margin: 28px 0;
+  border: 0;
+  border-top: 1px solid var(--hairline);
+}
+
+.aimd img {
+  display: block;
+  max-width: 100%;
+  height: auto;
+  margin: 18px 0;
+  border-radius: 8px;
+  box-shadow: var(--shadow-card);
+}
+
+.aimd code {
+  padding: 1px 5px;
+  border-radius: 4px;
+  background: var(--surface-code);
+  color: var(--ink-strong);
+  font-family: var(--font-mono);
+  font-size: 0.86em;
+}
+
+.aimd pre {
+  position: relative;
+  margin: 16px 0;
+  padding: 14px 16px;
+  border-radius: var(--radius-control);
+  background: var(--surface-code);
+  color: var(--ink-strong);
+  font-family: var(--font-mono);
+  font-size: 12.5px;
+  line-height: 1.6;
+  overflow: hidden;
+  scrollbar-width: thin;
+}
+
+.aimd pre code {
+  display: block;
+  max-width: 100%;
+  overflow-x: auto;
+  padding: 0;
+  background: transparent;
+  font-size: inherit;
+  white-space: pre;
+  scrollbar-width: thin;
+}
+
+.code-copy {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  min-height: var(--size-control-xs);
+  padding: 0 8px;
+  border-radius: var(--radius-control-sm);
+  background: var(--surface-control);
+  color: var(--ink-muted);
+  font-size: 11px;
+  opacity: 0;
+  transition: opacity var(--t-fast) var(--ease), background var(--t-fast) var(--ease);
+}
+
+.aimd pre:hover .code-copy,
+.code-copy:focus {
+  opacity: 1;
+}
+
+.code-copy:hover {
+  background: var(--surface-control-hover);
+  color: var(--ink-strong);
+}
+
+.aimd table {
+  /* Keep table layout based on normal word boundaries. The document-level
+     `overflow-wrap: anywhere` is useful for prose, but in tables it lets one
+     long text column shrink neighboring short tokens like `24bit` or `OpCode`
+     down to arbitrary character breaks. Tables may scroll horizontally when
+     their real minimum width is wider than the reader. */
+  display: block;
+  width: 100%;
+  max-width: 100%;
+  margin: 18px 0;
+  border-collapse: collapse;
+  font-size: 13px;
+  table-layout: auto;
+  overflow-x: auto;
+  overflow-wrap: normal;
+  word-break: normal;
+}
+
+.aimd thead th {
+  padding: 9px 12px;
+  border-bottom: 1px solid var(--hairline-strong);
+  background: var(--surface-table-head);
+  color: var(--ink-muted);
+  font-weight: 600;
+  text-align: left;
+  letter-spacing: 0;
+  overflow-wrap: break-word;
+  word-break: normal;
+}
+
+.aimd tbody td {
+  padding: 9px 12px;
+  border-bottom: 1px solid var(--hairline);
+  vertical-align: top;
+  overflow-wrap: break-word;
+  word-break: normal;
+}
+
+.aimd tbody tr:last-child td { border-bottom: 0; }
+
+.aimd tbody tr:hover { background: var(--surface-table-head); }
+
+/* Inline frontmatter metadata card (rendered in reader for visible YAML) */
+
+.aimd-frontmatter {
+  background: var(--markdown-metadata-bg);
+  border: 1px solid var(--markdown-metadata-border);
+  border-left: 3px solid var(--markdown-metadata-rail);
+  border-radius: var(--radius-control);
+  box-shadow: inset 0 1px 0 var(--highlight-edge-muted);
+  padding: 12px 16px;
+  margin-bottom: 28px;
+  font-size: 12.5px;
+  color: var(--ink-muted);
+  cursor: default;
+}
+
+.aimd-frontmatter dl {
+  display: grid;
+  grid-template-columns: max-content 1fr;
+  gap: 4px 16px;
+  margin: 0;
+}
+
+.aimd-frontmatter dt {
+  font-weight: 600;
+  color: var(--ink-strong);
+  padding-top: 1px;
+}
+
+.aimd-frontmatter dd {
+  margin: 0;
+  word-break: break-word;
+}
+
+.aimd-frontmatter pre {
+  margin: 0;
+  font-family: var(--font-mono);
+  font-size: 11.5px;
+  white-space: pre-wrap;
+  word-break: break-all;
+}
+
+/* Webkit scrollbars for sidebar / reader / source textarea */
+
+.sidebar-body::-webkit-scrollbar,
+.reader::-webkit-scrollbar,
+#markdown::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+
+.sidebar-body::-webkit-scrollbar-thumb,
+.reader::-webkit-scrollbar-thumb,
+#markdown::-webkit-scrollbar-thumb {
+  background: transparent;
+  border: 3px solid transparent;
+  border-radius: 999px;
+  background-clip: padding-box;
+}
+
+.sidebar-body:hover::-webkit-scrollbar-thumb,
+.reader:hover::-webkit-scrollbar-thumb,
+#markdown:hover::-webkit-scrollbar-thumb {
+  background-color: var(--hairline-strong);
+  background-clip: padding-box;
+}
+
+.sidebar-body::-webkit-scrollbar-track,
+.reader::-webkit-scrollbar-track,
+#markdown::-webkit-scrollbar-track {
+  background: transparent;
+}
+}

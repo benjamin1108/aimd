@@ -1,0 +1,362 @@
+@layer layout {
+/* Workspace shell — compact command strip + body grid + foot/status pill.
+   Toolbar / button / menu styling lives in toolbar.css and buttons.css. */
+
+.workspace {
+  display: grid;
+  grid-template-rows: auto auto minmax(0, 1fr) auto;
+  height: 100%;
+  min-height: 0;
+  min-width: 0;
+  background: var(--surface-panel);
+}
+
+.document-meta-probe {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+}
+
+.document-tab-strip {
+  grid-row: 1;
+  display: block;
+  min-width: 0;
+  min-height: 34px;
+  padding: 6px 12px 0;
+  border-bottom: 1px solid var(--hairline-soft);
+  background: var(--surface-tab-strip);
+}
+
+.document-tab-strip[hidden] { display: none !important; }
+
+.document-command-strip {
+  grid-row: 2;
+  display: flex;
+  align-items: center;
+  justify-content: stretch;
+  min-width: 0;
+  min-height: 40px;
+  padding: 6px 12px;
+  border-bottom: 1px solid var(--hairline);
+  background: var(--surface-command-strip);
+  box-shadow: inset 0 1px 0 var(--highlight-edge-muted);
+}
+
+.document-command-strip[hidden] { display: none !important; }
+
+.doc-state-badges {
+  display: flex;
+  align-items: center;
+  flex-wrap: nowrap;
+  gap: 4px;
+  min-height: var(--size-control-sm);
+  max-width: 100%;
+  overflow: hidden;
+}
+
+.doc-state-badges[hidden] {
+  display: none !important;
+}
+
+.doc-state-badge {
+  display: inline-flex;
+  align-items: center;
+  flex: 0 1 auto;
+  min-width: 0;
+  max-width: 160px;
+  height: 20px;
+  padding: 0 8px;
+  border: 1px solid var(--hairline-muted);
+  border-radius: 999px;
+  background: var(--surface-chip);
+  color: var(--ink-muted);
+  font-size: 11px;
+  font-weight: 650;
+  line-height: 1;
+  letter-spacing: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.doc-state-badge[data-tone="strong"] {
+  background: var(--tone-success-surface);
+  border-color: var(--tone-success-border);
+  color: var(--tone-success);
+}
+
+.doc-state-badge[data-tone="warn"] {
+  background: var(--tone-warn-surface);
+  border-color: var(--tone-warn-border);
+  color: var(--tone-warn);
+}
+
+.doc-state-badge[data-tone="info"] {
+  background: var(--surface-muted);
+  color: var(--ink);
+}
+
+.head-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+  min-width: 0;
+  max-width: 100%;
+}
+
+.doc-toolbar {
+  position: relative;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto auto auto;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  width: 100%;
+  max-width: 100%;
+  padding: 0;
+  overflow: visible;
+}
+
+.doc-toolbar[hidden] { display: none !important; }
+
+.command-actions {
+  grid-column: 4;
+  justify-self: end;
+  flex: 0 0 auto;
+}
+
+.doc-toolbar > .format-toolbar {
+  grid-column: 1;
+}
+
+.document-menu-btn {
+  height: var(--size-control);
+  width: var(--size-control);
+  padding: 0;
+}
+
+.vertical-dots {
+  display: inline-grid;
+  place-items: center;
+  gap: 2px;
+  width: 12px;
+  height: 18px;
+}
+
+.vertical-dots span {
+  width: 3px;
+  height: 3px;
+  border-radius: 999px;
+  background: currentColor;
+}
+
+.find-cluster {
+  grid-column: 2;
+  justify-self: end;
+  display: inline-flex;
+  align-items: center;
+  flex: 0 1 auto;
+  min-width: 0;
+  position: relative;
+}
+
+.toolbar-group--mode {
+  grid-column: 3;
+  justify-self: end;
+}
+
+.panel[data-main-view="git-diff"] .doc-toolbar {
+  grid-template-columns: minmax(0, 1fr) auto;
+}
+
+.panel[data-main-view="git-diff"] .doc-toolbar > .format-toolbar,
+.panel[data-main-view="git-diff"] .toolbar-group--mode,
+.panel[data-main-view="git-diff"] #doc-actions {
+  display: none;
+}
+
+.panel[data-main-view="git-diff"] .find-cluster {
+  grid-column: 2;
+}
+
+.panel[data-main-view="git-diff"] .find-replace-group {
+  display: none;
+}
+
+.menu-chevron {
+  color: var(--ink-faint);
+  font-size: 10px;
+  line-height: 1;
+}
+
+/* Workspace body */
+
+.workspace-body {
+  grid-row: 3;
+  position: relative;
+  display: grid;
+  /* Without explicit 1fr / minmax(0, 1fr), an `auto` track sizes to
+     max-content. Long documents would then make the track grow past the
+     viewport, the children would never become smaller than their content,
+     and `.reader { overflow-y: auto }` would never engage. */
+  grid-template-rows: minmax(0, 1fr);
+  grid-template-columns: minmax(0, 1fr);
+  min-height: 0;
+  min-width: 0;
+  height: 100%;
+  overflow: hidden;
+}
+
+.workspace-body > * {
+  grid-area: 1 / 1;
+  min-height: 0;
+  min-width: 0;
+  animation: fadeIn var(--t-fast) var(--ease);
+}
+
+/* 不让正文文本从透明度 0 起步淡入：模式切换或自动 e2e 截图时会出现
+   短暂"看不清"的状态。把起点提到 0.85 + 1px 位移，仍有平滑过渡但不影响阅读。 */
+@keyframes fadeIn {
+  from { opacity: 0.85; transform: translateY(1px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .workspace-body > *,
+  .debug-indicator-dot,
+  .status-pill[data-tone="loading"] .status-dot {
+    animation: none;
+  }
+}
+
+/* Workspace footer (status pill + 隐式调试指示器) */
+
+.workspace-foot {
+  grid-row: 4;
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 10px;
+  flex: 0 0 auto;
+  height: 32px;
+  padding: 0 14px;
+  border-top: 1px solid var(--hairline);
+  background: var(--surface-toolbar);
+  min-width: 0;
+  overflow: hidden;
+}
+
+/* 隐式调试指示器：默认 hidden，仅在出现 warn / error 时由 main.ts 通过
+   onDebugChange 取消 hidden。点击直接打开调试控制台 —— 对普通用户透明，
+   但出问题时显形，避免"用户先去菜单 → 打开 → 才发现报错"的盲区。 */
+.debug-indicator {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 3px 9px;
+  border-radius: 999px;
+  background: var(--tone-danger-surface);
+  color: var(--tone-danger);
+  font-size: 11.5px;
+  font-weight: 600;
+  letter-spacing: 0;
+  flex: 0 0 auto;
+  min-width: 0;
+  max-width: 45%;
+  transition: background var(--t-fast) var(--ease),
+              transform var(--t-fast) var(--ease);
+}
+
+.debug-indicator[hidden] { display: none !important; }
+
+.debug-indicator:hover { background: var(--tone-danger-surface-strong); }
+.debug-indicator:active { transform: translateY(1px); }
+
+.debug-indicator-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 999px;
+  background: currentColor;
+  animation: debug-indicator-pulse 1.6s var(--ease) infinite;
+}
+
+.debug-indicator-count {
+  font-family: var(--font-mono);
+  font-size: 11px;
+}
+
+@keyframes debug-indicator-pulse {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50%      { opacity: 0.55; transform: scale(1.2); }
+}
+
+.status-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  max-width: min(100%, 680px);
+  flex: 0 1 auto;
+  padding: 4px 10px;
+  border-radius: 999px;
+  background: var(--surface-status);
+  color: var(--ink-muted);
+  font-size: 11.5px;
+  font-weight: 500;
+  transition: background var(--t-fast) var(--ease),
+              color var(--t-fast) var(--ease),
+              box-shadow var(--t-fast) var(--ease);
+  box-shadow: inset 0 1px 0 var(--highlight-edge-muted);
+}
+
+.status-pill #status {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.status-pill[data-action] {
+  cursor: pointer;
+}
+
+.status-pill[data-action]:hover {
+  background: var(--tone-info-surface);
+}
+
+.status-pill[data-action]:focus-visible {
+  outline: 2px solid var(--focus-ring-strong);
+  outline-offset: 2px;
+}
+
+.status-dot {
+  width: 6px;
+  height: 6px;
+  flex: 0 0 6px;
+  border-radius: 999px;
+  background: currentColor;
+  opacity: 0.55;
+}
+
+.status-pill[data-tone="loading"] {
+  color: var(--tone-loading);
+}
+.status-pill[data-tone="loading"] .status-dot {
+  animation: pulse 1.2s var(--ease) infinite;
+}
+
+.status-pill[data-tone="success"] { color: var(--tone-success); }
+.status-pill[data-tone="warn"]    { color: var(--tone-warn); }
+.status-pill[data-tone="info"]    { color: var(--tone-info); }
+.status-pill[data-tone="idle"]    { color: var(--ink-muted); }
+
+@keyframes pulse {
+  0%, 100% { opacity: 0.4; transform: scale(1); }
+  50%      { opacity: 1;   transform: scale(1.25); }
+}
+
+}

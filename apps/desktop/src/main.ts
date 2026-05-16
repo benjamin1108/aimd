@@ -2,12 +2,9 @@ import { invoke, isTauri } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import "./styles.css";
-
 import { APP_HTML } from "./ui/template";
-
 // Inject the app shell BEFORE any module touches the lazy DOM accessors.
 document.querySelector<HTMLDivElement>("#app")!.innerHTML = APP_HTML;
-
 import { state } from "./core/state";
 import type { AimdDocument } from "./core/types";
 import {
@@ -66,13 +63,15 @@ import {
 } from "./ui/git-diff";
 import { bindSelectionBoundary } from "./ui/selection";
 import { loadAppSettings, type AppSettings } from "./core/settings";
+import { applyThemePreference, bindSystemThemePreference } from "./ui/theme";
 import { bindUpdater, checkForUpdates, scheduleStartupUpdateCheck, showAboutAimd } from "./updater/client";
 import { syncActiveTabFromFacade } from "./document/open-document-state";
-
+document.body.dataset.aimdEntry = "desktop";
 installDebugConsole();
 bindSelectionBoundary("main");
 bindUpdater();
 bindProjectRailCollapse();
+bindSystemThemePreference(() => state.uiSettings.theme);
 if (isTauri()) {
   void listen<{ level?: string; traceId?: string; elapsedMs?: number; message?: string }>("aimd-pdf-log", (event) => {
     const payload = event.payload || {};
@@ -89,14 +88,13 @@ if (isTauri()) {
     );
   });
 }
-
 function applyAppSettings(settings: AppSettings) {
   state.uiSettings = { ...settings.ui };
+  applyThemePreference(state.uiSettings.theme);
   setDebugMode(state.uiSettings.debugMode);
   renderDocPanelTabs();
   updateChrome();
 }
-
 // footer 状态条上的隐式调试指示器：只有出现 warn / error 时才显示，
 // 文案 "调试 · N"，点击就开 Debug 窗口；不再用最小化 / 最小化条。
 onDebugChange((errorCount) => {

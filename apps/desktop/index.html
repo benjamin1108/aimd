@@ -4,8 +4,17 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>AIMD Desktop</title>
+    <script>
+      (() => {
+        const prefersDark = window.matchMedia?.("(prefers-color-scheme: dark)").matches;
+        const theme = prefersDark ? "dark" : "light";
+        document.documentElement.dataset.themePreference = "system";
+        document.documentElement.dataset.theme = theme;
+        document.documentElement.style.colorScheme = theme;
+      })();
+    </script>
   </head>
-  <body>
+  <body data-aimd-entry="desktop">
     <div id="app"></div>
     <script type="module" src="/src/main.ts"></script>
   </body>

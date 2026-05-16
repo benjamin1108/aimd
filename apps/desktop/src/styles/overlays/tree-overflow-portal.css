@@ -1,0 +1,37 @@
+@layer overlays {
+.workspace-row-overflow-measure {
+  position: fixed;
+  height: 0;
+  overflow: hidden;
+  visibility: hidden;
+  pointer-events: none;
+}
+
+.workspace-row.workspace-row-overflow-overlay {
+  position: fixed;
+  z-index: var(--z-tree-portal);
+  pointer-events: none;
+  overflow: hidden;
+  background: var(--workspace-row-overflow-bg);
+  color: var(--workspace-row-overflow-fg);
+  box-shadow: var(--workspace-row-overflow-shadow);
+  opacity: 1;
+  transform: translateX(var(--workspace-row-overflow-offset));
+  transform-origin: left center;
+  transition: transform var(--workspace-row-overflow-duration) var(--ease);
+}
+
+.workspace-row.workspace-row-overflow-overlay.is-active {
+  background: var(--workspace-row-overflow-active-bg);
+  color: var(--workspace-row-overflow-active-fg);
+}
+
+.workspace-row.workspace-row-overflow-overlay.is-open {
+  transform: translateX(0);
+}
+
+.workspace-row-overflow-overlay .workspace-name {
+  overflow: visible;
+  text-overflow: clip;
+}
+}

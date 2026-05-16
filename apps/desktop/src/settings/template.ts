@@ -13,19 +13,30 @@ export function settingsTemplateHTML() {
 
       <div class="settings-body">
         <aside class="settings-nav" role="tablist" aria-label="设置分类">
-          <button type="button" class="settings-nav-item is-active" data-section="general" role="tab" aria-selected="true">常规</button>
-          <button type="button" class="settings-nav-item" data-section="model" role="tab" aria-selected="false">AI / 模型</button>
-          <button type="button" class="settings-nav-item" data-section="webclip" role="tab" aria-selected="false">网页导入</button>
-          <button type="button" class="settings-nav-item" data-section="format" role="tab" aria-selected="false">格式化</button>
-          <button type="button" class="settings-nav-item" data-section="git" role="tab" aria-selected="false">Git 集成</button>
+          <button id="settings-tab-general" type="button" class="settings-nav-item is-active" data-section="general" role="tab" aria-selected="true" aria-controls="settings-panel-general" tabindex="0">常规</button>
+          <button id="settings-tab-model" type="button" class="settings-nav-item" data-section="model" role="tab" aria-selected="false" aria-controls="settings-panel-model" tabindex="-1">AI / 模型</button>
+          <button id="settings-tab-webclip" type="button" class="settings-nav-item" data-section="webclip" role="tab" aria-selected="false" aria-controls="settings-panel-webclip" tabindex="-1">网页导入</button>
+          <button id="settings-tab-format" type="button" class="settings-nav-item" data-section="format" role="tab" aria-selected="false" aria-controls="settings-panel-format" tabindex="-1">格式化</button>
+          <button id="settings-tab-git" type="button" class="settings-nav-item" data-section="git" role="tab" aria-selected="false" aria-controls="settings-panel-git" tabindex="-1">Git 集成</button>
         </aside>
 
         <div class="settings-content">
-          <section class="settings-section is-active" data-section="general" role="tabpanel" aria-labelledby="settings-tab-general">
+          <section id="settings-panel-general" class="settings-section is-active" data-section="general" role="tabpanel" aria-labelledby="settings-tab-general">
             <header class="settings-section-head">
               <h2>常规</h2>
               <p>调整主窗口的显示偏好。</p>
             </header>
+
+            <label class="field">
+              <span class="field-label">主题</span>
+              <select id="ui-theme">
+                <option value="system">跟随系统</option>
+                <option value="light">浅色</option>
+                <option value="dark">深色</option>
+                <option value="high-contrast">高对比</option>
+              </select>
+              <span class="field-hint">主题会同步到主窗口，不需要重启。</span>
+            </label>
 
             <label class="toggle-field">
               <input type="checkbox" id="ui-debug-mode" />
@@ -36,7 +47,7 @@ export function settingsTemplateHTML() {
             </label>
           </section>
 
-          <section class="settings-section" data-section="model" role="tabpanel" aria-labelledby="settings-tab-model" hidden>
+          <section id="settings-panel-model" class="settings-section" data-section="model" role="tabpanel" aria-labelledby="settings-tab-model" hidden>
             <header class="settings-section-head">
               <h2>模型连接</h2>
               <p>请选择模型服务商并配置对应的访问凭据。</p>
@@ -59,7 +70,7 @@ export function settingsTemplateHTML() {
             <label class="field">
               <span class="field-label">API Key</span>
               <div class="api-key-wrap" data-state="masked">
-                <input id="api-key" class="api-key-input" type="password" autocomplete="off" spellcheck="false" />
+                <input id="api-key" class="api-key-input" type="password" autocomplete="off" spellcheck="false" aria-describedby="api-key-error" />
                 <span class="api-key-mask" aria-hidden="true"></span>
                 <button id="api-key-reveal" type="button" class="api-key-reveal" aria-pressed="false" aria-label="显示 / 隐藏 API Key" title="显示 / 隐藏">
                   <svg viewBox="0 0 16 16" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
@@ -68,7 +79,7 @@ export function settingsTemplateHTML() {
                   </svg>
                 </button>
               </div>
-              <span id="api-key-error" class="field-error" hidden></span>
+              <span id="api-key-error" class="field-error" role="alert" hidden></span>
             </label>
 
             <label class="field">
@@ -82,17 +93,19 @@ export function settingsTemplateHTML() {
             </div>
           </section>
 
-          <section class="settings-section" data-section="webclip" role="tabpanel" aria-labelledby="settings-tab-webclip" hidden>
+          <section id="settings-panel-webclip" class="settings-section" data-section="webclip" role="tabpanel" aria-labelledby="settings-tab-webclip" hidden>
             <header class="settings-section-head">
               <h2>从网页导入</h2>
               <p>配置从网页创建草稿时的正文清洗与智能排版。</p>
             </header>
 
-            <label class="field" style="flex-direction: row; align-items: center; gap: 8px; cursor: pointer;">
-              <input type="checkbox" id="webclip-llm-enabled" style="margin: 0; width: 16px; height: 16px;" />
-              <span class="field-label" style="margin: 0;">开启大模型智能排版与清洗</span>
+            <label class="toggle-field webclip-llm-toggle">
+              <input type="checkbox" id="webclip-llm-enabled" />
+              <span class="toggle-field-text">
+                <span class="field-label">开启大模型智能排版与清洗</span>
+                <span class="field-hint">启用后，会把提取到的网页正文发送给所选模型，并生成摘要、核心观点和层级化分章正文。这可能会增加一些等待时间。</span>
+              </span>
             </label>
-            <p style="font-size: 13px; color: var(--text-muted); margin-bottom: 16px;">启用后，会把提取到的网页正文发送给所选模型，并生成摘要、核心观点和层级化分章正文。这可能会增加一些等待时间。</p>
 
             <label class="field">
               <span class="field-label">Provider</span>
@@ -116,7 +129,7 @@ export function settingsTemplateHTML() {
                 <option value="en">英文</option>
               </select>
             </label>
-            <p style="font-size: 13px; color: var(--text-muted); margin-bottom: 16px;">如果网页原文不是所选语言，智能排版会在保留链接、图片和术语的前提下翻译正文。</p>
+            <p class="field-hint settings-help-copy">如果网页原文不是所选语言，智能排版会在保留链接、图片和术语的前提下翻译正文。</p>
 
             <div class="field-grid">
               <label class="field">
@@ -133,7 +146,7 @@ export function settingsTemplateHTML() {
             </div>
           </section>
 
-          <section class="settings-section" data-section="format" role="tabpanel" aria-labelledby="settings-tab-format" hidden>
+          <section id="settings-panel-format" class="settings-section" data-section="format" role="tabpanel" aria-labelledby="settings-tab-format" hidden>
             <header class="settings-section-head">
               <h2>一键格式化</h2>
               <p>配置当前文档一键整理时使用的模型和输出语言。</p>

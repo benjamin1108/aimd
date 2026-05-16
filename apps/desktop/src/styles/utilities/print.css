@@ -1,0 +1,46 @@
+@layer utilities {
+@media print {
+  body {
+    background: white;
+    color: black;
+    overflow: visible;
+  }
+
+  .topbar,
+  .sidebar,
+  .inspector,
+  .document-tab-strip,
+  .document-command-strip,
+  .doc-toolbar,
+  .format-toolbar,
+  .action-menu,
+  .context-menu,
+  .debug-console,
+  .lightbox,
+  .settings-shell,
+  .web-clip-panel {
+    display: none !important;
+  }
+
+  #reader,
+  .rendered-surface,
+  .aimd {
+    max-width: none;
+    color: black;
+    background: white;
+    box-shadow: none;
+  }
+
+  .aimd pre,
+  .rendered-surface pre {
+    break-inside: avoid;
+    white-space: pre-wrap;
+  }
+
+  .aimd img,
+  .rendered-surface img {
+    max-width: 100%;
+    break-inside: avoid;
+  }
+}
+}

@@ -209,6 +209,43 @@ test.describe("1. Finder context menu", () => {
     await expect(page.locator("[data-file-ctx-menu]")).not.toBeVisible();
   });
 
+  test("reopening context menu cleans up old document listeners", async ({ page }) => {
+    await installTauriMock(page);
+    await page.addInitScript(() => {
+      const active = { click: 0, keydown: 0 };
+      const originalAdd = Document.prototype.addEventListener;
+      const originalRemove = Document.prototype.removeEventListener;
+      const isCapture = (options?: boolean | AddEventListenerOptions) => options === true || (typeof options === "object" && Boolean(options.capture));
+      Document.prototype.addEventListener = function (type: string, listener: EventListenerOrEventListenerObject, options?: boolean | AddEventListenerOptions) {
+        if (this === document && (type === "click" || type === "keydown") && isCapture(options)) active[type as "click" | "keydown"] += 1;
+        return originalAdd.call(this, type, listener, options);
+      };
+      Document.prototype.removeEventListener = function (type: string, listener: EventListenerOrEventListenerObject, options?: boolean | EventListenerOptions) {
+        if (this === document && (type === "click" || type === "keydown") && isCapture(options)) active[type as "click" | "keydown"] -= 1;
+        return originalRemove.call(this, type, listener, options);
+      };
+      (window as any).__aimdContextListenerBalance = () => ({ ...active });
+      window.localStorage.setItem("aimd.desktop.recents", JSON.stringify(["/mock/sample.aimd"]));
+    });
+    await page.goto("/");
+    const baseline = await page.evaluate(() => (window as any).__aimdContextListenerBalance());
+    const recentItem = page.locator(".recent-item").first();
+
+    await recentItem.dispatchEvent("contextmenu", { clientX: 100, clientY: 200 });
+    await page.waitForTimeout(20);
+    await recentItem.dispatchEvent("contextmenu", { clientX: 120, clientY: 220 });
+    await page.waitForTimeout(20);
+    await expect(page.locator("[data-file-ctx-menu]")).toHaveCount(1);
+    expect(await page.evaluate(() => (window as any).__aimdContextListenerBalance())).toEqual({
+      click: baseline.click + 1,
+      keydown: baseline.keydown + 1,
+    });
+
+    await page.keyboard.press("Escape");
+    await expect(page.locator("[data-file-ctx-menu]")).not.toBeVisible();
+    expect(await page.evaluate(() => (window as any).__aimdContextListenerBalance())).toEqual(baseline);
+  });
+
   test("从最近列表移除 removes item from recent list", async ({ page }) => {
     await installTauriMock(page);
     await page.addInitScript(() => {
