@@ -4,6 +4,7 @@ import {
   REPO_ROOT,
   assertTagMatchesVersion,
   bumpVersion,
+  ensureCommandsAvailable,
   loadReleaseConfig,
   runCommand,
   syncVersion,
@@ -159,6 +160,7 @@ try {
   }
 
   ensureMainBranch();
+  ensureCommandsAvailable(republish ? ["gh", "git"] : ["npm", "cargo", "git"]);
 
   if (republish) {
     syncVersion({ check: true });

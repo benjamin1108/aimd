@@ -274,12 +274,32 @@ export function ensureCleanWorktree(root = REPO_ROOT) {
   }
 }
 
+export function executableForPlatform(command) {
+  if (process.platform === "win32" && !path.extname(command)) {
+    if (command === "npm" || command === "npx") return `${command}.cmd`;
+  }
+  return command;
+}
+
+export function ensureCommandsAvailable(commands, { cwd = REPO_ROOT } = {}) {
+  for (const command of commands) {
+    try {
+      execFileSync(executableForPlatform(command), ["--version"], {
+        cwd,
+        stdio: "ignore",
+      });
+    } catch {
+      throw new Error(`Required release command is not available on PATH: ${command}`);
+    }
+  }
+}
+
 export function runCommand(command, args, options = {}) {
   if (options.dryRun) {
     console.log(`[dry-run] ${command} ${args.join(" ")}`);
     return;
   }
-  execFileSync(command, args, {
+  execFileSync(executableForPlatform(command), args, {
     cwd: options.cwd || REPO_ROOT,
     stdio: "inherit",
     shell: false,
