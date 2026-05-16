@@ -8,6 +8,7 @@ import {
   bumpVersion,
   computeSyncedFiles,
   executableForPlatform,
+  getGitTag,
   releaseWorkflowDispatchArgs,
   syncVersion,
   validateReleaseConfig,
@@ -145,6 +146,27 @@ test("release workflow dispatch runs from main while passing the release tag", (
     "tag=v1.2.3",
   ]);
   assert.throws(() => releaseWorkflowDispatchArgs(""), /requires a tag/);
+});
+
+test("explicit release tag overrides workflow ref name", () => {
+  const previousReleaseTag = process.env.RELEASE_TAG;
+  const previousRefName = process.env.GITHUB_REF_NAME;
+  try {
+    process.env.RELEASE_TAG = "v1.2.3";
+    process.env.GITHUB_REF_NAME = "main";
+    assert.equal(getGitTag(), "v1.2.3");
+  } finally {
+    if (previousReleaseTag === undefined) {
+      delete process.env.RELEASE_TAG;
+    } else {
+      process.env.RELEASE_TAG = previousReleaseTag;
+    }
+    if (previousRefName === undefined) {
+      delete process.env.GITHUB_REF_NAME;
+    } else {
+      process.env.GITHUB_REF_NAME = previousRefName;
+    }
+  }
 });
 
 test("Windows npm commands resolve to command shims", () => {

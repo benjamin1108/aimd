@@ -249,7 +249,7 @@ export function syncVersion({ root = REPO_ROOT, check = false } = {}) {
 }
 
 export function getGitTag(root = REPO_ROOT) {
-  const envTag = process.env.GITHUB_REF_NAME || process.env.RELEASE_TAG || "";
+  const envTag = process.env.RELEASE_TAG || process.env.GITHUB_REF_NAME || "";
   if (envTag) return envTag.trim();
   try {
     return execFileSync("git", ["describe", "--tags", "--exact-match"], {
