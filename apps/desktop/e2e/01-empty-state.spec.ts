@@ -48,6 +48,73 @@ test.describe("Empty state — running outside Tauri", () => {
     await expect(page.locator("#empty-import")).not.toBeAttached();
   });
 
+  test("launch action and recent panels align without forced slack", async ({ page }) => {
+    await page.setViewportSize({ width: 1280, height: 720 });
+    await page.addInitScript(() => {
+      window.localStorage.setItem(
+        "aimd.desktop.recents",
+        JSON.stringify(["/mock/project/Daily.md", "/mock/project/Report.aimd"]),
+      );
+    });
+    await page.goto("/");
+    await expect(page.locator("#recent-section")).toBeVisible();
+
+    const metrics = await page.evaluate(() => {
+      const style = (selector: string) => {
+        const el = document.querySelector(selector);
+        return el ? getComputedStyle(el) : null;
+      };
+      const action = document.querySelector(".launch-command-block")?.getBoundingClientRect();
+      const recent = document.querySelector("#recent-section")?.getBoundingClientRect();
+      const commandCard = document.querySelector("#empty-new")?.getBoundingClientRect();
+      const recentItem = document.querySelector(".recent-item")?.getBoundingClientRect();
+      const lastRecentItem = document.querySelector(".recent-item:last-child")?.getBoundingClientRect();
+      const commandCardStyle = style("#empty-new");
+      const recentItemStyle = style(".recent-item");
+      const commandIconStyle = style(".launch-card-icon");
+      const recentIconStyle = style(".recent-item-icon");
+      const commandLabelStyle = style(".launch-group-label");
+      const recentLabelStyle = style(".recent-title");
+      const commandTitleStyle = style(".launch-card-title");
+      const recentTitleStyle = style(".recent-item-title");
+      const commandMetaStyle = style(".launch-card-meta");
+      const recentMetaStyle = style(".recent-item-meta");
+      return {
+        topDelta: action && recent ? Math.abs(action.top - recent.top) : 999,
+        cardHeightDelta: commandCard && recentItem ? Math.abs(commandCard.height - recentItem.height) : 999,
+        recentBottomPadding: recent && lastRecentItem ? recent.bottom - lastRecentItem.bottom : 999,
+        cardBackground: commandCardStyle && recentItemStyle ? [commandCardStyle.backgroundColor, recentItemStyle.backgroundColor] : [],
+        cardBorder: commandCardStyle && recentItemStyle ? [commandCardStyle.borderColor, recentItemStyle.borderColor] : [],
+        iconBackground: commandIconStyle && recentIconStyle ? [commandIconStyle.backgroundColor, recentIconStyle.backgroundColor] : [],
+        iconColor: commandIconStyle && recentIconStyle ? [commandIconStyle.color, recentIconStyle.color] : [],
+        labelColor: commandLabelStyle && recentLabelStyle ? [commandLabelStyle.color, recentLabelStyle.color] : [],
+        labelFont: commandLabelStyle && recentLabelStyle ? [commandLabelStyle.fontSize, recentLabelStyle.fontSize] : [],
+        labelWeight: commandLabelStyle && recentLabelStyle ? [commandLabelStyle.fontWeight, recentLabelStyle.fontWeight] : [],
+        titleFont: commandTitleStyle && recentTitleStyle ? [commandTitleStyle.fontSize, recentTitleStyle.fontSize] : [],
+        titleWeight: commandTitleStyle && recentTitleStyle ? [commandTitleStyle.fontWeight, recentTitleStyle.fontWeight] : [],
+        titleColor: commandTitleStyle && recentTitleStyle ? [commandTitleStyle.color, recentTitleStyle.color] : [],
+        metaFont: commandMetaStyle && recentMetaStyle ? [commandMetaStyle.fontSize, recentMetaStyle.fontSize] : [],
+        metaColor: commandMetaStyle && recentMetaStyle ? [commandMetaStyle.color, recentMetaStyle.color] : [],
+      };
+    });
+
+    expect(metrics.topDelta).toBeLessThanOrEqual(1);
+    expect(metrics.cardHeightDelta).toBeLessThanOrEqual(1);
+    expect(metrics.recentBottomPadding).toBeLessThanOrEqual(18);
+    expect(metrics.cardBackground[0]).toBe(metrics.cardBackground[1]);
+    expect(metrics.cardBorder[0]).toBe(metrics.cardBorder[1]);
+    expect(metrics.iconBackground[0]).toBe(metrics.iconBackground[1]);
+    expect(metrics.iconColor[0]).toBe(metrics.iconColor[1]);
+    expect(metrics.labelColor[0]).toBe(metrics.labelColor[1]);
+    expect(metrics.labelFont[0]).toBe(metrics.labelFont[1]);
+    expect(metrics.labelWeight[0]).toBe(metrics.labelWeight[1]);
+    expect(metrics.titleFont[0]).toBe(metrics.titleFont[1]);
+    expect(metrics.titleWeight[0]).toBe(metrics.titleWeight[1]);
+    expect(metrics.titleColor[0]).toBe(metrics.titleColor[1]);
+    expect(metrics.metaFont[0]).toBe(metrics.metaFont[1]);
+    expect(metrics.metaColor[0]).toBe(metrics.metaColor[1]);
+  });
+
   test("status pill is in idle tone on first paint", async ({ page }) => {
     await page.goto("/");
     const pill = page.locator("#status-pill");

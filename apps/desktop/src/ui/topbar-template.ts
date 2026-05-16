@@ -6,12 +6,12 @@ export const APP_TOPBAR_HTML = `
           <span class="brand-mark">A</span>
           <span class="brand-name">AIMD</span>
         </div>
-        <div class="app-scope" aria-label="当前工作范围">
-          <strong id="app-scope-primary">启动页</strong>
+        <div class="app-scope" aria-label="当前位置">
+          <strong id="app-scope-primary">主页</strong>
           <span class="app-scope-sep">/</span>
-          <span id="app-scope-secondary">入口按命令域分层</span>
+          <span id="app-scope-secondary">新建、打开、最近文档</span>
         </div>
-        <div class="app-actions" aria-label="全局操作">
+        <div class="app-actions" aria-label="常用操作">
           <div class="app-menu-wrap">
             <button id="global-new-toggle" class="secondary-btn app-action-btn" type="button" aria-haspopup="menu" aria-expanded="false">
               <span class="secondary-btn-icon">${ICONS.plus}</span>
@@ -43,7 +43,6 @@ export const APP_TOPBAR_HTML = `
               <button id="global-import-md-project" class="action-menu-item" type="button">
                 <span class="action-menu-icon">${ICONS.folder}</span>
                 <span>导入 Markdown 文件夹</span>
-                <small>包</small>
               </button>
             </div>
           </div>
@@ -63,25 +62,18 @@ export const APP_TOPBAR_HTML = `
               <button id="global-open-workspace" class="action-menu-item" type="button">
                 <span class="action-menu-icon">${ICONS.folder}</span>
                 <span>打开项目目录</span>
-                <small>目录</small>
-              </button>
-              <hr class="action-menu-divider" role="separator">
-              <button id="global-show-recents" class="action-menu-item" type="button">
-                <span class="action-menu-icon">${ICONS.recent}</span>
-                <span>显示最近打开</span>
-                <small>8项</small>
               </button>
             </div>
           </div>
 
           <div class="app-menu-wrap">
             <button id="app-menu-toggle" class="secondary-btn app-action-btn" type="button" aria-haspopup="menu" aria-expanded="false">
-              <span class="secondary-btn-icon">${ICONS.appGrid}</span>
-              <span>应用</span>
+              <span class="secondary-btn-icon">${ICONS.more}</span>
+              <span>更多</span>
               <span class="menu-chevron" aria-hidden="true">▾</span>
             </button>
             <div id="app-menu" class="action-menu global-menu app-level-menu" role="menu" hidden>
-              <div class="action-menu-title">应用</div>
+              <div class="action-menu-title">更多</div>
               <button id="new-window" class="action-menu-item" type="button">
                 <span class="action-menu-icon">${ICONS.plus}</span>
                 <span>新建窗口</span>
@@ -90,17 +82,14 @@ export const APP_TOPBAR_HTML = `
               <button id="settings-open" class="action-menu-item" type="button">
                 <span class="action-menu-icon">${ICONS.settings}</span>
                 <span>设置</span>
-                <small>应用</small>
               </button>
               <button id="check-updates" class="action-menu-item" type="button">
                 <span class="action-menu-icon">${ICONS.refresh}</span>
                 <span>检查更新</span>
-                <small>版本</small>
               </button>
               <button id="about-aimd" class="action-menu-item" type="button">
                 <span class="action-menu-icon">${ICONS.info}</span>
                 <span>关于 AIMD</span>
-                <small>信息</small>
               </button>
             </div>
           </div>

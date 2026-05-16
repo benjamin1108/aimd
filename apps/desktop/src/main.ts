@@ -23,6 +23,7 @@ import { setStatus, updateChrome } from "./ui/chrome";
 import { bindFormatToolbar } from "./editor/format-toolbar";
 import { bindSearch, openFindBar } from "./editor/search";
 import { bindSourceHighlight } from "./editor/source-highlight";
+import { bindFormatToolbarDragHandles } from "./ui/toolbar-drag";
 import { bindWidthSwitch, setWidth } from "./ui/width";
 import { bindSidebarResizers, bindSidebarHrResizer, bindInspectorHrResizer } from "./ui/resizers";
 import { showFileContextMenu } from "./ui/context-menu";
@@ -158,16 +159,6 @@ globalNewProjectMarkdownEl().addEventListener("click", () => { closeActionMenus(
 $("#global-import-md-project").addEventListener("click", () => { closeActionMenus(); void chooseAndImportMarkdownProject(); });
 $("#global-open-document").addEventListener("click", () => { closeActionMenus(); void chooseAndOpen(); });
 $("#global-open-workspace").addEventListener("click", () => { closeActionMenus(); void openWorkspacePicker(); });
-$("#global-show-recents").addEventListener("click", () => {
-  closeActionMenus();
-  const recent = document.querySelector<HTMLElement>("#recent-section");
-  if (recent && !recent.hidden) {
-    recent.scrollIntoView({ block: "nearest" });
-    setStatus("最近打开已显示", "info");
-  } else {
-    setStatus("暂无最近打开文档", "info");
-  }
-});
 $("#empty-open").addEventListener("click", chooseAndOpen);
 $("#empty-open-workspace").addEventListener("click", () => { void openWorkspacePicker(); });
 $("#empty-new").addEventListener("click", () => { void newDocument(); });
@@ -247,6 +238,7 @@ inlineEditorEl().addEventListener("focus", () => {
 }, { once: true });
 
 bindFormatToolbar();
+bindFormatToolbarDragHandles();
 bindSearch();
 bindSourceHighlight();
 bindHealthPanel();

@@ -3,7 +3,7 @@
 
 .format-toolbar {
   display: inline-flex;
-  align-items: center;
+  align-items: flex-start;
   flex-wrap: nowrap;
   gap: 2px;
   min-width: 0;
@@ -13,7 +13,8 @@
   border-bottom: 0;
   background: transparent;
   box-shadow: none;
-  scrollbar-width: thin;
+  scrollbar-width: none;
+  overscroll-behavior-x: contain;
 }
 
 .format-toolbar::-webkit-scrollbar {
@@ -33,11 +34,37 @@
 }
 
 .ft-sep {
-  width: 1px;
-  height: 18px;
-  margin: 0 4px;
-  background: var(--hairline-strong);
+  position: relative;
+  width: 9px;
+  height: var(--size-control-sm);
+  margin: 2px 1px;
+  cursor: ew-resize;
   flex: 0 0 auto;
+  touch-action: none;
+}
+
+.ft-sep::after {
+  content: "";
+  position: absolute;
+  top: 5px;
+  bottom: 5px;
+  left: 50%;
+  width: 1px;
+  border-radius: 999px;
+  background: var(--hairline-strong);
+  transform: translateX(-50%);
+  transition: background var(--t-fast) var(--ease),
+              opacity var(--t-fast) var(--ease);
+}
+
+.ft-sep:hover::after,
+.format-toolbar.is-sep-dragging .ft-sep.is-dragging::after {
+  background: var(--ink-faint);
+}
+
+.format-toolbar.is-sep-dragging {
+  cursor: ew-resize;
+  user-select: none;
 }
 
 .ft-btn {
@@ -108,8 +135,8 @@
 
 .inline-editor:focus { outline: none; }
 .inline-editor:focus-visible {
-  outline: 2px solid var(--focus-ring);
-  outline-offset: -2px;
+  outline: 1px solid var(--hairline-focus-soft);
+  outline-offset: -1px;
 }
 
 .inline-editor :where(p, h1, h2, h3, h4, li, blockquote):empty::before {

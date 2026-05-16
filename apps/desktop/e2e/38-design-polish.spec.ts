@@ -95,6 +95,50 @@ test.describe("顶部工具栏视觉权重", () => {
     ]);
 
     await expect(page.locator("#format-toolbar .ft-btn")).toHaveCount(17);
+    const toolbarMetrics = await page.evaluate(() => {
+      const toolbar = document.querySelector<HTMLElement>("#format-toolbar")!;
+      const separator = document.querySelector<HTMLElement>("#format-toolbar .ft-sep")!;
+      const toolbarStyle = getComputedStyle(toolbar);
+      const separatorStyle = getComputedStyle(separator);
+      const separatorLineStyle = getComputedStyle(separator, "::after");
+      return {
+        scrollbarWidth: toolbarStyle.scrollbarWidth,
+        overflowX: toolbarStyle.overflowX,
+        overflowY: toolbarStyle.overflowY,
+        alignItems: toolbarStyle.alignItems,
+        separatorCursor: separatorStyle.cursor,
+        separatorTouchAction: separatorStyle.touchAction,
+        separatorWidth: separator.getBoundingClientRect().width,
+        separatorLineWidth: separatorLineStyle.width,
+      };
+    });
+    expect(toolbarMetrics.scrollbarWidth).toBe("none");
+    expect(toolbarMetrics.overflowX).toBe("auto");
+    expect(toolbarMetrics.overflowY).toBe("hidden");
+    expect(toolbarMetrics.alignItems).toBe("flex-start");
+    expect(toolbarMetrics.separatorCursor).toBe("ew-resize");
+    expect(toolbarMetrics.separatorTouchAction).toBe("none");
+    expect(toolbarMetrics.separatorWidth).toBeGreaterThan(1);
+    expect(toolbarMetrics.separatorLineWidth).toBe("1px");
+
+    await page.setViewportSize({ width: 560, height: 720 });
+    await expect(page.locator("#format-toolbar")).toBeVisible();
+    const beforeDrag = await page.locator("#format-toolbar").evaluate((toolbar) => {
+      toolbar.scrollLeft = 0;
+      return {
+        clientWidth: toolbar.clientWidth,
+        scrollLeft: toolbar.scrollLeft,
+        scrollWidth: toolbar.scrollWidth,
+      };
+    });
+    expect(beforeDrag.scrollWidth).toBeGreaterThan(beforeDrag.clientWidth);
+    const sepBox = await page.locator("#format-toolbar .ft-sep").first().boundingBox();
+    expect(sepBox).not.toBeNull();
+    await page.mouse.move(sepBox!.x + sepBox!.width / 2, sepBox!.y + sepBox!.height / 2);
+    await page.mouse.down();
+    await page.mouse.move(sepBox!.x - 120, sepBox!.y + sepBox!.height / 2);
+    await page.mouse.up();
+    await expect.poll(() => page.locator("#format-toolbar").evaluate((toolbar) => toolbar.scrollLeft)).toBeGreaterThan(beforeDrag.scrollLeft);
 
     const more = page.locator("#more-menu-toggle");
     await expect(more).toHaveClass(/ghost-btn/);
@@ -154,6 +198,50 @@ test.describe("顶部工具栏视觉权重", () => {
 
     await page.locator("#reader").click({ position: { x: 10, y: 10 } });
     await expect(page.locator("#find-bar")).toBeHidden();
+  });
+
+  test("文本输入焦点框保持克制，不再用粗高亮抢注意力", async ({ page }) => {
+    await installTauriMock(page);
+    await page.goto("/");
+    await page.locator("#empty-open").click();
+
+    await page.locator("#mode-source").click();
+    await page.locator("#markdown").focus();
+    const sourceFocus = await page.locator("#markdown").evaluate((input) => {
+      const style = getComputedStyle(input);
+      return {
+        outlineWidth: style.outlineWidth,
+        outlineOffset: style.outlineOffset,
+      };
+    });
+    expect(sourceFocus.outlineWidth).toBe("1px");
+    expect(sourceFocus.outlineOffset).toBe("-1px");
+
+    await page.locator("#mode-edit").click();
+    await page.locator("#inline-editor").focus();
+    const inlineFocus = await page.locator("#inline-editor").evaluate((editor) => {
+      const style = getComputedStyle(editor);
+      return {
+        outlineWidth: style.outlineWidth,
+        outlineOffset: style.outlineOffset,
+      };
+    });
+    expect(inlineFocus.outlineWidth).toBe("1px");
+    expect(inlineFocus.outlineOffset).toBe("-1px");
+
+    await page.locator("#find-toggle").click();
+    await page.locator("#find-input").focus();
+    const findFocus = await page.locator("#find-input").evaluate((input) => {
+      const style = getComputedStyle(input);
+      return {
+        outlineWidth: style.outlineWidth,
+        outlineOffset: style.outlineOffset,
+        boxShadow: style.boxShadow,
+      };
+    });
+    expect(findFocus.outlineWidth).toBe("1px");
+    expect(findFocus.outlineOffset).toBe("1px");
+    expect(findFocus.boxShadow).toBe("none");
   });
 });
 

@@ -14,9 +14,12 @@ import {
   sanitizePastedHTML,
   MAX_TITLE_LENGTH,
 } from "./inline";
+import { htmlToMarkdown } from "./markdown";
 import { insertAtCursor } from "./inline";
 import { closestBlock, runFormatCommand } from "./format-toolbar";
 import { commitMarkdownChange } from "../document/markdown-mutation";
+import { renderPreview } from "../ui/outline";
+import { sourceOffsetFromSelection } from "./source-preserve";
 
 function isHeading(el: Element | null): boolean {
   return !!el && /^H[1-6]$/.test(el.tagName);
@@ -149,17 +152,54 @@ export function onInlinePaste(event: ClipboardEvent) {
   const text = event.clipboardData.getData("text/plain");
   if (!html && !text) return;
   event.preventDefault();
-  const fragment = html ? sanitizePastedHTML(html) : document.createTextNode(text);
-  const sel = document.getSelection();
-  if (!sel || sel.rangeCount === 0) {
-    inlineEditorEl().appendChild(fragment);
-  } else {
-    const range = sel.getRangeAt(0);
-    range.deleteContents();
-    range.insertNode(fragment);
-    range.collapse(false);
+  const markdown = pastedMarkdown(html, text);
+  if (!markdown.trim()) return;
+  insertMarkdownAtVisualSelection(markdown);
+}
+
+function pastedMarkdown(html: string, text: string) {
+  if (!html) return text;
+  const fragment = sanitizePastedHTML(html);
+  const template = document.createElement("template");
+  template.content.appendChild(fragment);
+  return htmlToMarkdown(template.innerHTML).trim();
+}
+
+function insertMarkdownAtVisualSelection(markdown: string) {
+  if (!state.doc) return;
+  const model = state.sourceModel?.markdown === state.doc.markdown ? state.sourceModel : null;
+  const offset = model ? sourceOffsetFromSelection(inlineEditorEl(), model) : state.doc.markdown.length;
+  const next = spliceMarkdown(state.doc.markdown, offset ?? state.doc.markdown.length, markdown);
+  state.inlineDirty = false;
+  commitMarkdownChange({
+    markdown: next,
+    origin: "visual-paste",
+    updateSourceTextarea: true,
+    renderImmediately: true,
+  });
+  void renderPreview().then(() => {
+    if (state.mode === "edit") inlineEditorEl().focus();
+  });
+}
+
+function spliceMarkdown(markdown: string, offset: number, insertion: string) {
+  const at = Math.max(0, Math.min(offset, markdown.length));
+  const before = markdown.slice(0, at);
+  const after = markdown.slice(at);
+  const block = insertion.trim();
+  if (!block) return markdown;
+  if (isBlockMarkdown(block)) {
+    const prefix = before.trimEnd();
+    const suffix = after.trimStart();
+    if (!prefix) return suffix ? `${block}\n\n${suffix}` : `${block}\n`;
+    return suffix ? `${prefix}\n\n${block}\n\n${suffix}` : `${prefix}\n\n${block}\n`;
   }
-  inlineEditorEl().dispatchEvent(new Event("input"));
+  return `${before}${insertion}${after}`;
+}
+
+function isBlockMarkdown(markdown: string) {
+  return markdown.includes("\n")
+    || /^(#{1,6}\s|[-*+]\s|\d+[.)]\s|>\s|```|~~~|\|.*\||(?:\*\s*){3,}$|(?:-\s*){3,}$|(?:_\s*){3,}$)/.test(markdown.trim());
 }
 
 export function onInlineKeydown(event: KeyboardEvent) {

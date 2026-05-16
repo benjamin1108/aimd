@@ -13,6 +13,14 @@ button:focus-visible {
   outline-offset: 2px;
 }
 
+input:focus-visible,
+select:focus-visible,
+textarea:focus-visible,
+[contenteditable="true"]:focus-visible {
+  outline: 1px solid var(--hairline-focus-soft);
+  outline-offset: 1px;
+}
+
 @media (forced-colors: active) {
   * {
     forced-color-adjust: auto;

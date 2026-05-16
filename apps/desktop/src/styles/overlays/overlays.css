@@ -87,14 +87,14 @@
 }
 
 .link-popover-input:focus {
-  border-color: var(--accent);
-  box-shadow: 0 0 0 2px var(--focus-ring-soft);
+  border-color: var(--hairline-focus-muted);
+  box-shadow: 0 0 0 1px var(--focus-ring-soft);
 }
 
 .link-popover-input:focus-visible,
 .web-clip-field input:focus-visible {
-  outline: 2px solid var(--focus-ring);
-  outline-offset: 2px;
+  outline: 1px solid var(--hairline-focus-soft);
+  outline-offset: 1px;
 }
 
 .link-popover-actions {
@@ -174,8 +174,8 @@
 }
 
 .web-clip-field input:focus {
-  border-color: var(--accent);
-  box-shadow: 0 0 0 2px var(--focus-ring-soft);
+  border-color: var(--hairline-focus-muted);
+  box-shadow: 0 0 0 1px var(--focus-ring-soft);
 }
 
 .web-clip-error {

@@ -237,8 +237,16 @@ test.describe("Phase 4 navigation language and stable status", () => {
     await expect(page.locator("#doc-path")).toHaveText("未打开文档");
     await expect(page.locator("#workspace-root-label")).toHaveText("项目");
     await expect(page.locator("#workspace-close")).toHaveAttribute("title", "关闭项目");
-    await expect(page.locator("#app-scope-primary")).toHaveText("启动页");
-    await expect(page.locator("#app-scope-secondary")).toHaveText("入口按命令域分层");
+    await expect(page.locator("#workspace-open")).toHaveAttribute("title", "打开项目目录");
+    await expect(page.locator("#workspace-open")).toHaveAttribute("aria-label", "打开项目目录");
+    await expect(page.locator("#workspace-refresh")).toHaveAttribute("title", "刷新项目目录");
+    await expect(page.locator("#workspace-refresh")).toHaveAttribute("aria-label", "刷新项目目录");
+    await expect(page.locator("#workspace-new-doc")).toHaveAttribute("aria-label", "新建项目文件");
+    await expect(page.locator("#workspace-close")).toHaveAttribute("aria-label", "关闭项目");
+    await expect(page.locator("#app-menu-toggle")).toContainText("更多");
+    await expect(page.locator("#app-scope-primary")).toHaveText("主页");
+    await expect(page.locator("#app-scope-secondary")).toHaveText("新建、打开、最近文档");
+    await expect(page.locator("body")).not.toContainText(/入口按|命令域|命令领域|启动页/);
     await expect(page.locator("#empty")).toContainText("继续处理文档");
     await expect(page.locator("#empty")).toContainText("从最近打开的文档继续，或开始新的内容。");
     await expect(page.locator("#empty")).toContainText("空白 AIMD 草稿");
@@ -254,17 +262,19 @@ test.describe("Phase 4 navigation language and stable status", () => {
       "在项目中新建AIMD.aimd",
       "在项目中新建Markdown.md",
       "从网页导入URL",
-      "导入Markdown文件夹包",
+      "导入Markdown文件夹",
     ]);
+    expect((await normalizedTexts(page, "#global-new-menu .action-menu-item")).join("")).not.toMatch(/文件夹包|目录目录|最近打开8项/);
     await expect(page.locator("#global-new-project-aimd")).toBeDisabled();
     await page.keyboard.press("Escape");
 
     await page.locator("#global-open-toggle").click();
     expect(await normalizedTexts(page, "#global-open-menu .action-menu-item")).toEqual([
       "打开文档⌘O",
-      "打开项目目录目录",
-      "显示最近打开8项",
+      "打开项目目录",
     ]);
+    await expect(page.locator("#global-show-recents")).toHaveCount(0);
+    expect((await normalizedTexts(page, "#global-open-menu .action-menu-item")).join("")).not.toMatch(/文件夹包|目录目录|最近打开8项|显示最近打开/);
     await page.keyboard.press("Escape");
 
     await openProject(page);
@@ -272,7 +282,7 @@ test.describe("Phase 4 navigation language and stable status", () => {
     expect(await normalizedTexts(page, "#project-create-menu .action-menu-item")).toEqual([
       "新建AIMD文档.aimd",
       "新建Markdown文档.md",
-      "新建文件夹目录",
+      "新建文件夹",
     ]);
     await page.keyboard.press("Escape");
 
@@ -297,10 +307,18 @@ test.describe("Phase 4 navigation language and stable status", () => {
     await page.keyboard.press("Escape");
 
     await page.locator("#app-menu-toggle").click();
+    await expect(page.locator("#app-menu .action-menu-title")).toHaveText("更多");
     await expect(page.locator("#app-menu")).toContainText("新建窗口");
     await expect(page.locator("#app-menu")).toContainText("设置");
     await expect(page.locator("#app-menu")).toContainText("检查更新");
     await expect(page.locator("#app-menu")).toContainText("关于 AIMD");
+    const settingsIcon = await page.locator("#settings-open svg").evaluate((svg) => ({
+      path: svg.querySelector("path")?.getAttribute("d") || "",
+      circle: svg.querySelector("circle")?.getAttribute("r") || "",
+    }));
+    expect(settingsIcon.path).toContain("M7 1.7h2");
+    expect(settingsIcon.path).not.toContain("M9.2 1.8");
+    expect(settingsIcon.circle).toBe("2.15");
     await page.keyboard.press("Escape");
 
     await page.locator("#mode-source").click();
@@ -476,10 +494,25 @@ test.describe("Phase 4 navigation language and stable status", () => {
       const format = document.querySelector(".open-tab-format")?.textContent || "";
       const tabStripRect = document.querySelector("#document-tab-strip")?.getBoundingClientRect();
       const commandStripRect = document.querySelector("#document-command-strip")?.getBoundingClientRect();
+      const probe = (value: string) => {
+        const el = document.createElement("div");
+        el.style.background = value;
+        document.body.append(el);
+        const color = getComputedStyle(el).backgroundColor;
+        el.remove();
+        return color;
+      };
       return {
         brand: rect(".brand-mark"),
         topbarIcon: rect("#global-new-toggle .secondary-btn-icon svg"),
         projectIcon: rect("#workspace-open svg"),
+        topbarButtonBackgrounds: Array.from(document.querySelectorAll<HTMLElement>(".app-action-btn"))
+          .map((button) => getComputedStyle(button).backgroundColor),
+        topbarButtonBorderColors: Array.from(document.querySelectorAll<HTMLElement>(".app-action-btn"))
+          .map((button) => getComputedStyle(button).borderTopColor),
+        surfaceMuted: probe("var(--surface-muted)"),
+        hairlineSoft: probe("var(--hairline-soft)"),
+        projectTooltipContent: getComputedStyle(document.querySelector<HTMLElement>("#workspace-open")!, "::after").content,
         menuIconColumn: style(".action-menu-item")?.gridTemplateColumns || "",
         commandStripContainsTabs: Boolean(document.querySelector("#document-command-strip #tab-bar")),
         tabStripBottom: tabStripRect?.bottom || 0,
@@ -500,7 +533,11 @@ test.describe("Phase 4 navigation language and stable status", () => {
     expect(metrics.brand).toEqual({ width: 25, height: 25 });
     expect(metrics.topbarIcon).toEqual({ width: 15, height: 15 });
     expect(metrics.projectIcon).toEqual({ width: 15, height: 15 });
-    expect(launchMetrics.icon).toEqual({ width: 31, height: 31 });
+    expect(metrics.topbarButtonBackgrounds).toEqual([metrics.surfaceMuted, metrics.surfaceMuted, metrics.surfaceMuted]);
+    expect(metrics.topbarButtonBorderColors).toEqual([metrics.hairlineSoft, metrics.hairlineSoft, metrics.hairlineSoft]);
+    expect(metrics.projectTooltipContent).toBe("\"打开项目目录\"");
+    expect(launchMetrics.icon.width).toBeCloseTo(31, 2);
+    expect(launchMetrics.icon.height).toBeCloseTo(31, 2);
     expect(launchMetrics.createLeft).toBeLessThan(launchMetrics.recentLeft);
     expect(launchMetrics.openLeft).toBeLessThan(launchMetrics.recentLeft);
     expect(launchMetrics.sideRecentDelta).toBeLessThanOrEqual(2);

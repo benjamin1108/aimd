@@ -285,6 +285,11 @@
   padding: 0 8px;
 }
 
+.git-commit-input:focus-visible {
+  outline: 1px solid var(--hairline-focus-soft);
+  outline-offset: 1px;
+}
+
 .git-empty,
 .git-error,
 .git-warning {

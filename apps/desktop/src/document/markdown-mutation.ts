@@ -20,6 +20,7 @@ export type MarkdownMutationOrigin =
   | "image-alt"
   | "format-toolbar"
   | "paste-image"
+  | "visual-paste"
   | "insert-image"
   | "format-apply"
   | "save-canonical"

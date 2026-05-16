@@ -294,18 +294,41 @@ test.describe("Open Documents tabs", () => {
     const controlPosition = await page.evaluate(() => {
       const prevRect = document.querySelector("#open-tabs-prev")!.getBoundingClientRect();
       const nextRect = document.querySelector("#open-tabs-next")!.getBoundingClientRect();
+      const controls = document.querySelector<HTMLElement>(".tab-nav-controls")!;
+      const controlsRect = controls.getBoundingClientRect();
       const barRect = document.querySelector("#tab-bar")!.getBoundingClientRect();
       return {
+        barTop: barRect.top,
+        barHeight: barRect.height,
         prevLeft: prevRect.left,
         prevRight: prevRect.right,
+        prevWidth: prevRect.width,
         nextLeft: nextRect.left,
         nextRight: nextRect.right,
+        nextWidth: nextRect.width,
+        controlsTop: controlsRect.top,
+        controlsRight: controlsRect.right,
+        controlsHeight: controlsRect.height,
+        controlsBackground: getComputedStyle(controls).backgroundColor,
+        controlsAlignSelf: getComputedStyle(controls).alignSelf,
+        controlsTransform: getComputedStyle(controls).transform,
         barRight: barRect.right,
       };
     });
     expect(controlPosition.prevLeft).toBeLessThan(controlPosition.nextLeft);
     expect(controlPosition.prevRight).toBeLessThanOrEqual(controlPosition.nextLeft + 2);
-    expect(Math.abs(controlPosition.nextRight - controlPosition.barRight)).toBeLessThanOrEqual(1);
+    expect(controlPosition.prevWidth).toBe(24);
+    expect(controlPosition.nextWidth).toBe(24);
+    expect(controlPosition.controlsHeight).toBe(28);
+    expect(controlPosition.controlsBackground).not.toBe("rgba(0, 0, 0, 0)");
+    expect(controlPosition.controlsAlignSelf).toBe("center");
+    expect(controlPosition.controlsTransform).toContain("-2");
+    const opticalOffset = controlPosition.controlsTop + controlPosition.controlsHeight / 2
+      - (controlPosition.barTop + controlPosition.barHeight / 2);
+    expect(opticalOffset).toBeGreaterThanOrEqual(-3);
+    expect(opticalOffset).toBeLessThanOrEqual(-1);
+    expect(Math.abs(controlPosition.controlsRight - controlPosition.barRight)).toBeLessThanOrEqual(1);
+    expect(controlPosition.nextRight).toBeLessThanOrEqual(controlPosition.controlsRight);
 
     await expect(next).toBeDisabled();
     await expect(prev).toBeEnabled();

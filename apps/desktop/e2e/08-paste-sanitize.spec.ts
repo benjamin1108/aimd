@@ -24,16 +24,35 @@ async function installTauriMock(page: Page) {
 
   await page.addInitScript((s: typeof seed) => {
     type Args = Record<string, unknown> | undefined;
+    const renderInline = (value: string) => value
+      .replace(/&/g, "&amp;")
+      .replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;")
+      .replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2">$1</a>');
+    const render = (md: string) => ({
+      html: md.split(/\n/).map((line) => {
+        if (line.startsWith("# ")) return `<h1>${renderInline(line.slice(2))}</h1>`;
+        if (line.trim()) return `<p>${renderInline(line)}</p>`;
+        return "";
+      }).join(""),
+    });
+    let doc = { ...s.doc, html: render(s.doc.markdown).html, format: "aimd" };
     const handlers: Record<string, (a: Args) => unknown> = {
       initial_open_path: () => null,
       choose_aimd_file: () => s.doc.path,
       choose_doc_file: () => s.doc.path,
       choose_image_file: () => null,
-      open_aimd: () => s.doc,
-      save_aimd: (a) => ({ ...s.doc, markdown: (a as any)?.markdown ?? s.doc.markdown, dirty: false }),
-      render_markdown: () => ({ html: s.doc.html }),
+      open_aimd: () => doc,
+      save_aimd: (a) => {
+        const markdown = String((a as any)?.markdown ?? doc.markdown);
+        doc = { ...doc, markdown, html: render(markdown).html, dirty: false };
+        return doc;
+      },
+      render_markdown: (a) => render(String((a as any)?.markdown ?? "")),
+      render_markdown_standalone: (a) => render(String((a as any)?.markdown ?? "")),
       add_image: () => null,
       list_aimd_assets: () => [],
+      cleanup_old_drafts: () => undefined,
     };
     (window as any).__TAURI_INTERNALS__ = {
       invoke: async (cmd: string, a?: Args) => {
@@ -101,46 +120,32 @@ test.describe("Paste sanitisation", () => {
 
     await pasteHTMLIntoEditor(page, malicious);
 
-    // Allow the input event + 700ms flushInline debounce to settle, but we
-    // assert directly on the editor DOM, which is the synchronous output
-    // of sanitizePastedHTML.
-    await page.waitForTimeout(50);
+    await page.locator("#mode-source").click();
+    const markdown = await page.locator("#markdown").inputValue();
 
     const editor = page.locator("#inline-editor");
 
-    // Dangerous embedded-content tags must be gone from the live DOM.
-    await expect(editor.locator("iframe")).toHaveCount(0);
-    await expect(editor.locator("object")).toHaveCount(0);
-    await expect(editor.locator("embed")).toHaveCount(0);
-    await expect(editor.locator("frame")).toHaveCount(0);
-    await expect(editor.locator("frameset")).toHaveCount(0);
-    await expect(editor.locator("script")).toHaveCount(0);
-    await expect(editor.locator("style")).toHaveCount(0);
+    // Dangerous embedded-content tags must never reach Markdown source.
+    expect(markdown).not.toContain("iframe");
+    expect(markdown).not.toContain("object");
+    expect(markdown).not.toContain("embed");
+    expect(markdown).not.toContain("frame");
+    expect(markdown).not.toContain("frameset");
+    expect(markdown).not.toContain("script");
+    expect(markdown).not.toContain("background: red");
+    expect(markdown).not.toContain("javascript:");
+    expect(markdown).not.toContain("onclick");
+    expect(markdown).not.toContain("data-evil");
 
     // The script must not have executed.
     const pwned = await page.evaluate(() => (window as any).__pwned === true);
     expect(pwned).toBe(false);
 
-    // javascript: hrefs must have their href attribute stripped.
-    const jsHrefs = await editor.evaluate((el) => {
-      return Array.from(el.querySelectorAll("a")).filter((a) =>
-        (a.getAttribute("href") || "").toLowerCase().startsWith("javascript:"),
-      ).length;
-    });
-    expect(jsHrefs).toBe(0);
+    // Benign content survives as Markdown, not as raw pasted DOM.
+    expect(markdown).toContain("safe paragraph");
+    expect(markdown).toContain("[ok link](https://example.com)");
 
-    // The benign https link should survive (though stripped of style/class).
-    const okLink = editor.locator('a[href="https://example.com"]');
-    await expect(okLink).toHaveCount(1);
-
-    // Inline style/class/onclick/data-* must be stripped from generic elements.
-    const leakedAttrs = await editor.evaluate((el) => {
-      const styled = el.querySelector('p[style], p[class], p[onclick], p[data-evil]');
-      return styled ? styled.outerHTML : null;
-    });
-    expect(leakedAttrs).toBeNull();
-
-    // The benign content must remain visible.
+    await page.locator("#mode-edit").click();
     await expect(editor).toContainText("safe paragraph");
   });
 
@@ -171,6 +176,7 @@ test.describe("Paste sanitisation", () => {
       el.dispatchEvent(evt);
     });
 
-    await expect(page.locator("#inline-editor")).toContainText("plain pasted text");
+    await page.locator("#mode-source").click();
+    await expect(page.locator("#markdown")).toHaveValue(/段落。plain pasted text/);
   });
 });

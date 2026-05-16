@@ -88,6 +88,15 @@ export const pointerEventsNone = [
   { file: "apps/desktop/src/styles/overlays/tree-overflow-portal.css", selector: ".workspace-row-overflow-measure", reason: "hidden measurement probe" },
   { file: "apps/desktop/src/styles/overlays/tree-overflow-portal.css", selector: ".workspace-row.workspace-row-overflow-overlay", reason: "visual clone; original row keeps interaction" },
   { file: "apps/desktop/src/styles/components/settings.css", selector: ".api-key-mask", reason: "masked text overlay passes clicks to input" },
+  { file: "apps/desktop/src/styles/components/sidebar-tooltips.css", selector: ".workspace-actions .icon-btn[title]::after", reason: "passive tooltip surface" },
+];
+
+export const hiddenScrollbars = [
+  {
+    file: "apps/desktop/src/styles/surfaces/editor.css",
+    selector: ".format-toolbar",
+    alternate: "toolbar separator drag handles bound in ui/toolbar-drag.ts",
+  },
 ];
 
 export const registeredBreakpoints = new Set([1320, 1180, 1100, 1020, 900, 760, 720, 620]);

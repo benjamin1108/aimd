@@ -113,8 +113,8 @@
 }
 
 #markdown:focus-visible {
-  outline: 2px solid var(--focus-ring);
-  outline-offset: -2px;
+  outline: 1px solid var(--hairline-focus-soft);
+  outline-offset: -1px;
 }
 
 .preview-pane #preview {

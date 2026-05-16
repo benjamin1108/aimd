@@ -32,27 +32,37 @@
 
 .tab-nav-controls {
   grid-column: 2;
-  display: inline-flex;
+  align-self: center;
+  display: none;
   align-items: center;
-  gap: 2px;
+  gap: 0;
+  height: 28px;
+  padding: 2px;
+  border: 1px solid var(--hairline-soft);
+  border-radius: var(--radius-control);
+  background: var(--surface-muted-soft);
+  box-shadow: inset 0 1px 0 var(--highlight-edge-soft);
+  transform: translateY(-2px);
+}
+
+.tab-bar.has-tab-navigation .tab-nav-controls {
+  display: inline-flex;
 }
 
 .tab-nav-btn {
   display: inline-grid;
   place-items: center;
-  width: 30px;
-  height: 34px;
-  border: 1px solid var(--hairline-muted);
+  width: 24px;
+  height: 24px;
+  border: 0;
   border-radius: var(--radius-control-sm);
-  background:
-    linear-gradient(180deg, var(--highlight-edge-strong), var(--surface-control)),
-    var(--surface-muted-soft);
-  color: var(--ink-muted);
-  box-shadow: inset 0 1px 0 var(--highlight-edge);
+  background: transparent;
+  color: var(--ink-faint);
+  box-shadow: none;
   transition: background var(--t-fast) var(--ease),
-              border-color var(--t-fast) var(--ease),
               color var(--t-fast) var(--ease),
-              opacity var(--t-fast) var(--ease);
+              opacity var(--t-fast) var(--ease),
+              transform var(--t-fast) var(--ease);
 }
 
 .tab-nav-btn[hidden] { display: none !important; }
@@ -62,9 +72,12 @@
 }
 
 .tab-nav-btn:hover:not(:disabled) {
-  background: var(--surface-muted-strong);
-  border-color: var(--hairline-strong);
+  background: var(--surface-muted);
   color: var(--ink-strong);
+}
+
+.tab-nav-btn:active:not(:disabled) {
+  transform: scale(0.94);
 }
 
 .tab-nav-btn:disabled {

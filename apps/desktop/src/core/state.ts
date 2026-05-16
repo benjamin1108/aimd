@@ -45,7 +45,8 @@ export const ICONS = {
   close: `<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><path d="m4 4 8 8M12 4 4 12"/></svg>`,
   play: `<svg viewBox="0 0 16 16" fill="none"><path d="M5 3.7v8.6a.8.8 0 0 0 1.2.7l6.5-4.3a.8.8 0 0 0 0-1.4L6.2 3A.8.8 0 0 0 5 3.7Z" fill="currentColor"/></svg>`,
   sparkle: `<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.35" stroke-linecap="round" stroke-linejoin="round"><path d="M8.5 1.8 9.8 5l3.4 1.2-3.4 1.3-1.3 3.4-1.3-3.4-3.4-1.3L7.2 5z"/><path d="M3.2 9.8 3.8 11l1.2.5-1.2.5-.6 1.3-.5-1.3-1.2-.5 1.2-.5z"/></svg>`,
-  settings: `<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.35" stroke-linecap="round" stroke-linejoin="round"><circle cx="8" cy="8" r="2.2"/><path d="M9.2 1.8 9.6 3a5 5 0 0 1 1.1.5l1.2-.5 1.3 2.2-1 .8c.1.4.1.7.1 1.1s0 .7-.1 1.1l1 .8-1.3 2.2-1.2-.5a5 5 0 0 1-1.1.5l-.4 1.2H6.8l-.4-1.2a5 5 0 0 1-1.1-.5l-1.2.5L2.8 9l1-.8A5 5 0 0 1 3.7 7c0-.4 0-.7.1-1.1l-1-.8 1.3-2.2 1.2.5A5 5 0 0 1 6.4 3l.4-1.2z"/></svg>`,
+  settings: `<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.35" stroke-linecap="round" stroke-linejoin="round"><circle cx="8" cy="8" r="2.15"/><path d="M7 1.7h2l.35 1.45c.4.12.79.28 1.15.48l1.28-.78 1.42 1.42-.78 1.28c.2.36.36.75.48 1.15L14.3 7v2l-1.45.35a5 5 0 0 1-.48 1.15l.78 1.28-1.42 1.42-1.28-.78c-.36.2-.75.36-1.15.48L9 14.3H7l-.35-1.45a5 5 0 0 1-1.15-.48l-1.28.78-1.42-1.42.78-1.28a5 5 0 0 1-.48-1.15L1.7 9V7l1.45-.35c.12-.4.28-.79.48-1.15l-.78-1.28L4.27 2.8l1.28.78c.36-.2.75-.36 1.15-.48z"/></svg>`,
+  more: `<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.45" stroke-linecap="round" stroke-linejoin="round"><circle cx="4" cy="8" r=".9" fill="currentColor" stroke="none"/><circle cx="8" cy="8" r=".9" fill="currentColor" stroke="none"/><circle cx="12" cy="8" r=".9" fill="currentColor" stroke="none"/></svg>`,
   appGrid: `<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.35" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="3" height="3" rx=".7"/><rect x="10" y="3" width="3" height="3" rx=".7"/><rect x="3" y="10" width="3" height="3" rx=".7"/><rect x="10" y="10" width="3" height="3" rx=".7"/></svg>`,
   console: `<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.35" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="3" width="12" height="10" rx="1.4"/><path d="m4.5 6 2 2-2 2M8 10h3.5"/></svg>`,
   bold: `<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M5 3h4.2a2.3 2.3 0 0 1 0 4.6H5zM5 7.6h4.6a2.4 2.4 0 0 1 0 4.8H5zM5 3v9.4"/></svg>`,
@@ -162,8 +163,8 @@ export const state: {
   },
   uiSettings: { debugMode: false, theme: "system" },
   // Tracks whether the inline editor's DOM has been mutated by user input since
-  // the last flush / paint. flushInline skips its (expensive) turndown call when
-  // false — this is what keeps mode hops snappy on long documents.
+  // the last flush / paint. flushInline skips source patching when false — this
+  // is what keeps mode hops snappy on long documents.
   inlineDirty: false,
   sourceModel: null,
   sourceDirtyRefs: new Set(),

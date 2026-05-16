@@ -62,9 +62,21 @@
   flex: 0 0 auto;
 }
 
-.app-action-btn {
+.app-topbar .app-action-btn {
   height: 33px;
   padding: 0 12px;
+  border-color: var(--hairline-soft);
+  background: var(--surface-muted);
+  color: var(--ink-muted);
+  box-shadow: inset 0 1px 0 var(--highlight-edge-soft);
+}
+
+.app-topbar .app-action-btn:hover:not(:disabled),
+.app-topbar .app-action-btn[aria-expanded="true"] {
+  border-color: var(--hairline-strong);
+  background: var(--surface-muted-strong);
+  color: var(--ink-strong);
+  box-shadow: inset 0 1px 0 var(--highlight-edge-control);
 }
 
 .app-action-btn .secondary-btn-icon svg,

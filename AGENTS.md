@@ -45,6 +45,18 @@ Read this file before doing work in this repository. It captures project-specifi
 - The Git inspector tab must be clickable even when the current project is not a Git repository. In that state, keep the Git tab selected and render an empty/non-repo state instead of a blank panel.
 - Multi-document tab overflow should not rely on a visible horizontal scrollbar. Keep the active tab visible and provide explicit tab navigation controls that activate neighboring tabs, not only scroll the strip.
 
+## CSS Development Contract
+
+- Treat `docs/todo/css-architecture-production-goal.md` and `apps/desktop/scripts/check-css-architecture.mjs` as the active CSS architecture contract. New CSS must stay inside the existing cascade layer, token, entry-isolation, breakpoint, motion, and code-size gates.
+- Do not add hard-coded colors, raw color tokens, naked z-index values, unregistered CSS variables, unreviewed `!important`, or unscoped global selectors. Use semantic tokens such as `--ink-*`, `--surface-*`, `--hairline-*`, `--radius-*`, and `--shadow-*`.
+- Keep styling in the responsible CSS module under `apps/desktop/src/styles/`. Do not fix visual issues with inline `style.*` writes unless the value is truly runtime data; prefer registered CSS custom properties for runtime values.
+- Layout fixes must use structural grid/flex relationships, not magic offsets or forced empty space. Avoid hard-coded alignment shims like arbitrary `margin-top` values when a shared grid row, column, or component contract can express the layout.
+- Do not force cards or panels to equal height when their content naturally differs. Align meaningful edges and shared controls, and let empty space exist only when it represents real layout breathing room, not fake content.
+- Same-level UI elements must share the same selector group or component token contract. Matching only font size is not enough; verify color, font family, weight, line height, spacing, border, background, hover, active, focus, and icon treatment.
+- Avoid one-off visual variants for launch cards, recent items, toolbar items, tabs, inspector rows, and similar repeated controls. If two things are semantically the same class of control, encode their common styling once and keep only necessary structural differences separate.
+- When changing CSS, add or update targeted Playwright coverage for the visual contract being changed. For layout polish, assertions should cover geometry and the relevant computed styles, not only element visibility.
+- Before reporting a CSS/UI task done, run the narrow affected Playwright spec(s), `npm --prefix apps/desktop run check`, and `git diff --check` unless the user explicitly waives validation.
+
 ## Release And Submission
 
 - When the user says `发布`, `提交代码推送并发布v1.0`, or asks to overwrite an existing release, handle the full flow: version/tag/commit/push as needed, then verify the remote workflow and uploaded release assets.

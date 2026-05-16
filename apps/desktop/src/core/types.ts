@@ -39,7 +39,7 @@ export type MarkdownSourceCell = {
 
 export type MarkdownSourceBlock = {
   id: string;
-  kind: "heading" | "paragraph" | "list_item" | "blockquote" | "table" | "code" | "other";
+  kind: "heading" | "paragraph" | "list_item" | "blockquote" | "table" | "code" | "thematic_break" | "other";
   start: number;
   end: number;
   contentStart: number;

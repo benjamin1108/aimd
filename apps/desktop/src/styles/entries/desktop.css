@@ -18,6 +18,7 @@
 
 @import "../components/app-topbar.css";
 @import "../components/sidebar.css";
+@import "../components/sidebar-tooltips.css";
 @import "../overlays/tree-overflow-portal.css";
 @import "../components/inspector.css";
 @import "../components/sidebar-git.css";

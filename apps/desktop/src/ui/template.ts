@@ -13,13 +13,13 @@ ${APP_TOPBAR_HTML}
           <section class="nav-section workspace-section" id="workspace-section">
             <div class="section-label workspace-label">
               <span id="workspace-root-label">项目</span>
-              <button id="project-rail-collapse" class="section-toggle rail-collapse-toggle" type="button" title="折叠项目栏" aria-expanded="true">${ICONS.sidePanelClose}</button>
+              <button id="project-rail-collapse" class="section-toggle rail-collapse-toggle" type="button" title="折叠项目栏" aria-label="折叠项目栏" aria-expanded="true">${ICONS.sidePanelClose}</button>
             </div>
             <div class="workspace-actions" aria-label="项目操作">
-              <button id="workspace-open" class="icon-btn" type="button" title="打开目录">${ICONS.folder}</button>
-              <button id="workspace-refresh" class="icon-btn" type="button" title="刷新项目" disabled>${ICONS.refresh}</button>
+              <button id="workspace-open" class="icon-btn" type="button" title="打开项目目录" aria-label="打开项目目录">${ICONS.folder}</button>
+              <button id="workspace-refresh" class="icon-btn" type="button" title="刷新项目目录" aria-label="刷新项目目录" disabled>${ICONS.refresh}</button>
               <div class="project-menu-wrap">
-                <button id="workspace-new-doc" class="icon-btn" type="button" title="新建项目文件" aria-haspopup="menu" aria-expanded="false" disabled>${ICONS.plus}</button>
+                <button id="workspace-new-doc" class="icon-btn" type="button" title="新建项目文件" aria-label="新建项目文件" aria-haspopup="menu" aria-expanded="false" disabled>${ICONS.plus}</button>
                 <div id="project-create-menu" class="action-menu project-create-menu" role="menu" hidden>
                   <div class="action-menu-title">项目文件</div>
                   <button id="project-new-aimd" class="action-menu-item" type="button">
@@ -35,11 +35,10 @@ ${APP_TOPBAR_HTML}
                   <button id="project-new-folder" class="action-menu-item" type="button">
                     <span class="action-menu-icon">${ICONS.folder}</span>
                     <span>新建文件夹</span>
-                    <small>目录</small>
                   </button>
                 </div>
               </div>
-              <button id="workspace-close" class="icon-btn" type="button" title="关闭项目" disabled>${ICONS.close}</button>
+              <button id="workspace-close" class="icon-btn" type="button" title="关闭项目" aria-label="关闭项目" disabled>${ICONS.close}</button>
             </div>
             <div class="section-content workspace-scroll">
               <div id="workspace-tree" class="workspace-tree"></div>
@@ -76,20 +75,20 @@ ${APP_TOPBAR_HTML}
                 <button class="ft-btn" data-cmd="italic" type="button" title="斜体 (⌘I)">${ICONS.italic}</button>
                 <button class="ft-btn" data-cmd="strike" type="button" title="删除线">${ICONS.strike}</button>
               </div>
-              <span class="ft-sep"></span>
+              <span class="ft-sep" role="separator" aria-orientation="vertical" title="拖动浏览工具"></span>
               <div class="ft-group">
                 <button class="ft-btn" data-cmd="h1" type="button" title="标题 1">${ICONS.h1}</button>
                 <button class="ft-btn" data-cmd="h2" type="button" title="标题 2">${ICONS.h2}</button>
                 <button class="ft-btn" data-cmd="h3" type="button" title="标题 3">${ICONS.h3}</button>
                 <button class="ft-btn ft-btn--text" data-cmd="paragraph" type="button" title="正文">正文</button>
               </div>
-              <span class="ft-sep"></span>
+              <span class="ft-sep" role="separator" aria-orientation="vertical" title="拖动浏览工具"></span>
               <div class="ft-group">
                 <button class="ft-btn" data-cmd="ul" type="button" title="无序列表">${ICONS.ul}</button>
                 <button class="ft-btn" data-cmd="ol" type="button" title="有序列表">${ICONS.ol}</button>
                 <button class="ft-btn" data-cmd="quote" type="button" title="引用">${ICONS.quote}</button>
               </div>
-              <span class="ft-sep"></span>
+              <span class="ft-sep" role="separator" aria-orientation="vertical" title="拖动浏览工具"></span>
               <div class="ft-group">
                 <button class="ft-btn" data-cmd="code" type="button" title="行内代码">${ICONS.code}</button>
                 <button class="ft-btn" data-cmd="codeblock" type="button" title="代码块">${ICONS.source}</button>
@@ -322,46 +321,46 @@ ${APP_TOPBAR_HTML}
         <section class="workspace-body">
           <article id="empty" class="empty-state">
             <div class="launch-grid">
-              <div class="launch-main">
+              <div class="launch-main launch-intro">
                 <h2>继续处理文档</h2>
                 <p class="launch-copy">从最近打开的文档继续，或开始新的内容。</p>
+              </div>
 
-                <div class="launch-command-block">
-                  <div class="launch-group-label">创建</div>
-                  <div class="launch-command-list">
-                    <button id="empty-new" class="launch-command-card" type="button">
-                      <span class="launch-card-icon">${ICONS.plus}</span>
-                      <span class="launch-card-copy">
-                        <span class="launch-card-title">空白 AIMD 草稿</span>
-                        <span class="launch-card-meta">从一页空白文档开始</span>
-                      </span>
-                    </button>
-                    <button id="empty-import-web" class="launch-command-card" type="button">
-                      <span class="launch-card-icon">${ICONS.link}</span>
-                      <span class="launch-card-copy">
-                        <span class="launch-card-title">从网页导入</span>
-                        <span class="launch-card-meta">提取网页内容为草稿</span>
-                      </span>
-                    </button>
-                  </div>
+              <div class="launch-command-block">
+                <div class="launch-group-label">创建</div>
+                <div class="launch-command-list">
+                  <button id="empty-new" class="launch-command-card" type="button">
+                    <span class="launch-card-icon">${ICONS.plus}</span>
+                    <span class="launch-card-copy">
+                      <span class="launch-card-title">空白 AIMD 草稿</span>
+                      <span class="launch-card-meta">从一页空白文档开始</span>
+                    </span>
+                  </button>
+                  <button id="empty-import-web" class="launch-command-card" type="button">
+                    <span class="launch-card-icon">${ICONS.link}</span>
+                    <span class="launch-card-copy">
+                      <span class="launch-card-title">从网页导入</span>
+                      <span class="launch-card-meta">提取网页内容为草稿</span>
+                    </span>
+                  </button>
+                </div>
 
-                  <div class="launch-group-label">打开</div>
-                  <div class="launch-command-list">
-                    <button id="empty-open" class="launch-command-card" type="button">
-                      <span class="launch-card-icon">${ICONS.openDocument}</span>
-                      <span class="launch-card-copy">
-                        <span class="launch-card-title">打开 AIMD / Markdown</span>
-                        <span class="launch-card-meta">选择本地文档继续编辑</span>
-                      </span>
-                    </button>
-                    <button id="empty-open-workspace" class="launch-command-card" type="button">
-                      <span class="launch-card-icon">${ICONS.folder}</span>
-                      <span class="launch-card-copy">
-                        <span class="launch-card-title">打开项目目录</span>
-                        <span class="launch-card-meta">浏览并编辑项目文件</span>
-                      </span>
-                    </button>
-                  </div>
+                <div class="launch-group-label">打开</div>
+                <div class="launch-command-list">
+                  <button id="empty-open" class="launch-command-card" type="button">
+                    <span class="launch-card-icon">${ICONS.openDocument}</span>
+                    <span class="launch-card-copy">
+                      <span class="launch-card-title">打开 AIMD / Markdown</span>
+                      <span class="launch-card-meta">选择本地文档继续编辑</span>
+                    </span>
+                  </button>
+                  <button id="empty-open-workspace" class="launch-command-card" type="button">
+                    <span class="launch-card-icon">${ICONS.folder}</span>
+                    <span class="launch-card-copy">
+                      <span class="launch-card-title">打开项目目录</span>
+                      <span class="launch-card-meta">浏览并编辑项目文件</span>
+                    </span>
+                  </button>
                 </div>
               </div>
 

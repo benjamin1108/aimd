@@ -27,11 +27,11 @@
 }
 .toolbar-select:focus {
   border-color: var(--hairline-focus-muted);
-  box-shadow: 0 0 0 3px var(--focus-ring-soft);
+  box-shadow: 0 0 0 1px var(--focus-ring-soft);
 }
 .toolbar-select:focus-visible {
-  outline: 2px solid var(--focus-ring);
-  outline-offset: 2px;
+  outline: 1px solid var(--hairline-focus-soft);
+  outline-offset: 1px;
 }
 .more-menu-wrap {
   position: static;
@@ -250,8 +250,8 @@
 
 .find-input:focus-visible,
 .replace-input:focus-visible {
-  outline: 2px solid var(--focus-ring);
-  outline-offset: 2px;
+  outline: 1px solid var(--hairline-focus-soft);
+  outline-offset: 1px;
 }
 
 .find-count {

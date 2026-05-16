@@ -46,6 +46,12 @@ export function createSourceModel(markdown: string): MarkdownSourceModel {
       continue;
     }
 
+    if (isThematicBreak(line.text)) {
+      blocks.push(block(`b${blockIndex++}`, "thematic_break", line.start, line.end, line.start, line.endWithoutBreak));
+      i += 1;
+      continue;
+    }
+
     if (isTableStart(lines, i)) {
       let end = i + 2;
       while (end < lines.length && /^\s*\|.*\|\s*$/.test(lines[end].text)) end += 1;
@@ -88,7 +94,7 @@ export function annotateSourceBlocks(root: HTMLElement, model: MarkdownSourceMod
   root.querySelectorAll("[data-md-source-ref]").forEach((el) => {
     delete (el as HTMLElement).dataset[SOURCE_REF];
   });
-  const candidates = Array.from(root.querySelectorAll<HTMLElement>("h1,h2,h3,h4,h5,h6,p,li,blockquote,pre,table"));
+  const candidates = Array.from(root.querySelectorAll<HTMLElement>("h1,h2,h3,h4,h5,h6,p,li,blockquote,pre,table,hr"));
   const blocks = model.blocks.filter((b) => b.kind !== "other");
   let blockIndex = 0;
   for (const el of candidates) {
@@ -105,12 +111,23 @@ export function annotateSourceBlocks(root: HTMLElement, model: MarkdownSourceMod
 export function sourceRefFromEvent(event?: Event): string | null {
   const target = event?.target;
   if (target instanceof HTMLElement) {
-    const fromTarget = target.closest<HTMLElement>("[data-md-source-ref]")?.dataset[SOURCE_REF];
+    const fromTarget = sourceRefFromNode(target);
     if (fromTarget) return fromTarget;
   }
-  const anchor = window.getSelection()?.anchorNode;
-  const anchorElement = anchor instanceof HTMLElement ? anchor : anchor?.parentElement;
-  return anchorElement?.closest<HTMLElement>("[data-md-source-ref]")?.dataset[SOURCE_REF] || null;
+  const selection = window.getSelection();
+  if (!selection || selection.rangeCount === 0) return null;
+  const anchor = selection.anchorNode;
+  const fromAnchor = sourceRefFromNode(anchor);
+  if (fromAnchor) return fromAnchor;
+
+  const range = selection.getRangeAt(0);
+  const container = range.startContainer;
+  if (container instanceof HTMLElement) {
+    const before = range.startOffset > 0 ? container.childNodes[range.startOffset - 1] : null;
+    const after = container.childNodes[range.startOffset] ?? null;
+    return sourceRefFromNode(before) || sourceRefFromNode(after);
+  }
+  return null;
 }
 
 export function patchDirtySource(root: HTMLElement, model: MarkdownSourceModel, refs: Set<string>): PatchResult {
@@ -158,13 +175,30 @@ export function patchRemovedImageBlocks(root: HTMLElement, model: MarkdownSource
 
 export function appendedStructuralHTML(root: HTMLElement): string | null {
   const children = Array.from(root.children) as HTMLElement[];
-  const firstUnmapped = children.findIndex((child) => !child.dataset[SOURCE_REF]);
+  const firstUnmapped = children.findIndex((child) => !hasSourceRef(child));
   if (firstUnmapped < 0) return "";
   const before = children.slice(0, firstUnmapped);
-  if (before.some((child) => !child.dataset[SOURCE_REF])) return null;
+  if (before.some((child) => !hasSourceRef(child))) return null;
   const appended = children.slice(firstUnmapped);
-  if (appended.some((child) => child.dataset[SOURCE_REF])) return null;
+  if (appended.some((child) => hasSourceRef(child))) return null;
   return appended.map((child) => child.outerHTML).join("");
+}
+
+export function sourceOffsetFromSelection(root: HTMLElement, model: MarkdownSourceModel): number | null {
+  const selection = window.getSelection();
+  if (!selection || selection.rangeCount === 0) return model.markdown.length;
+  const range = selection.getRangeAt(0);
+  const direct = sourceOffsetFromNode(range.startContainer, model, range);
+  if (direct !== null) return direct;
+  if (range.startContainer === root) {
+    const before = range.startOffset > 0 ? root.childNodes[range.startOffset - 1] : null;
+    const after = root.childNodes[range.startOffset] ?? null;
+    const beforeRef = sourceRefFromNode(before);
+    if (beforeRef) return sourceRangeForRef(model, beforeRef)?.contentEnd ?? null;
+    const afterRef = sourceRefFromNode(after);
+    if (afterRef) return sourceRangeForRef(model, afterRef)?.start ?? null;
+  }
+  return model.markdown.length;
 }
 
 function isImageOnlyMarkdown(source: string) {
@@ -193,9 +227,17 @@ function splitLines(markdown: string) {
 function startsSpecial(lines: ReturnType<typeof splitLines>, i: number) {
   return /^(#{1,6})\s/.test(lines[i].text)
     || /^\s*(```|~~~)/.test(lines[i].text)
+    || isThematicBreak(lines[i].text)
     || /^(\s*(?:[-+*]|\d+[.)])\s+)/.test(lines[i].text)
     || /^\s*>\s?/.test(lines[i].text)
     || isTableStart(lines, i);
+}
+
+function isThematicBreak(line: string) {
+  const trimmed = line.trim();
+  return /^(?:\*\s*){3,}$/.test(trimmed)
+    || /^(?:-\s*){3,}$/.test(trimmed)
+    || /^(?:_\s*){3,}$/.test(trimmed);
 }
 
 function isTableStart(lines: ReturnType<typeof splitLines>, i: number) {
@@ -238,6 +280,7 @@ function elementKind(el: HTMLElement): MarkdownSourceBlock["kind"] {
   if (tag === "blockquote") return "blockquote";
   if (tag === "table") return "table";
   if (tag === "pre") return "code";
+  if (tag === "hr") return "thematic_break";
   return "paragraph";
 }
 
@@ -293,6 +336,39 @@ function sourceIndexForVisible(positions: Array<{ start: number; end: number }>,
   return positions[index].start;
 }
 
+function visibleOffsetWithin(el: HTMLElement, range: Range) {
+  const probe = document.createRange();
+  try {
+    probe.selectNodeContents(el);
+    probe.setEnd(range.startContainer, range.startOffset);
+    return probe.toString().length;
+  } catch {
+    return null;
+  }
+}
+
+function sourceOffsetFromNode(node: Node, model: MarkdownSourceModel, range: Range): number | null {
+  const ref = sourceRefFromNode(node);
+  if (!ref) return null;
+  const el = node instanceof HTMLElement
+    ? node.closest<HTMLElement>("[data-md-source-ref]")
+    : node.parentElement?.closest<HTMLElement>("[data-md-source-ref]");
+  if (!el) return null;
+  const sourceRange = sourceRangeForRef(model, ref);
+  if (!sourceRange) return null;
+  const visibleOffset = visibleOffsetWithin(el, range);
+  if (visibleOffset === null) return null;
+  const original = model.markdown.slice(sourceRange.contentStart, sourceRange.contentEnd);
+  const mapped = inlineVisibleMap(original);
+  return sourceRange.contentStart + sourceIndexForVisible(mapped.positions, visibleOffset, original.length);
+}
+
+function sourceRangeForRef(model: MarkdownSourceModel, id: string) {
+  const cell = findCell(model, id);
+  if (cell) return cell;
+  return model.blocks.find((candidate) => candidate.id === id) ?? null;
+}
+
 function inlineVisibleMap(source: string) {
   const positions: Array<{ start: number; end: number }> = [];
   let text = "";
@@ -309,10 +385,6 @@ function inlineVisibleMap(source: string) {
       const open = close >= 0 ? source.indexOf("(", close) : -1;
       const end = open >= 0 ? source.indexOf(")", open) : -1;
       if (close >= 0 && open === close + 1 && end >= 0) {
-        for (let p = i + 2; p < close; p += 1) {
-          text += source[p];
-          positions.push({ start: p, end: p + 1 });
-        }
         i = end;
         continue;
       }
@@ -335,4 +407,13 @@ function inlineVisibleMap(source: string) {
     positions.push({ start: i, end: i + 1 });
   }
   return { text, positions };
+}
+
+function sourceRefFromNode(node: Node | null | undefined): string | null {
+  const el = node instanceof HTMLElement ? node : node?.parentElement;
+  return el?.closest<HTMLElement>("[data-md-source-ref]")?.dataset[SOURCE_REF] || null;
+}
+
+function hasSourceRef(el: HTMLElement): boolean {
+  return Boolean(el.dataset[SOURCE_REF] || el.querySelector("[data-md-source-ref]"));
 }

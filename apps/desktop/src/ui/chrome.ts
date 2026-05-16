@@ -71,8 +71,8 @@ function renderAppScope(doc: AimdDocument | null, inDiffView: boolean) {
     appScopeSecondaryEl().textContent = "未打开文档";
     return;
   }
-  appScopePrimaryEl().textContent = "启动页";
-  appScopeSecondaryEl().textContent = "入口按命令域分层";
+  appScopePrimaryEl().textContent = "主页";
+  appScopeSecondaryEl().textContent = "新建、打开、最近文档";
 }
 
 function renderDocumentStateBadges(doc: AimdDocument | null, inDiffView: boolean) {

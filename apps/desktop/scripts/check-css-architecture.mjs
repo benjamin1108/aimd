@@ -4,6 +4,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import {
   categories,
+  hiddenScrollbars,
   pointerEventsNone,
   registeredBreakpoints,
   runtimeStyleWrites,
@@ -393,7 +394,9 @@ function checkMotionResponsiveAndPrint() {
         add("motion", file, index + 1, "layout-position transitions require an explicit registry exception");
       }
       if (/scrollbar-width:\s*none|::-webkit-scrollbar\s*{\s*display:\s*none/.test(cleanLine) && !file.endsWith("components/tabs.css")) {
-        add("hidden-scrollbars", file, index + 1, "hidden scrollbars require explicit alternate navigation");
+        const selector = selectorForDeclaration(text, lineStart + line.indexOf("scrollbar"));
+        const allowed = hiddenScrollbars.some((item) => item.file === file && selector.includes(item.selector));
+        if (!allowed) add("hidden-scrollbars", file, index + 1, "hidden scrollbars require explicit alternate navigation");
       }
       const truncationOwner = /components\/(app-topbar|buttons|inspector|tabs|toolbar|menus|sidebar|launch|settings)|layout\/workspace|surfaces\/(editor|git-diff)|overlays\/(updater|tree-overflow-portal)|entries\/webclip/.test(file);
       if (/white-space:\s*nowrap|text-overflow:\s*(ellipsis|clip)|line-clamp/.test(cleanLine) && !truncationOwner) {

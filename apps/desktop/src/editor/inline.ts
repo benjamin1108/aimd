@@ -4,7 +4,6 @@ import { setStatus, updateChrome } from "../ui/chrome";
 import { activeHTMLMatchesMarkdown } from "../ui/outline";
 import { persistSessionSnapshot } from "../session/snapshot";
 import { htmlToMarkdown } from "./markdown";
-import { joinFrontmatter, splitFrontmatter } from "../markdown/frontmatter";
 import { appendedStructuralHTML, patchDirtySource, patchRemovedImageBlocks, sourceRefFromEvent } from "./source-preserve";
 import { commitMarkdownChange } from "../document/markdown-mutation";
 import { syncActiveTabFromFacade } from "../document/open-document-state";
@@ -57,16 +56,20 @@ export function onInlineInput(event?: Event) {
     return;
   }
   const composing = (event as InputEvent | undefined)?.isComposing;
-  const sourceRef = sourceRefFromEvent(event);
-  if (sourceRef) state.sourceDirtyRefs.add(sourceRef);
-  else state.sourceStructuralDirty = true;
+  if (isStructuralInput(event) || selectionTouchesUnmappedStructuralNode()) {
+    state.sourceStructuralDirty = true;
+  } else {
+    const sourceRef = sourceRefFromEvent(event);
+    if (sourceRef) state.sourceDirtyRefs.add(sourceRef);
+    else state.sourceStructuralDirty = true;
+  }
   state.inlineDirty = true;
   state.doc.dirty = true;
   lightNormalize(inlineEditorEl());
   if (!composing) enforceTitleLength(inlineEditorEl());
   ensureSelectionInEditor();
   updateChrome();
-  // Defer expensive HTML→MD conversion (full normalize + turndown) until idle.
+  // Defer source patching until idle so rapid typing coalesces into one flush.
   if (state.flushTimer) window.clearTimeout(state.flushTimer);
   state.flushTimer = window.setTimeout(() => {
     flushInline();
@@ -114,17 +117,14 @@ export function flushInline(): FlushInlineResult {
     window.clearTimeout(state.flushTimer);
     state.flushTimer = null;
   }
-  // Mode hops without user edits in between (e.g., edit → read → edit) used
-  // to run turndown on every transition; on long docs that was the dominant
-  // chunk of the perceived "click takes a beat" lag. Skip it when nothing
-  // mutated the inline editor since the last flush / paint.
+  // Mode hops without user edits in between (e.g., edit -> read -> edit) should
+  // not do any source patch work. Skip it when nothing mutated the inline
+  // editor since the last flush / paint.
   if (!state.inlineDirty) return { ok: true, markdownChanged: false };
   if (!activeHTMLMatchesMarkdown()) {
     return failInlineFlush("可视化编辑器尚未同步最新 Markdown，请等待同步完成后再继续");
   }
   normalizeInlineDOM();
-  const html = inlineEditorEl().innerHTML;
-  const existing = splitFrontmatter(state.doc.markdown);
   let structuralMarkdown: string | null = null;
   if (state.sourceStructuralDirty) {
     const removedImages = state.sourceModel?.markdown === state.doc.markdown
@@ -148,10 +148,14 @@ export function flushInline(): FlushInlineResult {
   if (patched && !patched.ok) {
     return failInlineFlush(`可视化保存受限: ${patched.reason}，请切到 Markdown 模式保存该结构`);
   }
-  const md = structuralMarkdown
-    ?? (patched?.ok
-    ? patched.markdown
-    : joinFrontmatter(existing.frontmatter, htmlToMarkdown(html)));
+  let md: string;
+  if (structuralMarkdown !== null) {
+    md = structuralMarkdown;
+  } else if (patched?.ok) {
+    md = patched.markdown;
+  } else {
+    return failInlineFlush("当前可视化编辑不能安全映射回 Markdown 原文，请切到 Markdown 模式完成这次修改");
+  }
   if (patched?.ok || structuralMarkdown !== null) {
     state.sourceDirtyRefs.clear();
     state.sourceStructuralDirty = false;
@@ -184,6 +188,38 @@ function failInlineFlush(reason: string): FlushInlineResult {
   updateChrome();
   setStatus(reason, "warn");
   return { ok: false, reason };
+}
+
+function isStructuralInput(event?: Event) {
+  const inputType = typeof (event as InputEvent | undefined)?.inputType === "string"
+    ? (event as InputEvent).inputType
+    : "";
+  if (!inputType) return false;
+  return inputType === "insertHTML"
+    || inputType === "insertParagraph"
+    || inputType === "insertLineBreak"
+    || inputType === "insertOrderedList"
+    || inputType === "insertUnorderedList"
+    || inputType === "insertFromDrop"
+    || inputType === "insertFromYank"
+    || inputType === "historyUndo"
+    || inputType === "historyRedo"
+    || inputType.startsWith("format");
+}
+
+function selectionTouchesUnmappedStructuralNode() {
+  const selection = window.getSelection();
+  if (!selection || selection.rangeCount === 0 || !selection.isCollapsed) return false;
+  const range = selection.getRangeAt(0);
+  if (range.startContainer !== inlineEditorEl()) return false;
+  const before = range.startOffset > 0 ? inlineEditorEl().childNodes[range.startOffset - 1] : null;
+  const after = inlineEditorEl().childNodes[range.startOffset] ?? null;
+  return isUnmappedStructuralElement(before) || isUnmappedStructuralElement(after);
+}
+
+function isUnmappedStructuralElement(node: Node | null) {
+  if (!(node instanceof HTMLElement)) return false;
+  return !node.closest("[data-md-source-ref]");
 }
 
 function gcInlineAssets(markdown: string) {
