@@ -1,14 +1,14 @@
 import { state } from "../core/state";
 import {
-  titleEl, pathEl, statusEl, statusPillEl, panelEl, emptyEl,
+  titleEl, pathEl, appScopePrimaryEl, appScopeSecondaryEl, statusEl, statusPillEl, panelEl, emptyEl,
   docStateBadgesEl,
   outlineSectionEl, assetSectionEl, assetListEl,
   sidebarOutlineAssetResizerEl,
   starterActionsEl, docActionsEl, sidebarFootEl,
-  sidebarNewEl, sidebarSaveEl, saveEl, saveLabelEl, saveAsEl, closeEl,
+  saveEl, saveLabelEl, saveAsEl, closeEl,
   packageLocalImagesEl, healthCheckEl, webImportEl, exportMarkdownEl, exportHtmlEl, exportPdfEl,
   formatDocumentEl,
-  newWindowEl, findToggleEl,
+  globalNewProjectAimdEl, globalNewProjectMarkdownEl, findToggleEl,
   modeReadEl, modeEditEl, modeSourceEl, docToolbarEl,
 } from "../core/dom";
 import type { AimdAsset, AimdDocument } from "../core/types";
@@ -63,6 +63,32 @@ function isInsideCurrentProject(path: string): boolean {
 function documentFormatLabel(doc: AimdDocument): string {
   if (doc.isDraft) return "草稿";
   return doc.format === "markdown" ? "Markdown" : "AIMD";
+}
+
+function basename(path: string): string {
+  const parts = path.split(/[\\/]/).filter(Boolean);
+  return parts.at(-1) || path || "未命名";
+}
+
+function renderAppScope(doc: AimdDocument | null, inDiffView: boolean) {
+  if (inDiffView) {
+    const diffTab = state.git.diffTabs.find((tab) => tab.id === state.openDocuments.activeTabId) || null;
+    appScopePrimaryEl().textContent = `Git / ${diffTab?.title || "项目变更"}`;
+    appScopeSecondaryEl().textContent = diffTab?.directory || "项目文件差异";
+    return;
+  }
+  if (doc) {
+    appScopePrimaryEl().textContent = `${state.workspace ? "项目" : "文档"} / ${displayDocTitle(doc)}`;
+    appScopeSecondaryEl().textContent = doc.path ? formatPathHint(doc.path) : "未保存草稿";
+    return;
+  }
+  if (state.workspace?.root) {
+    appScopePrimaryEl().textContent = `项目 / ${basename(state.workspace.root)}`;
+    appScopeSecondaryEl().textContent = "未打开文档";
+    return;
+  }
+  appScopePrimaryEl().textContent = "启动页";
+  appScopeSecondaryEl().textContent = "入口按命令域分层";
 }
 
 function renderDocumentStateBadges(doc: AimdDocument | null) {
@@ -184,10 +210,14 @@ export function updateChrome() {
     panelEl().style.removeProperty("--inspector-rail-width");
   }
   const inDiffView = state.mainView === "git-diff";
+  panelEl().dataset.hasDoc = doc ? "true" : "false";
+  renderAppScope(doc, inDiffView);
+  globalNewProjectAimdEl().disabled = !hasWorkspace;
+  globalNewProjectMarkdownEl().disabled = !hasWorkspace;
   starterActionsEl().hidden = Boolean(doc) || inDiffView;
   docActionsEl().hidden = !doc || inDiffView;
   docToolbarEl().hidden = !doc || inDiffView;
-  sidebarFootEl().hidden = !doc || inDiffView;
+  sidebarFootEl().hidden = true;
 
   if (inDiffView) {
     const diffTab = state.git.diffTabs.find((tab) => tab.id === state.openDocuments.activeTabId) || null;
@@ -215,12 +245,11 @@ export function updateChrome() {
   formatDocumentEl().disabled = !doc || inDiffView || !doc.markdown.trim();
   packageLocalImagesEl().disabled = inDiffView || doc?.format !== "markdown";
   healthCheckEl().disabled = !doc || inDiffView;
-  webImportEl().disabled = !doc || inDiffView;
+  webImportEl().disabled = false;
   exportMarkdownEl().disabled = !doc || inDiffView || doc.format === "markdown";
   exportHtmlEl().disabled = !doc || inDiffView;
   exportPdfEl().disabled = !doc || inDiffView;
   findToggleEl().disabled = !doc || inDiffView;
-  newWindowEl().disabled = !doc || inDiffView;
   closeEl().disabled = !doc || inDiffView;
   // 顶部的主按钮统一显示「保存」：草稿状态下点击仍走 saveDocumentAs 创建文件，
   // 但视觉/语义上对用户都是"保存"动作（与 sidebar-foot 一致）。
@@ -241,12 +270,6 @@ export function updateChrome() {
   }
 
   emptyEl().hidden = true;
-  // 草稿一旦输入了内容（dirty），sidebar-foot 把 "新建" 替换成 "保存"，
-  // 把这一步的主动作放在更显眼的位置；非草稿/未脏的状态保留 "新建" 入口。
-  const draftWithContent = Boolean(doc.isDraft && doc.dirty);
-  sidebarNewEl().hidden = draftWithContent;
-  sidebarSaveEl().hidden = !draftWithContent;
-
   outlineSectionEl().hidden = false;
   const showActiveAssetPanel = state.sidebarDocTab === "assets";
   const assetVisibilityChanged = assetSectionEl().hidden === showActiveAssetPanel;

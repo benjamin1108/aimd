@@ -31,7 +31,6 @@
 .workspace-section.is-collapsed .workspace-scroll,
 .workspace-section.is-collapsed #workspace-refresh,
 .workspace-section.is-collapsed #workspace-new-doc,
-.workspace-section.is-collapsed #workspace-new-folder,
 #outline-section.is-collapsed .section-content {
   display: none;
 }

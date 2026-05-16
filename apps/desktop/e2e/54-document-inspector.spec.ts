@@ -294,7 +294,7 @@ test.describe("Document inspector ownership", () => {
     await expect(page.locator(".git-diff-scope")).toHaveCount(0);
     await expect(page.locator("#git-diff-back")).toHaveCount(0);
     await expect(page.locator("#doc-title")).toHaveText("Alpha.aimd");
-    await expect(page.locator(".open-tab.is-active")).toContainText("Git Diff");
+    await expect(page.locator(".open-tab.is-active")).toContainText("Git");
     await expect(page.locator(".open-tab.is-active")).toContainText("Alpha");
     await expect(page.locator(".git-diff-line.is-add")).toContainText("+# Alpha reviewed");
     await expect(page.locator("#sidebar-tab-assets")).toBeHidden();

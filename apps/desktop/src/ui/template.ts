@@ -1,15 +1,14 @@
 import { ICONS } from "../core/state";
+import { APP_TOPBAR_HTML } from "./topbar-template";
 
 export const APP_HTML = `
   <div class="app-frame">
     <div class="panel" id="panel" data-shell="launch">
+${APP_TOPBAR_HTML}
+
       <aside class="sidebar" id="sidebar">
         <div class="sidebar-hr-resizer" id="sidebar-hr-resizer" aria-label="调整侧边栏宽度"></div>
         <header class="sidebar-head">
-          <div class="brand">
-            <span class="brand-mark">A</span>
-            <span class="brand-name">AIMD</span>
-          </div>
         </header>
 
         <nav class="sidebar-body" id="sidebar-body">
@@ -21,8 +20,27 @@ export const APP_HTML = `
             <div class="workspace-actions" aria-label="项目操作">
               <button id="workspace-open" class="icon-btn" type="button" title="打开目录">${ICONS.folder}</button>
               <button id="workspace-refresh" class="icon-btn" type="button" title="刷新项目" disabled>${ICONS.refresh}</button>
-              <button id="workspace-new-doc" class="icon-btn" type="button" title="在项目中新建文档" disabled>${ICONS.document}</button>
-              <button id="workspace-new-folder" class="icon-btn" type="button" title="新建文件夹" disabled>${ICONS.plus}</button>
+              <div class="project-menu-wrap">
+                <button id="workspace-new-doc" class="icon-btn" type="button" title="新建项目文件" aria-haspopup="menu" aria-expanded="false" disabled>${ICONS.plus}</button>
+                <div id="project-create-menu" class="action-menu project-create-menu" role="menu" hidden>
+                  <div class="action-menu-title">项目文件</div>
+                  <button id="project-new-aimd" class="action-menu-item" type="button">
+                    <span class="action-menu-icon">${ICONS.plus}</span>
+                    <span>新建 AIMD 文档</span>
+                    <small>.aimd</small>
+                  </button>
+                  <button id="project-new-markdown" class="action-menu-item" type="button">
+                    <span class="action-menu-icon">${ICONS.source}</span>
+                    <span>新建 Markdown 文档</span>
+                    <small>.md</small>
+                  </button>
+                  <button id="project-new-folder" class="action-menu-item" type="button">
+                    <span class="action-menu-icon">${ICONS.folder}</span>
+                    <span>新建文件夹</span>
+                    <small>目录</small>
+                  </button>
+                </div>
+              </div>
               <button id="workspace-close" class="icon-btn" type="button" title="关闭项目" disabled>${ICONS.close}</button>
             </div>
             <div class="section-content workspace-scroll">
@@ -31,20 +49,7 @@ export const APP_HTML = `
           </section>
         </nav>
 
-        <footer class="sidebar-foot" id="sidebar-foot">
-          <button id="sidebar-save" class="secondary-btn" type="button" hidden>
-            <span class="secondary-btn-icon">${ICONS.save}</span>
-            <span>保存</span>
-          </button>
-          <button id="sidebar-new" class="secondary-btn" type="button">
-            <span class="secondary-btn-icon">${ICONS.plus}</span>
-            <span>新建</span>
-          </button>
-          <button id="sidebar-open" class="secondary-btn" type="button">
-            <span class="secondary-btn-icon">${ICONS.folder}</span>
-            <span>打开</span>
-          </button>
-        </footer>
+        <footer class="sidebar-foot" id="sidebar-foot" hidden></footer>
       </aside>
 
       <main class="workspace">
@@ -55,16 +60,7 @@ export const APP_HTML = `
             <div id="doc-state-badges" class="doc-state-badges" aria-label="当前文档状态" hidden></div>
           </div>
 
-          <div class="starter-actions" id="starter-actions">
-            <button id="head-new" class="secondary-btn" type="button">
-              <span class="secondary-btn-icon">${ICONS.plus}</span>
-              <span>新建</span>
-            </button>
-            <button id="head-open" class="secondary-btn" type="button">
-              <span class="secondary-btn-icon">${ICONS.folder}</span>
-              <span>打开</span>
-            </button>
-          </div>
+          <div class="starter-actions" id="starter-actions" hidden></div>
 
           <div class="head-actions" id="doc-actions" hidden>
             <button id="save" class="primary-btn" type="button" disabled>
@@ -74,21 +70,21 @@ export const APP_HTML = `
             <div class="more-menu-wrap">
               <button id="more-menu-toggle" class="ghost-btn icon-only" type="button" title="当前文档操作" aria-haspopup="menu" aria-expanded="false">⋯</button>
               <div id="more-menu" class="action-menu" role="menu" hidden>
+                <div class="action-menu-title">当前文档</div>
                 <button id="save-as" class="action-menu-item" type="button" disabled>
-                  <span class="action-menu-icon">${ICONS.folder}</span>
+                  <span class="action-menu-icon">${ICONS.save}</span>
                   <span>另存为...</span>
+                  <small>⇧⌘S</small>
                 </button>
                 <button id="format-document" class="action-menu-item" type="button" disabled>
                   <span class="action-menu-icon">${ICONS.sparkle}</span>
                   <span>一键格式化</span>
+                  <small>AI</small>
                 </button>
                 <button id="package-local-images" class="action-menu-item" type="button" disabled>
                   <span class="action-menu-icon">${ICONS.image}</span>
-                  <span>保存为 AIMD</span>
-                </button>
-                <button id="web-import" class="action-menu-item" type="button" disabled>
-                  <span class="action-menu-icon">${ICONS.link}</span>
-                  <span>从网页导入</span>
+                  <span>嵌入本地图片 / 保存为 AIMD</span>
+                  <small>资源</small>
                 </button>
                 <button id="health-check" class="action-menu-item" type="button" disabled hidden>
                   <span class="action-menu-icon">${ICONS.info}</span>
@@ -98,32 +94,23 @@ export const APP_HTML = `
                 <button id="export-markdown" class="action-menu-item" type="button" disabled>
                   <span class="action-menu-icon">${ICONS.source}</span>
                   <span>导出 Markdown</span>
+                  <small>.md</small>
                 </button>
                 <button id="export-html" class="action-menu-item" type="button" disabled>
-                  <span class="action-menu-icon">${ICONS.document}</span>
+                  <span class="action-menu-icon">${ICONS.htmlDocument}</span>
                   <span>导出 HTML</span>
+                  <small>.html</small>
                 </button>
                 <button id="export-pdf" class="action-menu-item" type="button" disabled>
-                  <span class="action-menu-icon">${ICONS.document}</span>
+                  <span class="action-menu-icon">${ICONS.pdfDocument}</span>
                   <span>导出 PDF</span>
+                  <small>.pdf</small>
                 </button>
                 <hr class="action-menu-divider" role="separator">
                 <button id="close" class="action-menu-item" type="button" disabled>
                   <span class="action-menu-icon">${ICONS.close}</span>
                   <span>关闭当前标签页</span>
-                </button>
-                <hr class="action-menu-divider" role="separator">
-                <button id="new-window" class="action-menu-item" type="button">
-                  <span class="action-menu-icon">${ICONS.plus}</span>
-                  <span>新建窗口</span>
-                </button>
-                <button id="check-updates" class="action-menu-item" type="button">
-                  <span class="action-menu-icon">${ICONS.refresh}</span>
-                  <span>检查更新</span>
-                </button>
-                <button id="about-aimd" class="action-menu-item" type="button">
-                  <span class="action-menu-icon">${ICONS.info}</span>
-                  <span>关于 AIMD</span>
+                  <small>⌘W</small>
                 </button>
               </div>
             </div>
@@ -322,46 +309,58 @@ export const APP_HTML = `
 
         <section class="workspace-body">
           <article id="empty" class="empty-state">
-            <header class="launch-head">
-              <div class="empty-mark">${ICONS.document}</div>
-              <div class="launch-head-text">
-                <h2>开始</h2>
-                <p>新建文档、打开 AIMD / Markdown，或打开项目目录。</p>
-              </div>
-            </header>
+            <div class="launch-grid">
+              <div class="launch-main">
+                <h2>继续处理文档</h2>
+                <p class="launch-copy">从最近打开的文档继续，或开始新的内容。</p>
 
-            <div class="launch-actions">
-              <button id="empty-new" class="primary-btn" type="button">
-                <span class="primary-btn-icon">${ICONS.plus}</span>
-                <span>新建文档</span>
-              </button>
-              <button id="empty-open" class="secondary-btn" type="button">
-                <span class="secondary-btn-icon">${ICONS.folder}</span>
-                <span>打开文档</span>
-              </button>
-              <button id="empty-open-workspace" class="secondary-btn" type="button">
-                <span class="secondary-btn-icon">${ICONS.folder}</span>
-                <span>打开目录</span>
-              </button>
-              <button id="empty-import-web" class="secondary-btn" type="button">
-                <span class="secondary-btn-icon">${ICONS.link}</span>
-                <span>从网页导入</span>
-              </button>
-              <button id="empty-import-md-project" class="secondary-btn" type="button">
-                <span class="secondary-btn-icon">${ICONS.source}</span>
-                <span>导入 Markdown 文件夹</span>
-              </button>
+                <section class="recent-section" id="recent-section" hidden>
+                  <div class="recent-head">
+                    <div class="recent-title">最近打开</div>
+                    <button id="clear-recent" class="text-btn" type="button">清空</button>
+                  </div>
+                  <div id="recent-list" class="recent-list"></div>
+                </section>
+              </div>
+
+              <div class="launch-side">
+                <div class="launch-group-label">创建</div>
+                <div class="launch-command-list">
+                  <button id="empty-new" class="launch-command-card" type="button">
+                    <span class="launch-card-icon">${ICONS.plus}</span>
+                    <span class="launch-card-copy">
+                      <span class="launch-card-title">空白 AIMD 草稿</span>
+                      <span class="launch-card-meta">从一页空白文档开始</span>
+                    </span>
+                  </button>
+                  <button id="empty-import-web" class="launch-command-card" type="button">
+                    <span class="launch-card-icon">${ICONS.link}</span>
+                    <span class="launch-card-copy">
+                      <span class="launch-card-title">从网页导入</span>
+                      <span class="launch-card-meta">提取网页内容为草稿</span>
+                    </span>
+                  </button>
+                </div>
+
+                <div class="launch-group-label">打开</div>
+                <div class="launch-command-list">
+                  <button id="empty-open" class="launch-command-card" type="button">
+                    <span class="launch-card-icon">${ICONS.openDocument}</span>
+                    <span class="launch-card-copy">
+                      <span class="launch-card-title">打开 AIMD / Markdown</span>
+                      <span class="launch-card-meta">选择本地文档继续编辑</span>
+                    </span>
+                  </button>
+                  <button id="empty-open-workspace" class="launch-command-card" type="button">
+                    <span class="launch-card-icon">${ICONS.folder}</span>
+                    <span class="launch-card-copy">
+                      <span class="launch-card-title">打开项目目录</span>
+                      <span class="launch-card-meta">浏览并编辑项目文件</span>
+                    </span>
+                  </button>
+                </div>
+              </div>
             </div>
-
-            <section class="recent-section" id="recent-section" hidden>
-              <div class="recent-head">
-                <div class="recent-title">最近打开</div>
-                <button id="clear-recent" class="text-btn" type="button">清空</button>
-              </div>
-              <div id="recent-list" class="recent-list"></div>
-            </section>
-
-            <div class="empty-hint">⌘N 新建 · ⌘O 打开 · ⇧⌘S 另存为 · 拖入 .aimd / Markdown 即可打开</div>
           </article>
 
           <article id="git-diff-view" class="git-diff-view" hidden>

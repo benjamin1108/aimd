@@ -188,7 +188,7 @@ test.describe("Workspace directory management", () => {
     await expect(page.locator("#workspace-tree")).toHaveText("打开目录");
     await expect(page.locator("#workspace-refresh")).toBeDisabled();
     await expect(page.locator("#workspace-new-doc")).toBeDisabled();
-    await expect(page.locator("#workspace-new-folder")).toBeDisabled();
+    await expect(page.locator("#project-create-menu")).toBeHidden();
     await expect(page.locator("#workspace-close")).toBeDisabled();
     await expect.poll(() => page.evaluate(() => window.localStorage.getItem("aimd.desktop.workspace.root"))).toBeNull();
   });
@@ -197,7 +197,7 @@ test.describe("Workspace directory management", () => {
     await installWorkspaceMock(page);
     await page.goto("/");
 
-    await expect(page.locator("#empty-open-workspace")).toContainText("打开目录");
+    await expect(page.locator("#empty-open-workspace")).toContainText("打开项目目录");
     await page.locator("#empty-open-workspace").click();
     await expect(page.locator("#workspace-root-label")).toHaveText("项目");
     await expect(page.locator("#workspace-count")).toHaveCount(0);
@@ -207,12 +207,14 @@ test.describe("Workspace directory management", () => {
     await expect(page.locator("#doc-title")).toHaveText("Report");
     await expect(page.locator(".workspace-row.is-active", { hasText: "Report.aimd" })).toBeVisible();
 
-    await page.locator("#workspace-new-folder").click();
+    await page.locator("#workspace-new-doc").click();
+    await page.locator("#project-new-folder").click();
     await page.locator("#workspace-prompt-input").fill("Notes");
     await page.locator(".link-popover [data-action='confirm']").click();
     await expect(page.locator(".workspace-row", { hasText: "Notes" })).toBeVisible();
 
     await page.locator("#workspace-new-doc").click();
+    await page.locator("#project-new-markdown").click();
     await page.locator("#workspace-prompt-input").fill("Daily.md");
     await page.locator(".link-popover [data-action='confirm']").click();
     await expect(page.locator("#doc-title")).toHaveText("Daily");

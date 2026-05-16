@@ -203,7 +203,7 @@ test.describe("Git workspace panel", () => {
     await expect(page.locator("#format-toolbar")).toBeHidden();
     await expect(page.locator("#git-diff-back")).toHaveCount(0);
     await expect(page.locator(".open-tab.is-active")).toContainText("foo.ts");
-    await expect(page.locator(".open-tab.is-active")).toContainText("Git Diff");
+    await expect(page.locator(".open-tab.is-active")).toContainText("Git");
     await expect(page.locator("#doc-title")).toHaveText("foo.ts");
     await expect(page.locator("#doc-path")).toHaveText("Git Diff · apps");
     await expect(page.locator(".git-diff-scope")).toHaveCount(0);
@@ -284,7 +284,7 @@ test.describe("Git workspace panel", () => {
     await page.locator(".git-file-row[data-path='apps/foo.ts']").locator("[data-git-action='select']").click();
     await expect(page.locator("#git-diff-view")).toBeVisible();
     await expect(page.locator(".open-tab")).toHaveCount(2);
-    await expect(page.locator(".open-tab.is-active")).toContainText("Git Diff");
+    await expect(page.locator(".open-tab.is-active")).toContainText("Git");
     await page.locator(".open-tab.is-active .open-tab-close").click();
     await expect(page.locator("#reader")).toBeVisible();
     await expect(page.locator(".open-tab.is-active")).toContainText("Readme");

@@ -328,11 +328,10 @@ test.describe("D. 已知边界：ensureCanDiscardChanges 只检 dirty，不检 i
         if (cmd === "choose_doc_file") return "/mock/sample.aimd";
         return orig(cmd, a);
       };
-      // head-open 在文档打开状态下 hidden=true，强制点击
-      const el = document.getElementById("starter-actions");
-      if (el) el.hidden = false;
-      (document.getElementById("head-open") as HTMLButtonElement | null)?.click();
     });
+
+    await page.locator("#global-open-toggle").click();
+    await page.locator("#global-open-document").click();
 
     const calls = await page.evaluate(() => (window as any).__discardCalled);
     expect(calls).toBe(0);

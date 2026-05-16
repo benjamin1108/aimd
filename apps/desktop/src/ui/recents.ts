@@ -1,4 +1,4 @@
-import { state, STORAGE_RECENTS, STORAGE_LAST, MAX_RECENTS } from "../core/state";
+import { state, STORAGE_RECENTS, STORAGE_LAST, MAX_RECENTS, ICONS } from "../core/state";
 import { recentSectionEl, recentListEl } from "../core/dom";
 import { fileStem } from "../util/path";
 import { escapeAttr, escapeHTML } from "../util/escape";
@@ -41,6 +41,14 @@ export function clearRecentDocuments() {
   renderRecentList();
 }
 
+function recentFormat(path: string): "AIMD" | "MD" {
+  return /\.aimd$/i.test(path) ? "AIMD" : "MD";
+}
+
+function recentIcon(path: string): string {
+  return recentFormat(path) === "AIMD" ? ICONS.document : ICONS.source;
+}
+
 export function renderRecentList() {
   recentSectionEl().hidden = state.recentPaths.length === 0;
   if (state.recentPaths.length === 0) {
@@ -48,13 +56,14 @@ export function renderRecentList() {
     return;
   }
   recentListEl().innerHTML = state.recentPaths
-    .map((path, index) => `
+    .map((path) => `
       <button class="recent-item" data-path="${escapeAttr(path)}" data-file-item="true" type="button">
+        <span class="recent-item-icon">${recentIcon(path)}</span>
         <span class="recent-item-main">
           <span class="recent-item-title">${escapeHTML(fileStem(path) || "未命名文档")}</span>
           <span class="recent-item-meta">${escapeHTML(formatPathHint(path))}</span>
         </span>
-        <span class="recent-item-badge">${index === 0 ? "继续" : "打开"}</span>
+        <span class="recent-item-badge">${recentFormat(path)}</span>
       </button>
     `)
     .join("");

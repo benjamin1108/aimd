@@ -21,12 +21,12 @@
 .open-tab {
   display: inline-flex;
   align-items: center;
-  min-width: 112px;
-  max-width: 220px;
+  min-width: 132px;
+  max-width: 230px;
   height: 34px;
   border: 1px solid transparent;
   border-bottom: 0;
-  border-radius: var(--radius-control) var(--radius-control) 0 0;
+  border-radius: 10px 10px 0 0;
   background: rgba(31, 22, 11, 0.045);
   color: var(--ink-muted);
   transition: background var(--t-fast) var(--ease),
@@ -48,7 +48,7 @@
   min-width: 0;
   flex: 1 1 auto;
   height: 100%;
-  padding: 0 6px 0 10px;
+  padding: 0 9px 0 12px;
   border: 0;
   background: transparent;
   color: inherit;
@@ -83,8 +83,8 @@
   display: inline-grid;
   place-items: center;
   flex: 0 0 auto;
-  width: var(--size-control-sm);
-  height: var(--size-control-sm);
+  width: 28px;
+  height: 28px;
   margin-right: 3px;
   border: 0;
   border-radius: var(--radius-control-sm);

@@ -54,6 +54,10 @@ body.resizing-h * {
   padding: 14px 14px 12px;
 }
 
+.sidebar-head:empty {
+  display: none;
+}
+
 .brand {
   display: flex;
   align-items: center;
@@ -64,9 +68,9 @@ body.resizing-h * {
 .brand-mark {
   display: grid;
   place-items: center;
-  width: 22px;
-  height: 22px;
-  border-radius: 7px;
+  width: 25px;
+  height: 25px;
+  border-radius: 8px;
   background:
     linear-gradient(180deg, rgba(255, 255, 255, 0.12), transparent 45%),
     var(--accent);
@@ -223,7 +227,7 @@ body.resizing-v * {
 
 .workspace-actions {
   display: grid;
-  grid-template-columns: repeat(5, var(--size-icon));
+  grid-template-columns: repeat(4, var(--size-icon));
   gap: 5px;
   padding: 0 6px 8px;
 }
@@ -252,7 +256,7 @@ body.resizing-v * {
 
 .workspace-row {
   display: grid;
-  grid-template-columns: 16px 16px minmax(0, 1fr);
+  grid-template-columns: 16px 16px minmax(0, 1fr) auto;
   align-items: center;
   gap: 5px;
   width: 100%;
@@ -264,6 +268,18 @@ body.resizing-v * {
   font-size: 12.5px;
   line-height: 1.2;
   transition: background var(--t-fast) var(--ease), color var(--t-fast) var(--ease);
+}
+
+.workspace-format-tag {
+  display: inline-flex;
+  align-items: center;
+  height: 18px;
+  padding: 0 7px;
+  border: 1px solid rgba(31, 22, 11, 0.08);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.54);
+  color: var(--ink-muted);
+  font: 650 10.5px/1 var(--font-mono);
 }
 
 .workspace-row:hover {
@@ -332,6 +348,10 @@ body.resizing-v * {
   gap: 8px;
   padding: 10px;
   border-top: 1px solid var(--hairline);
+}
+
+.sidebar-foot[hidden] {
+  display: none !important;
 }
 
 .sidebar-foot .secondary-btn {

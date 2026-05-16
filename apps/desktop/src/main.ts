@@ -16,6 +16,9 @@ import {
   saveEl, saveAsEl, closeEl,
   moreMenuToggleEl, moreMenuEl, webImportEl, formatDocumentEl,
   checkUpdatesEl, aboutAimdEl,
+  globalNewToggleEl, globalNewMenuEl, globalNewProjectAimdEl, globalNewProjectMarkdownEl,
+  globalOpenToggleEl, globalOpenMenuEl, appMenuToggleEl, appMenuEl, settingsOpenEl,
+  projectCreateMenuEl, workspaceNewDocEl,
   debugIndicatorEl, debugIndicatorCountEl,
 } from "./core/dom";
 import { setMode, refreshSourceBanner } from "./ui/mode";
@@ -49,7 +52,7 @@ import {
 import { persistSessionSnapshot, restoreSession } from "./session/snapshot";
 import { activateDocumentTab, applyDocument } from "./document/apply";
 import { debugLog, installDebugConsole, openDebugConsole, onDebugChange, setDebugMode } from "./debug/console";
-import { bindWorkspacePanel, openWorkspacePicker } from "./ui/workspace";
+import { bindWorkspacePanel, createProjectDocument, openWorkspacePicker } from "./ui/workspace";
 import { bindDocPanelTabs, renderDocPanelTabs } from "./ui/doc-panel";
 import { bindGitPanel, refreshGitStatus } from "./ui/git";
 import {
@@ -122,6 +125,14 @@ function bindMenuToggle(toggle: HTMLButtonElement, menu: HTMLElement) {
 function closeActionMenus() {
   moreMenuEl().hidden = true;
   moreMenuToggleEl().setAttribute("aria-expanded", "false");
+  globalNewMenuEl().hidden = true;
+  globalNewToggleEl().setAttribute("aria-expanded", "false");
+  globalOpenMenuEl().hidden = true;
+  globalOpenToggleEl().setAttribute("aria-expanded", "false");
+  appMenuEl().hidden = true;
+  appMenuToggleEl().setAttribute("aria-expanded", "false");
+  projectCreateMenuEl().hidden = true;
+  workspaceNewDocEl().setAttribute("aria-expanded", "false");
 }
 
 async function openNewWindow() {
@@ -134,19 +145,32 @@ async function openNewWindow() {
   }
 }
 
-$("#head-new").addEventListener("click", () => { void newDocument(); });
-$("#head-open").addEventListener("click", () => { void chooseAndOpen(); });
 $("body").addEventListener("dragover", onWindowDragOver);
 $("body").addEventListener("drop", onWindowDrop);
 $("body").addEventListener("dragleave", onWindowDragLeave);
+bindMenuToggle(globalNewToggleEl(), globalNewMenuEl());
+bindMenuToggle(globalOpenToggleEl(), globalOpenMenuEl());
+bindMenuToggle(appMenuToggleEl(), appMenuEl());
+$("#global-new-draft").addEventListener("click", () => { closeActionMenus(); void newDocument(); });
+globalNewProjectAimdEl().addEventListener("click", () => { closeActionMenus(); void createProjectDocument("aimd"); });
+globalNewProjectMarkdownEl().addEventListener("click", () => { closeActionMenus(); void createProjectDocument("markdown"); });
+$("#global-import-md-project").addEventListener("click", () => { closeActionMenus(); void chooseAndImportMarkdownProject(); });
+$("#global-open-document").addEventListener("click", () => { closeActionMenus(); void chooseAndOpen(); });
+$("#global-open-workspace").addEventListener("click", () => { closeActionMenus(); void openWorkspacePicker(); });
+$("#global-show-recents").addEventListener("click", () => {
+  closeActionMenus();
+  const recent = document.querySelector<HTMLElement>("#recent-section");
+  if (recent && !recent.hidden) {
+    recent.scrollIntoView({ block: "nearest" });
+    setStatus("最近打开已显示", "info");
+  } else {
+    setStatus("暂无最近打开文档", "info");
+  }
+});
 $("#empty-open").addEventListener("click", chooseAndOpen);
 $("#empty-open-workspace").addEventListener("click", () => { void openWorkspacePicker(); });
 $("#empty-new").addEventListener("click", () => { void newDocument(); });
 $("#empty-import-web").addEventListener("click", () => { void importWebClip(); });
-$("#empty-import-md-project").addEventListener("click", () => { void chooseAndImportMarkdownProject(); });
-$("#sidebar-new").addEventListener("click", () => { void newDocument(); });
-$("#sidebar-save").addEventListener("click", () => { void saveDocument(); });
-$("#sidebar-open").addEventListener("click", chooseAndOpen);
 $("#clear-recent").addEventListener("click", clearRecentDocuments);
 modeReadEl().addEventListener("click", () => setMode("read"));
 modeEditEl().addEventListener("click", () => setMode("edit"));
@@ -159,6 +183,7 @@ webImportEl().addEventListener("click", () => { closeActionMenus(); void importW
 $("#health-check").addEventListener("click", () => { closeActionMenus(); void runHealthCheck(); });
 checkUpdatesEl().addEventListener("click", () => { closeActionMenus(); void checkForUpdates({ manual: true }); });
 aboutAimdEl().addEventListener("click", () => { closeActionMenus(); void showAboutAimd(); });
+settingsOpenEl().addEventListener("click", () => { closeActionMenus(); void invoke("open_settings_window"); });
 $("#export-markdown").addEventListener("click", () => { closeActionMenus(); void exportMarkdownAssets(); });
 $("#export-html").addEventListener("click", () => { closeActionMenus(); void exportHTML(); });
 $("#export-pdf").addEventListener("click", () => { closeActionMenus(); void exportPDF(); });
@@ -189,7 +214,7 @@ openTabsEl().addEventListener("click", (event) => {
   }
 });
 document.addEventListener("click", (event) => {
-  if (!(event.target as HTMLElement).closest(".more-menu-wrap")) closeActionMenus();
+  if (!(event.target as HTMLElement).closest(".more-menu-wrap, .app-menu-wrap")) closeActionMenus();
 });
 
 markdownEl().addEventListener("input", () => {
@@ -390,6 +415,9 @@ window.addEventListener("DOMContentLoaded", async () => {
       "debug-console":     () => { if (state.uiSettings.debugMode) openDebugConsole(); },
       "new-document":      () => { void newDocument(); },
       "open-document":     () => { void chooseAndOpen(); },
+      "open-workspace":    () => { void openWorkspacePicker(); },
+      "import-web-clip":   () => { void importWebClip(); },
+      "import-markdown-project": () => { void chooseAndImportMarkdownProject(); },
       "save-document":     () => { void saveDocument(); },
       "save-document-as":  () => { void saveDocumentAs(); },
       "new-window":        () => { void openNewWindow(); },

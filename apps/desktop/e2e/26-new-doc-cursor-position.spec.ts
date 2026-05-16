@@ -131,7 +131,7 @@ test.describe("Bug 3 — 新建文档时光标位置正确性", () => {
    * B. 连续新建 10 次：压测偶发 race condition。
    *
    * 每次新建前，之前的文档被 "confirm_discard_changes" 丢弃。
-   * 注意：dirty 草稿状态下 #sidebar-new 被隐藏，改用 ⌘N 快捷键触发新建。
+   * 注意：新建入口已收敛到 topbar；这里继续用 ⌘N 压测快捷键路径。
    */
   test("连续新建 10 次，每次 inline-editor 光标都在编辑区内", async ({
     page,
@@ -142,7 +142,7 @@ test.describe("Bug 3 — 新建文档时光标位置正确性", () => {
     const failures: string[] = [];
 
     for (let round = 1; round <= 10; round++) {
-      // 第 1 次从 empty state CTA 点；之后用 ⌘N 快捷键（dirty 草稿下 sidebar-new 被隐藏）
+      // 第 1 次从 empty state CTA 点；之后用 ⌘N 快捷键覆盖全局新建路径。
       if (round === 1) {
         await page.locator("#empty-new").click();
       } else {

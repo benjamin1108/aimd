@@ -245,7 +245,8 @@ test.describe("Editor core capabilities", () => {
     await installEditorCoreMock(page);
     await page.goto("/");
 
-    await page.locator("#empty-import-md-project").click();
+    await page.locator("#global-new-toggle").click();
+    await page.locator("#global-import-md-project").click();
     await expect(page.locator("#doc-title")).toContainText("导入项目");
     await expect(page.locator("#doc-path")).toContainText("saved.aimd");
     await page.locator("#mode-source").click();
@@ -372,8 +373,7 @@ test.describe("Editor core capabilities", () => {
     await page.locator("#more-menu-toggle").click();
     await expect(page.locator("#package-local-images")).toContainText("保存为 AIMD");
     await expect(page.locator("#package-local-images")).toBeDisabled();
-    await expect(page.locator("#more-menu #web-import")).toContainText("从网页导入");
-    await expect(page.locator("#more-menu #web-import")).not.toBeDisabled();
+    await expect(page.locator("#more-menu #web-import")).toHaveCount(0);
     await expect(page.locator("#more-menu #health-check")).toBeHidden();
     await expect(page.locator("#export-markdown")).toContainText("导出 Markdown");
     await expect(page.locator("#export-markdown")).not.toBeDisabled();
@@ -381,7 +381,18 @@ test.describe("Editor core capabilities", () => {
     await expect(page.locator("#export-pdf")).not.toBeDisabled();
     await expect(page.locator("#format-document")).toContainText("一键格式化");
     await expect(page.locator("#format-document")).not.toBeDisabled();
-    await expect(page.locator("#more-menu .action-menu-item")).toHaveCount(12);
+    await expect(page.locator("#more-menu .action-menu-item")).toHaveCount(8);
+    await expect(page.locator("#more-menu")).not.toContainText("从网页导入");
+    await expect(page.locator("#more-menu")).not.toContainText("检查更新");
+    await expect(page.locator("#more-menu")).not.toContainText("关于 AIMD");
+    await page.keyboard.press("Escape");
+
+    await page.locator("#global-new-toggle").click();
+    await expect(page.locator("#global-new-menu")).toContainText("从网页导入");
+    await expect(page.locator("#global-new-menu")).toContainText("导入 Markdown 文件夹");
+    await page.keyboard.press("Escape");
+
+    await page.locator("#app-menu-toggle").click();
     await expect(page.locator("#check-updates")).toContainText("检查更新");
     await expect(page.locator("#about-aimd")).toContainText("关于 AIMD");
     await expect(page.locator("#new-window")).toContainText("新建窗口");
@@ -390,7 +401,8 @@ test.describe("Editor core capabilities", () => {
     await expect.poll(() => page.evaluate(() => (window as any).__aimdEditorCoreMock.getOpenWindowPaths())).toEqual([null]);
 
     await page.evaluate(() => (window as any).__aimdEditorCoreMock.openMarkdownNext());
-    await page.locator("#sidebar-open").click();
+    await page.locator("#global-open-toggle").click();
+    await page.locator("#global-open-document").click();
     await page.locator("#more-menu-toggle").click();
     await expect(page.locator("#package-local-images")).not.toBeDisabled();
     await expect(page.locator("#export-markdown")).toBeDisabled();

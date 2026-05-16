@@ -21,7 +21,7 @@
      sizes to max-content and the workspace+sidebar stretch past the
      viewport — `overflow: hidden` only clips, the inner panes never
      learn they need to scroll. */
-  grid-template-rows: minmax(0, 1fr);
+  grid-template-rows: auto minmax(0, 1fr);
   width: 100%;
   height: 100%;
   border: 1px solid rgba(255, 255, 255, 0.72);
@@ -41,6 +41,23 @@
     var(--rail-collapsed-width);
 }
 
+.panel[data-shell="document"][data-has-doc="false"]:not([data-main-view="git-diff"]) {
+  grid-template-columns:
+    var(--project-rail-width)
+    minmax(0, 1fr);
+}
+
+.app-topbar {
+  grid-column: 1 / -1;
+  grid-row: 1;
+}
+
+.sidebar,
+.workspace,
+.inspector {
+  grid-row: 2;
+}
+
 .panel > * {
   min-width: 0;
   min-height: 0;
@@ -52,6 +69,14 @@
 
 .panel[data-shell="launch"] .sidebar,
 .panel[data-shell="launch"] .inspector {
+  display: none;
+}
+
+.panel[data-shell="document"][data-has-doc="false"]:not([data-main-view="git-diff"]) .inspector {
+  display: none;
+}
+
+.panel[data-has-doc="false"] .workspace-head {
   display: none;
 }
 

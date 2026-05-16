@@ -10,6 +10,9 @@ pub const MENU_EVENT_IDS: &[&str] = &[
     "debug-console",
     "new-document",
     "open-document",
+    "open-workspace",
+    "import-web-clip",
+    "import-markdown-project",
     "save-document",
     "save-document-as",
     "new-window",
@@ -40,14 +43,18 @@ pub fn build_app_menu<M: Manager<tauri::Wry>>(
         .item(&quit_item)
         .build()?;
     let file_menu = SubmenuBuilder::new(manager, "文件")
-        .text("new-document", "新建")
-        .text("open-document", "打开...")
+        .text("new-document", "空白 AIMD 草稿")
+        .text("open-document", "打开文档...")
+        .text("open-workspace", "打开项目目录...")
+        .separator()
+        .text("import-web-clip", "从网页导入...")
+        .text("import-markdown-project", "导入 Markdown 文件夹...")
         .separator()
         .text("save-document", "保存")
         .text("save-document-as", "另存为...")
         .separator()
         .text("new-window", "新窗口")
-        .text("close-document", "关闭文档")
+        .text("close-document", "关闭当前标签页")
         .build()?;
     // 编辑菜单：必须存在，否则 macOS 上 Cmd+C / Cmd+V / Cmd+X / Cmd+A / Cmd+Z
     // 这些 first-responder selector（copy:/paste:/cut:/selectAll:/undo:）找不到

@@ -5,7 +5,7 @@ import { displayTabTitle, syncActiveTabFromFacade } from "../document/open-docum
 
 function tabFormat(doc: { isDraft?: boolean; format: "aimd" | "markdown" }) {
   if (doc.isDraft) return "草稿";
-  return doc.format === "markdown" ? "Markdown" : "AIMD";
+  return doc.format === "markdown" ? "MD" : "AIMD";
 }
 
 export function renderOpenTabs() {
@@ -48,7 +48,7 @@ export function renderOpenTabs() {
          title="${escapeAttr(tab.path)}">
       <button class="open-tab-main" type="button" data-tab-activate="${escapeAttr(tab.id)}" aria-label="切换到 Git Diff ${escapeAttr(tab.title)}">
         <span class="open-tab-title">${escapeHTML(tab.title)}</span>
-        <span class="open-tab-format">Git Diff</span>
+        <span class="open-tab-format">Git</span>
       </button>
       <button class="open-tab-close" type="button" data-tab-close="${escapeAttr(tab.id)}" title="关闭标签页：${escapeAttr(tab.title)}" aria-label="关闭标签页：${escapeAttr(tab.title)}">
         ${ICONS.close}

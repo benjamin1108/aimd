@@ -6,9 +6,12 @@ import {
   STORAGE_WORKSPACE_ROOT,
 } from "../core/state";
 import {
+  projectCreateMenuEl,
+  projectNewAimdEl,
+  projectNewFolderEl,
+  projectNewMarkdownEl,
   workspaceCloseEl,
   workspaceNewDocEl,
-  workspaceNewFolderEl,
   workspaceOpenEl,
   workspaceRefreshEl,
   workspaceRootLabelEl,
@@ -19,7 +22,7 @@ import { escapeAttr, escapeHTML } from "../util/escape";
 import { extractHeadingTitle, fileStem } from "../util/path";
 import { closeDocument, ensureCanDiscardChanges, routeOpenedPath } from "../document/lifecycle";
 import { setStatus, updateChrome } from "./chrome";
-import { dismissContextMenu, showContextMenu } from "./context-menu";
+import { dismissContextMenu } from "./context-menu";
 import { rememberOpenedPath, saveRecentPaths } from "./recents";
 import { confirmWorkspaceAction, promptWorkspaceText } from "./workspace-dialogs";
 import { refreshGitStatus, resetGitState } from "./git";
@@ -27,6 +30,7 @@ import { showDocumentView } from "./git-diff";
 import { applyWorkspaceCollapseState, bindWorkspaceCollapse } from "./sidebar-layout";
 import { updateOpenTabPath } from "../document/open-document-state";
 import { commitMarkdownChange } from "../document/markdown-mutation";
+import { showWorkspaceNodeContextMenu } from "./workspace-context-menu";
 
 function samePath(a: string, b: string): boolean { return a.replace(/\\/g, "/").toLowerCase() === b.replace(/\\/g, "/").toLowerCase(); }
 
@@ -111,6 +115,12 @@ function applyWorkspace(workspace: WorkspaceRoot) {
 
 function workspaceIcon(node: WorkspaceTreeNode): string { return node.kind === "folder" ? ICONS.folder : ICONS.document; }
 
+function workspaceFormatTag(node: WorkspaceTreeNode): string {
+  if (node.kind !== "document") return "";
+  const label = node.format === "markdown" ? "MD" : "AIMD";
+  return `<span class="workspace-format-tag">${label}</span>`;
+}
+
 function renderNode(node: WorkspaceTreeNode, depth: number): string {
   const expanded = state.workspaceExpanded.has(node.path);
   const active = Boolean(state.doc?.path && samePath(state.doc.path, node.path));
@@ -126,6 +136,7 @@ function renderNode(node: WorkspaceTreeNode, depth: number): string {
       ${hasChildren ? `<span class="workspace-twist">${ICONS.chevron}</span>` : `<span class="workspace-row-spacer"></span>`}
       <span class="workspace-node-icon">${workspaceIcon(node)}</span>
       <span class="workspace-name">${escapeHTML(node.name)}</span>
+      ${workspaceFormatTag(node)}
     </button>
     ${node.error ? `<div class="workspace-node-error">${escapeHTML(node.error)}</div>` : ""}
   `;
@@ -137,7 +148,6 @@ export function renderWorkspaceTree() {
   applyWorkspaceCollapseState();
   workspaceRefreshEl().disabled = !state.workspace || state.workspaceLoading;
   workspaceNewDocEl().disabled = !state.workspace || state.workspaceLoading;
-  workspaceNewFolderEl().disabled = !state.workspace || state.workspaceLoading;
   workspaceCloseEl().disabled = !state.workspace || state.workspaceLoading;
 
   if (state.workspaceLoading) {
@@ -255,6 +265,10 @@ async function createDocument(parent: string | null, preferredKind?: "aimd" | "m
   }
 }
 
+export async function createProjectDocument(preferredKind: "aimd" | "markdown") {
+  await createDocument(null, preferredKind);
+}
+
 async function createFolder(parent: string | null) {
   if (!state.workspace) return;
   const targetParent = parent || selectedParentPath() || state.workspace.root;
@@ -271,6 +285,15 @@ async function createFolder(parent: string | null) {
     state.workspaceExpanded.add(folderPath);
     return workspace;
   }, "文件夹已创建");
+}
+
+export async function createProjectFolder() {
+  await createFolder(null);
+}
+
+function closeProjectCreateMenu() {
+  projectCreateMenuEl().hidden = true;
+  workspaceNewDocEl().setAttribute("aria-expanded", "false");
 }
 
 async function renameEntry(node: WorkspaceTreeNode) {
@@ -330,75 +353,20 @@ async function trashEntry(node: WorkspaceTreeNode) {
 
 function showWorkspaceContextMenu(x: number, y: number, node: WorkspaceTreeNode) {
   const isRoot = Boolean(state.workspace && samePath(node.path, state.workspace.root));
-  showContextMenu(x, y, [
-    {
-      label: node.kind === "document" ? "打开" : "展开/收起",
-      action: () => {
-        dismissContextMenu();
-        if (node.kind === "document") void openWorkspaceDocument(node.path);
-        else {
-          if (state.workspaceExpanded.has(node.path)) state.workspaceExpanded.delete(node.path);
-          else state.workspaceExpanded.add(node.path);
-          persistWorkspaceState();
-          renderWorkspaceTree();
-        }
-      },
+  showWorkspaceNodeContextMenu(x, y, node, isRoot, parentPath(node.path), {
+    openDocument: (path) => { void openWorkspaceDocument(path); },
+    toggleFolder: (path) => {
+      if (state.workspaceExpanded.has(path)) state.workspaceExpanded.delete(path);
+      else state.workspaceExpanded.add(path);
+      persistWorkspaceState();
+      renderWorkspaceTree();
     },
-    {
-      label: "在新窗口打开",
-      disabled: node.kind !== "document",
-      action: () => {
-        dismissContextMenu();
-        void invoke("open_in_new_window", { path: node.path });
-      },
-    },
-    {
-      label: "新建 AIMD 文档",
-      action: () => {
-        dismissContextMenu();
-        void createDocument(node.kind === "folder" ? node.path : parentPath(node.path), "aimd");
-      },
-    },
-    {
-      label: "新建 Markdown 文档",
-      action: () => {
-        dismissContextMenu();
-        void createDocument(node.kind === "folder" ? node.path : parentPath(node.path), "markdown");
-      },
-    },
-    {
-      label: "新建文件夹",
-      action: () => {
-        dismissContextMenu();
-        void createFolder(node.kind === "folder" ? node.path : parentPath(node.path));
-      },
-    },
-    {
-      label: "重命名",
-      disabled: isRoot,
-      action: () => {
-        dismissContextMenu();
-        void renameEntry(node);
-      },
-    },
-    {
-      label: "移动到...",
-      disabled: isRoot,
-      action: () => {
-        dismissContextMenu();
-        void moveEntry(node);
-      },
-    },
-    {
-      label: "移到废纸篓/删除",
-      danger: true,
-      disabled: isRoot,
-      action: () => {
-        dismissContextMenu();
-        void trashEntry(node);
-      },
-    },
-  ]);
+    createDocument: (parent, kind) => { void createDocument(parent, kind); },
+    createFolder: (parent) => { void createFolder(parent); },
+    renameEntry: (target) => { void renameEntry(target); },
+    moveEntry: (target) => { void moveEntry(target); },
+    trashEntry: (target) => { void trashEntry(target); },
+  });
 }
 
 export async function openWorkspacePicker() {
@@ -486,9 +454,34 @@ export function bindWorkspacePanel() {
   bindWorkspaceCollapse(renderWorkspaceTree);
   workspaceOpenEl().addEventListener("click", () => { void openWorkspacePicker(); });
   workspaceRefreshEl().addEventListener("click", () => { void refreshWorkspace(); });
-  workspaceNewDocEl().addEventListener("click", () => { void createDocument(null); });
-  workspaceNewFolderEl().addEventListener("click", () => { void createFolder(null); });
+  workspaceNewDocEl().addEventListener("click", (event) => {
+    event.stopPropagation();
+    if (workspaceNewDocEl().disabled) return;
+    const wasHidden = projectCreateMenuEl().hidden;
+    document.querySelectorAll<HTMLElement>(".action-menu").forEach((menu) => { menu.hidden = true; });
+    document.querySelectorAll<HTMLButtonElement>("[aria-haspopup='menu'][aria-expanded='true']").forEach((button) => {
+      button.setAttribute("aria-expanded", "false");
+    });
+    const nextHidden = !wasHidden;
+    projectCreateMenuEl().hidden = nextHidden;
+    workspaceNewDocEl().setAttribute("aria-expanded", String(!nextHidden));
+  });
+  projectNewAimdEl().addEventListener("click", () => {
+    closeProjectCreateMenu();
+    void createProjectDocument("aimd");
+  });
+  projectNewMarkdownEl().addEventListener("click", () => {
+    closeProjectCreateMenu();
+    void createProjectDocument("markdown");
+  });
+  projectNewFolderEl().addEventListener("click", () => {
+    closeProjectCreateMenu();
+    void createProjectFolder();
+  });
   workspaceCloseEl().addEventListener("click", closeWorkspace);
+  document.addEventListener("click", (event) => {
+    if (!(event.target as HTMLElement | null)?.closest(".project-menu-wrap")) closeProjectCreateMenu();
+  });
   window.addEventListener("aimd-doc-applied", () => {
     if (state.doc?.path) state.workspaceSelectedPath = state.doc.path;
     renderWorkspaceTree();

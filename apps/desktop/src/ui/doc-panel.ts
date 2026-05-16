@@ -37,7 +37,7 @@ export function renderDocPanelTabs() {
   const showGit = state.git.isRepo;
   const inDiffView = state.mainView === "git-diff";
   const showAssets = Boolean(state.doc && !inDiffView && state.uiSettings.showAssetPanel);
-  const showSection = Boolean(state.doc || state.workspace || showGit);
+  const showSection = Boolean(state.doc || inDiffView);
   const activeDocumentTab = inDiffView ? null : activeTab();
   const activeDiffTab = inDiffView
     ? state.git.diffTabs.find((tab) => tab.id === state.openDocuments.activeTabId) || null

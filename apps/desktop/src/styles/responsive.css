@@ -31,6 +31,10 @@
     grid-template-columns: var(--project-rail-width) minmax(0, 1fr) var(--rail-collapsed-width);
   }
 
+  .panel[data-shell="document"][data-has-doc="false"]:not([data-main-view="git-diff"]) {
+    grid-template-columns: var(--project-rail-width) minmax(0, 1fr);
+  }
+
   .panel[data-inspector="expanded"] .inspector {
     position: absolute;
     top: 0;
@@ -50,6 +54,10 @@
   .panel:not([data-shell="launch"]) {
     grid-template-columns: minmax(0, 1fr) var(--rail-collapsed-width);
   }
+
+  .panel[data-shell="document"][data-has-doc="false"]:not([data-main-view="git-diff"]) {
+    grid-template-columns: minmax(0, 1fr);
+  }
   .sidebar { display: none; }
   .reader { padding: 28px 28px 56px; }
 }
@@ -67,6 +75,21 @@
   .panel:not([data-shell="launch"]) {
     grid-template-columns: minmax(0, 1fr);
     border-radius: 12px;
+  }
+  .app-topbar {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 8px;
+    padding: 9px 12px;
+  }
+  .app-actions {
+    width: 100%;
+    justify-content: flex-end;
+  }
+  .app-action-btn {
+    flex: 1 1 auto;
+  }
+  .app-scope {
+    width: 100%;
   }
   .sidebar,
   .inspector { display: none; }
@@ -125,8 +148,11 @@
   .empty-state {
     padding: 24px 18px 24px;
   }
-  .launch-actions {
-    flex-direction: column;
-    align-items: stretch;
+  .launch-grid {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 18px;
+  }
+  .launch-side {
+    margin-top: 0;
   }
 }

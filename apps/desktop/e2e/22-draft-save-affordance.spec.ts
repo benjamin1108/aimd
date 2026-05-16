@@ -3,8 +3,8 @@
  *
  * 钉用户的两条 UX 要求：
  *
- * A. 新建草稿一旦输入了内容（dirty），sidebar-foot 把 "新建" 隐掉、
- *    露出 "保存"。空草稿（没 dirty）和已落盘文档保持原 "新建" 入口。
+ * A. 新建草稿一旦输入了内容（dirty），当前文档头部露出可用的 "保存"。
+ *    全局 "新建" 始终只在 topbar，已落盘且干净的文档禁用保存按钮。
  *
  * B. 编辑模式下点击 inline-editor 内的图片，应弹出 lightbox
  *    （和阅读模式行为对齐）。
@@ -50,43 +50,39 @@ async function installMock(page: Page) {
   });
 }
 
-test.describe("A. sidebar-foot 在 dirty draft 下用 '保存' 替换 '新建'", () => {
-  test("空草稿（未 dirty）：sidebar 显示 '新建'，不显示 '保存'", async ({ page }) => {
+test.describe("A. 当前文档头部承载 dirty draft 保存入口", () => {
+  test("已保存文档：topbar 保留新建入口，当前文档保存按钮禁用", async ({ page }) => {
     await installMock(page);
     await page.goto("/");
 
-    // 进入空草稿。newDocument 把 dirty 置 true，需要再清掉模拟"未输入"的状态。
     await page.locator("#empty-new").click();
     await expect(page.locator("#inline-editor")).toBeVisible();
-    await page.evaluate(() => {
-      const w = window as any;
-      // 直接读 internal state 调整 dirty。e2e mock 里没暴露 setDirty，
-      // 用 doc-card 的 data-state 反查 dirty 状态来断言更稳。
-    });
 
-    // 直接 newDocument 后状态就是 isDraft=true && dirty=true，跳到下面用例覆盖。
-    // 这里改成断言"已保存文档下"的对照：sidebar-new 显示，sidebar-save 隐藏。
+    // 已落盘且干净的文档：全局新建仍在 topbar；当前文档没有可保存变化。
     await clickClose(page);
     await page.locator("#empty-open").click();
     await expect(page.locator("#doc-title")).toHaveText("已保存文档");
 
-    await expect(page.locator("#sidebar-new")).toBeVisible();
-    await expect(page.locator("#sidebar-save")).toBeHidden();
+    await expect(page.locator("#global-new-toggle")).toBeVisible();
+    await expect(page.locator("#save")).toBeVisible();
+    await expect(page.locator("#save")).toBeDisabled();
+    await expect(page.locator("#sidebar-foot")).toBeHidden();
   });
 
-  test("dirty 草稿：sidebar-new 隐藏，sidebar-save 显示并能保存", async ({ page }) => {
+  test("dirty 草稿：当前文档保存按钮显示并能保存", async ({ page }) => {
     await installMock(page);
     await page.goto("/");
 
     await page.locator("#empty-new").click();
     await expect(page.locator("#inline-editor")).toBeVisible();
 
-    // newDocument 自带 dirty=true（草稿即"已输入"语义），因此即刻满足条件
-    await expect(page.locator("#sidebar-new")).toBeHidden();
-    await expect(page.locator("#sidebar-save")).toBeVisible();
-    await expect(page.locator("#sidebar-save")).toContainText("保存");
+    // newDocument 自带 dirty=true（草稿即"已输入"语义），因此即刻满足条件。
+    await expect(page.locator("#global-new-toggle")).toBeVisible();
+    await expect(page.locator("#save")).toBeVisible();
+    await expect(page.locator("#save")).toBeEnabled();
+    await expect(page.locator("#save")).toContainText("保存");
 
-    // 点 sidebar-save 走 saveDocument()，模拟 cancel 文件选择，仅断言行为分发
+    // 点当前文档保存走 saveDocument()，模拟 cancel 文件选择，仅断言行为分发。
     let askedSavePath = false;
     await page.exposeFunction("__markSavePath", () => {
       askedSavePath = true;
@@ -102,18 +98,18 @@ test.describe("A. sidebar-foot 在 dirty draft 下用 '保存' 替换 '新建'",
       };
     });
 
-    await page.locator("#sidebar-save").click();
+    await page.locator("#save").click();
     await expect(page.locator("#save-format-panel")).toBeVisible();
     await page.locator("#save-format-aimd").click();
     await expect.poll(() => askedSavePath).toBe(true);
   });
 
-  test("草稿保存为正式文件后，sidebar 切回 '新建'", async ({ page }) => {
+  test("草稿保存为正式文件后，当前文档保存按钮回到禁用态", async ({ page }) => {
     await installMock(page);
     await page.goto("/");
 
     await page.locator("#empty-new").click();
-    await expect(page.locator("#sidebar-save")).toBeVisible();
+    await expect(page.locator("#save")).toBeEnabled();
 
     // 模拟 saveDocumentAs 流程通过：替换 choose_save_aimd_file + save_aimd_as
     await page.evaluate(() => {
@@ -134,12 +130,12 @@ test.describe("A. sidebar-foot 在 dirty draft 下用 '保存' 替换 '新建'",
       };
     });
 
-    await page.locator("#sidebar-save").click();
+    await page.locator("#save").click();
     await expect(page.locator("#save-format-panel")).toBeVisible();
     await page.locator("#save-format-aimd").click();
 
-    await expect(page.locator("#sidebar-save")).toBeHidden();
-    await expect(page.locator("#sidebar-new")).toBeVisible();
+    await expect(page.locator("#save")).toBeDisabled();
+    await expect(page.locator("#global-new-toggle")).toBeVisible();
   });
 });
 

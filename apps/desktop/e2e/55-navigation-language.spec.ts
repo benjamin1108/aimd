@@ -190,22 +190,16 @@ async function openDocumentFromProject(page: Page, fileName: string) {
   await expect(page.locator("#doc-title")).toContainText(fileName.replace(/\.(aimd|md)$/i, ""));
 }
 
-async function forceRequiresAimdSave(page: Page) {
-  await page.evaluate(async () => {
-    const { state } = await import("/src/core/state.ts");
-    const { updateChrome } = await import("/src/ui/chrome.ts");
-    if (!state.doc) throw new Error("expected active doc");
-    state.doc.requiresAimdSave = true;
-    state.doc.needsAimdSave = true;
-    state.doc.dirty = true;
-    updateChrome();
-  });
-}
-
 async function capturePhase4Screenshot(page: Page, name: string) {
   const dir = process.env.AIMD_PHASE4_SCREENSHOT_DIR;
   if (!dir) return;
   await page.screenshot({ path: `${dir.replace(/\/$/, "")}/${name}.png`, fullPage: true });
+}
+
+async function normalizedTexts(page: Page, selector: string): Promise<string[]> {
+  return page.locator(selector).evaluateAll((items) =>
+    items.map((item) => (item.textContent || "").replace(/\s+/g, "").trim()),
+  );
 }
 
 test.describe("Phase 4 navigation language and stable status", () => {
@@ -219,12 +213,50 @@ test.describe("Phase 4 navigation language and stable status", () => {
     await expect(page.locator("#doc-path")).toHaveText("未打开文档");
     await expect(page.locator("#workspace-root-label")).toHaveText("项目");
     await expect(page.locator("#workspace-close")).toHaveAttribute("title", "关闭项目");
-    await expect(page.locator("#empty")).toContainText("新建文档、打开 AIMD / Markdown，或打开项目目录。");
+    await expect(page.locator("#app-scope-primary")).toHaveText("启动页");
+    await expect(page.locator("#app-scope-secondary")).toHaveText("入口按命令域分层");
+    await expect(page.locator("#empty")).toContainText("继续处理文档");
+    await expect(page.locator("#empty")).toContainText("从最近打开的文档继续，或开始新的内容。");
+    await expect(page.locator("#empty")).toContainText("空白 AIMD 草稿");
+    await expect(page.locator("#empty")).toContainText("从一页空白文档开始");
+    await expect(page.locator("#empty")).toContainText("提取网页内容为草稿");
+    await expect(page.locator("#empty")).toContainText("打开 AIMD / Markdown");
+    await expect(page.locator("#empty")).toContainText("选择本地文档继续编辑");
+    await expect(page.locator("#empty")).toContainText("浏览并编辑项目文件");
+
+    await page.locator("#global-new-toggle").click();
+    expect(await normalizedTexts(page, "#global-new-menu .action-menu-item")).toEqual([
+      "空白AIMD草稿⌘N",
+      "在项目中新建AIMD.aimd",
+      "在项目中新建Markdown.md",
+      "从网页导入URL",
+      "导入Markdown文件夹包",
+    ]);
+    await expect(page.locator("#global-new-project-aimd")).toBeDisabled();
+    await page.keyboard.press("Escape");
+
+    await page.locator("#global-open-toggle").click();
+    expect(await normalizedTexts(page, "#global-open-menu .action-menu-item")).toEqual([
+      "打开文档⌘O",
+      "打开项目目录目录",
+      "显示最近打开8项",
+    ]);
+    await page.keyboard.press("Escape");
 
     await openProject(page);
+    await page.locator("#workspace-new-doc").click();
+    expect(await normalizedTexts(page, "#project-create-menu .action-menu-item")).toEqual([
+      "新建AIMD文档.aimd",
+      "新建Markdown文档.md",
+      "新建文件夹目录",
+    ]);
+    await page.keyboard.press("Escape");
+
     await openDocumentFromProject(page, "Daily.md");
     await capturePhase4Screenshot(page, "phase4-navigation-desktop");
 
+    await expect(page.locator("#app-scope-primary")).toHaveText("项目 / Daily");
+    await expect(page.locator("#app-scope-secondary")).toHaveText(".../project/Daily.md");
     await expect(page.locator("#mode-read")).toHaveText("预览");
     await expect(page.locator("#mode-edit")).toHaveText("可视编辑");
     await expect(page.locator("#mode-source")).toHaveText("Markdown");
@@ -232,8 +264,17 @@ test.describe("Phase 4 navigation language and stable status", () => {
     await page.locator("#more-menu-toggle").click();
     await expect(page.locator("#health-check")).toBeHidden();
     await expect(page.locator("#close")).toContainText("关闭当前标签页");
-    await expect(page.locator("#more-menu")).toContainText("检查更新");
-    await expect(page.locator("#more-menu")).toContainText("关于 AIMD");
+    await expect(page.locator("#more-menu")).toContainText("当前文档");
+    await expect(page.locator("#more-menu")).not.toContainText("从网页导入");
+    await expect(page.locator("#more-menu")).not.toContainText("检查更新");
+    await expect(page.locator("#more-menu")).not.toContainText("关于 AIMD");
+    await page.keyboard.press("Escape");
+
+    await page.locator("#app-menu-toggle").click();
+    await expect(page.locator("#app-menu")).toContainText("新建窗口");
+    await expect(page.locator("#app-menu")).toContainText("设置");
+    await expect(page.locator("#app-menu")).toContainText("检查更新");
+    await expect(page.locator("#app-menu")).toContainText("关于 AIMD");
     await page.keyboard.press("Escape");
 
     await page.locator("#mode-source").click();
@@ -259,7 +300,7 @@ test.describe("Phase 4 navigation language and stable status", () => {
     await page.locator("#markdown").fill("# Daily\n\nChanged");
     await expect(page.locator("#doc-state-badges")).toContainText("未保存");
 
-    await forceRequiresAimdSave(page);
+    await page.locator("#markdown").fill("# Daily\n\n![local](asset://img-001)");
     await expect(page.locator("#doc-state-badges")).toContainText("保存需选格式");
 
     await page.locator("#workspace-close").click();
@@ -268,7 +309,8 @@ test.describe("Phase 4 navigation language and stable status", () => {
     await expect(page.locator("#doc-state-badges")).not.toContainText("项目内");
     await expect(page.locator(".open-tab")).toHaveCount(1);
 
-    await page.locator("#sidebar-new").click();
+    await page.locator("#global-new-toggle").click();
+    await page.locator("#global-new-draft").click();
     await expect(page.locator("#doc-state-badges")).toContainText("草稿");
     await expect(page.locator("#doc-state-badges")).toContainText("未保存");
 
@@ -296,7 +338,7 @@ test.describe("Phase 4 navigation language and stable status", () => {
     await expect(page.locator("#git-diff-view")).toBeVisible();
     await expect(page.locator(".git-diff-scope")).toHaveCount(0);
     await expect(page.locator("#git-diff-back")).toHaveCount(0);
-    await expect(page.locator(".open-tab.is-active")).toContainText("Git Diff");
+    await expect(page.locator(".open-tab.is-active")).toContainText("Git");
     await expect(page.locator("#doc-title")).toHaveText("app.ts");
     await expect(page.locator("#doc-path")).toHaveText("Git Diff · src");
   });
@@ -341,5 +383,89 @@ test.describe("Phase 4 navigation language and stable status", () => {
     expect(metrics.tabHeight).toBeGreaterThan(0);
     expect(metrics.headHeight).toBeLessThan(160);
     await capturePhase4Screenshot(page, "phase4-navigation-narrow");
+  });
+
+  test("matches accepted topbar icon boxes and open-tab pixel geometry", async ({ page }) => {
+    await page.addInitScript(() => {
+      window.localStorage.setItem(
+        "aimd.desktop.recents",
+        JSON.stringify(["/mock/project/Daily.md", "/mock/project/Report.aimd"]),
+      );
+    });
+    await page.goto("/");
+    const launchMetrics = await page.evaluate(() => {
+      const box = document.querySelector(".launch-card-icon")?.getBoundingClientRect();
+      const recent = document.querySelector("#recent-section")?.getBoundingClientRect();
+      const side = document.querySelector(".launch-side")?.getBoundingClientRect();
+      return {
+        icon: box ? { width: box.width, height: box.height } : { width: 0, height: 0 },
+        sideRecentDelta: recent && side ? Math.abs(side.top - recent.top) : 999,
+      };
+    });
+    await openProject(page);
+    const projectLaunchMetrics = await page.evaluate(() => {
+      const empty = document.querySelector("#empty")?.getBoundingClientRect();
+      const recentItem = document.querySelector(".recent-item")?.getBoundingClientRect();
+      const commandCard = document.querySelector("#empty-new")?.getBoundingClientRect();
+      const inspector = document.querySelector("#inspector");
+      return {
+        emptyWidth: empty?.width || 0,
+        recentItemWidth: recentItem?.width || 0,
+        commandCardWidth: commandCard?.width || 0,
+        inspectorDisplay: inspector ? getComputedStyle(inspector).display : "",
+      };
+    });
+    await openDocumentFromProject(page, "Daily.md");
+
+    const metrics = await page.evaluate(() => {
+      const rect = (selector: string) => {
+        const box = document.querySelector(selector)?.getBoundingClientRect();
+        return box ? { width: box.width, height: box.height } : { width: 0, height: 0 };
+      };
+      const style = (selector: string) => {
+        const el = document.querySelector(selector);
+        return el ? getComputedStyle(el) : null;
+      };
+      const tabBar = style("#tab-bar");
+      const openTabs = style("#open-tabs");
+      const tab = style(".open-tab");
+      const tabMain = style(".open-tab-main");
+      const format = document.querySelector(".open-tab-format")?.textContent || "";
+      return {
+        brand: rect(".brand-mark"),
+        topbarIcon: rect("#global-new-toggle .secondary-btn-icon svg"),
+        projectIcon: rect("#workspace-open svg"),
+        menuIconColumn: style(".action-menu-item")?.gridTemplateColumns || "",
+        tabBarPadding: tabBar ? `${tabBar.paddingTop} ${tabBar.paddingRight} ${tabBar.paddingBottom} ${tabBar.paddingLeft}` : "",
+        tabGap: openTabs?.gap || "",
+        tabHeight: rect(".open-tab").height,
+        tabMinWidth: tab?.minWidth || "",
+        tabMaxWidth: tab?.maxWidth || "",
+        tabPadding: tabMain ? `${tabMain.paddingTop} ${tabMain.paddingRight} ${tabMain.paddingBottom} ${tabMain.paddingLeft}` : "",
+        tabRadius: tab ? `${tab.borderTopLeftRadius} ${tab.borderTopRightRadius} ${tab.borderBottomRightRadius} ${tab.borderBottomLeftRadius}` : "",
+        close: rect(".open-tab-close"),
+        format,
+      };
+    });
+
+    expect(metrics.brand).toEqual({ width: 25, height: 25 });
+    expect(metrics.topbarIcon).toEqual({ width: 15, height: 15 });
+    expect(metrics.projectIcon).toEqual({ width: 15, height: 15 });
+    expect(launchMetrics.icon).toEqual({ width: 31, height: 31 });
+    expect(launchMetrics.sideRecentDelta).toBeLessThanOrEqual(2);
+    expect(projectLaunchMetrics.inspectorDisplay).toBe("none");
+    expect(projectLaunchMetrics.emptyWidth).toBeGreaterThan(760);
+    expect(projectLaunchMetrics.recentItemWidth).toBeGreaterThan(360);
+    expect(projectLaunchMetrics.commandCardWidth).toBeGreaterThan(280);
+    expect(metrics.menuIconColumn.startsWith("18px ")).toBe(true);
+    expect(metrics.tabBarPadding).toBe("6px 12px 0px 12px");
+    expect(metrics.tabGap).toBe("4px");
+    expect(metrics.tabHeight).toBe(34);
+    expect(metrics.tabMinWidth).toBe("132px");
+    expect(metrics.tabMaxWidth).toBe("230px");
+    expect(metrics.tabPadding).toBe("0px 9px 0px 12px");
+    expect(metrics.tabRadius).toBe("10px 10px 0px 0px");
+    expect(metrics.close).toEqual({ width: 28, height: 28 });
+    expect(metrics.format).toBe("MD");
   });
 });
