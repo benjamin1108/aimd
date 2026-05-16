@@ -76,10 +76,6 @@
   display: none;
 }
 
-.panel[data-has-doc="false"] .workspace-head {
-  display: none;
-}
-
 .panel.dragging-file::after {
   content: "松开以打开 .aimd 或导入 Markdown";
   position: absolute;

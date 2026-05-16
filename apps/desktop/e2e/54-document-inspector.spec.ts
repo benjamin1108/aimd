@@ -297,7 +297,8 @@ test.describe("Document inspector ownership", () => {
     await expect(page.locator(".open-tab.is-active")).toContainText("Git");
     await expect(page.locator(".open-tab.is-active")).toContainText("Alpha");
     await expect(page.locator(".git-diff-line.is-add")).toContainText("+# Alpha reviewed");
-    await expect(page.locator("#sidebar-tab-assets")).toBeHidden();
+    await expect(page.locator("#doc-panel-tabs [role='tab']:not([hidden])")).toHaveText(["大纲", "Git", "资源"]);
+    await expect(page.locator("#sidebar-tab-assets")).toBeVisible();
     await page.locator("#sidebar-tab-outline").click();
     await expect(page.locator("#outline-list")).toContainText("Git Diff 没有文档大纲");
 
@@ -315,7 +316,8 @@ test.describe("Document inspector ownership", () => {
     await expect(page.locator("#workspace-root-label")).toHaveText("项目");
     await expect(page.locator("#inspector-owner")).toContainText("Beta");
     await expect(page.locator("#outline-list")).toContainText("Beta Scope");
-    await expect(page.locator("#sidebar-tab-git")).toBeHidden();
+    await expect(page.locator("#doc-panel-tabs [role='tab']:not([hidden])")).toHaveText(["大纲", "Git", "资源"]);
+    await expect(page.locator("#sidebar-tab-git")).toBeVisible();
   });
 
   test("narrow viewport can collapse the inspector without covering tabs or content", async ({ page }) => {

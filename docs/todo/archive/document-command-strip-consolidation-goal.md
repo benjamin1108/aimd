@@ -18,8 +18,8 @@ The duplicated chrome is the document header:
 - the document surface starts after all of that.
 
 The accepted product direction is to remove the separate document title/header
-row and consolidate current-document controls into one compact document command
-strip.
+row, keep open tabs on their own layer, and consolidate current-document
+controls into one compact document toolbar directly below the tabs.
 
 The accepted layout contract is:
 
@@ -27,8 +27,10 @@ The accepted layout contract is:
 top global bar
 ├─ project rail
 ├─ document workspace
-│  ├─ document command strip:
-│  │  [open tabs...] [预览 | 可视编辑 | Markdown] [查找] [状态] [保存] [文档 ▾]
+│  ├─ document tab strip:
+│  │  [open tabs...]
+│  ├─ document toolbar strip:
+│  │  [预览 | 可视编辑 | Markdown] [查找] [状态] [保存] [文档 ▾]
 │  └─ document surface
 └─ inspector rail
 ```
@@ -56,26 +58,26 @@ That mid-fidelity artifact defines the accepted visual language:
 
 The accepted layout refinement after that artifact is:
 
-- `预览 / 可视编辑 / Markdown`, `查找`, `保存`, and `文档` must sit on the same
-  row as the active document tab strip on desktop.
-- The prior two-row version in the mid-fidelity artifact is not the production
-  layout contract.
+- Open tabs must not share a row with mode switching, find, save, or document
+  menu controls.
+- `预览 / 可视编辑 / Markdown`, `查找`, `保存`, and `文档` sit together in one
+  document toolbar row directly below the tab strip on desktop.
 - If the prototype artifact is updated during implementation, its recommended,
-  menu-open, and source-mode scenes must use the one-row command strip.
+  menu-open, and source-mode scenes must use the tab strip plus one toolbar row.
 
 The implementation must preserve the mid-fidelity styling while applying the
-one-row information architecture.
+two-layer tab/toolbar information architecture.
 
 ## Objective
 
 Ship a production refactor of AIMD Desktop's document chrome so the document
-surface starts immediately below a single compact document command strip.
+surface starts immediately below a compact tab strip plus one document toolbar.
 
 Required outcome:
 
 - Remove the separate document header row from normal document states.
-- Move current-document operations into the document command strip.
-- Move mode switching and find into the same strip.
+- Move current-document operations into the document toolbar under the tabs.
+- Move mode switching and find into that same toolbar row.
 - Keep document identity in the global topbar scope and active tabs.
 - Preserve project rail behavior and inspector behavior.
 - Preserve save, export, format, image packaging, close-tab, dirty, draft,
@@ -117,18 +119,21 @@ Rules:
 - Project creation remains project-scoped and does not replace global
   `空白 AIMD 草稿`.
 
-### Document Command Strip
+### Document Tab Strip And Toolbar
 
-The document command strip owns the active document/tab:
+The document tab strip owns open-document switching. The document toolbar owns
+current-document commands:
 
 ```text
-[tabs...] [预览 | 可视编辑 | Markdown] [查找] [compact state] [保存] [文档 ▾]
+[tabs...]
+[预览 | 可视编辑 | Markdown] [查找] [compact state] [保存] [文档 ▾]
 ```
 
 Rules:
 
-- This strip replaces the separate document header and separate mode toolbar.
-- Open tabs stay on the left and keep the accepted tab geometry:
+- These two layers replace the separate document header and old separate mode
+  toolbar. There is no title/path/save header between topbar and tabs.
+- Open tabs stay in their own row and keep the accepted tab geometry:
   - height: `34px`
   - minimum width: `132px`
   - maximum width: `230px`
@@ -142,13 +147,16 @@ Rules:
   - close affordance does not expand row height
 - Mode switch copy and order are fixed:
   `预览`, `可视编辑`, `Markdown`.
-- `查找` stays next to the mode switch, not in the document menu.
+- `查找` stays next to the mode switch in the toolbar, not in the document menu.
+- The search UI opens as a small popover below the find button. It does not
+  expand the toolbar horizontally; source-mode replace controls appear as a
+  second row inside that popover.
 - `保存` remains visible as the active document's primary action.
 - `文档 ▾` remains visible as the active document's command menu.
 - No icon-only ellipsis trigger replaces `文档 ▾`.
-- The vertical center of active tab, mode switch, find, save, and document menu
-  aligns optically in the same row on desktop.
-- The command strip is not rendered when no document or Git diff tab is active.
+- The toolbar controls align optically in one row on desktop.
+- The tab strip and toolbar are not rendered when no document or Git diff tab is
+  active.
 
 ### Current Document Menu
 
@@ -274,26 +282,26 @@ Desktop document state:
 
 ```text
 topbar
-document command strip
+document tab strip
+document toolbar strip
 document surface
 footer/status
 ```
 
 Rules:
 
-- The document surface starts directly below the document command strip.
+- The document surface starts directly below the document toolbar strip.
 - There is no `.workspace-head` equivalent in document state.
-- There is no separate `.doc-toolbar` equivalent for mode switching and find in
-  normal document state.
-- The command strip height stays compact and stable. It must not grow when the
-  active tab is dirty, draft, Markdown, AIMD, or conflict-marked.
+- There is exactly one `.doc-toolbar` equivalent below tabs for mode switching,
+  find, state, save, and document menu.
+- The toolbar height stays compact and stable. It must not grow when the active
+  tab is dirty, draft, Markdown, AIMD, or conflict-marked.
 - Tabs use horizontal overflow or truncation before pushing the controls off the
-  right edge.
+  right edge; toolbar controls do not consume tab-row width.
 - The right-side controls remain reachable at desktop widths where the full
   three-column layout is active.
-- On narrow viewports, the command strip collapses into a compact two-row
-  control surface only after side rails are hidden; it must not reintroduce a
-  title/path/save header.
+- On narrow viewports, the toolbar may wrap into a compact control surface only
+  after side rails are hidden; it must not reintroduce a title/path/save header.
 
 Launch/no-document state:
 
@@ -301,18 +309,18 @@ Launch/no-document state:
 - The project rail remains visible when a project is open and the active shell
   has enough width for the existing project rail behavior.
 - The inspector rail does not occupy space.
-- The document command strip is hidden.
+- The document tab strip and toolbar are hidden.
 
 Source mode:
 
-- Source editor uses the same command strip.
+- Source editor uses the same tab strip and toolbar.
 - Dirty state is visible without adding a row.
 - Source find/replace behavior remains intact.
 - Existing source-preserving behavior is unchanged.
 
 Visual edit mode:
 
-- The one-row command strip remains above the visual editor.
+- The tab strip and one toolbar row remain above the visual editor.
 - The rich formatting toolbar is limited to visual-editing surfaces.
 - The formatting toolbar must not carry document identity, save, document menu,
   mode switch, or find.
@@ -348,7 +356,7 @@ Expected design artifact surface:
 
 - `docs/product/design/aimd-compact-document-chrome-midfi.html`
 
-This artifact must show the accepted one-row document command strip in
+This artifact must show the accepted document tab strip plus one toolbar row in
 recommended, menu-open, and source-mode scenes before it is used as an
 implementation reference.
 
@@ -374,11 +382,10 @@ Add or update Playwright coverage for:
 - Document state has no standalone document title/header row.
 - Active document title/path are still visible through the topbar scope and
   active tab.
-- Active tab, mode switch, find, save, and document menu are in the same command
-  strip on desktop.
-- The vertical center difference among active tab, mode switch, find, save, and
-  document menu is at most 2px in the accepted desktop viewport.
-- The document surface starts directly below the command strip; there is no
+- Active tab strip is directly above the document toolbar on desktop.
+- Mode switch, find, save, and document menu are in the same toolbar row on
+  desktop.
+- The document surface starts directly below the toolbar strip; there is no
   extra title/path/save row before the editor.
 - `预览`, `可视编辑`, `Markdown` remain in the fixed order.
 - `查找` remains reachable outside the document menu.
@@ -433,11 +440,11 @@ Before completion, run:
 - `npm --prefix apps/desktop run check`
 - `git diff --check`
 - `cargo check --workspace`
-- `PLAYWRIGHT_NO_WEB_SERVER=1 npm --prefix apps/desktop run test:e2e -- e2e/55-navigation-language.spec.ts`
-- `PLAYWRIGHT_NO_WEB_SERVER=1 npm --prefix apps/desktop run test:e2e -- e2e/56-three-column-css-polish.spec.ts e2e/57-high-end-visual-refactor.spec.ts`
-- `PLAYWRIGHT_NO_WEB_SERVER=1 npm --prefix apps/desktop run test:e2e -- e2e/42-editor-core-capabilities.spec.ts e2e/52-open-documents-tabs.spec.ts e2e/38-design-polish.spec.ts`
-- `PLAYWRIGHT_NO_WEB_SERVER=1 npm --prefix apps/desktop run test:e2e -- e2e/07-narrow-viewport.spec.ts e2e/31-md-open-association.spec.ts`
-- `PLAYWRIGHT_NO_WEB_SERVER=1 npm --prefix apps/desktop run test:e2e -- e2e/54-document-inspector.spec.ts e2e/45-asset-panel-settings.spec.ts e2e/46-git-workspace-panel.spec.ts e2e/06-outline-and-resizer.spec.ts`
+- From `apps/desktop`: `npx playwright test e2e/55-navigation-language.spec.ts`
+- From `apps/desktop`: `npx playwright test e2e/56-three-column-css-polish.spec.ts e2e/57-high-end-visual-refactor.spec.ts`
+- From `apps/desktop`: `npx playwright test e2e/42-editor-core-capabilities.spec.ts e2e/52-open-documents-tabs.spec.ts e2e/38-design-polish.spec.ts`
+- From `apps/desktop`: `npx playwright test e2e/07-narrow-viewport.spec.ts e2e/31-md-open-association.spec.ts`
+- From `apps/desktop`: `npx playwright test e2e/54-document-inspector.spec.ts e2e/45-asset-panel-settings.spec.ts e2e/46-git-workspace-panel.spec.ts e2e/06-outline-and-resizer.spec.ts`
 
 Any skipped validation must state the exact command and the exact environment or
 product failure.
@@ -445,8 +452,7 @@ product failure.
 ## Non-Negotiable Requirements
 
 - Do not reintroduce a separate document title/path/save header.
-- Do not split mode switch/find into a separate persistent toolbar row in normal
-  document state.
+- Do not put mode switch/find/save/document menu in the tab row.
 - Do not hide `保存` behind the document menu.
 - Do not use a bare `...` trigger for current-document actions.
 - Do not move app-level commands into `文档`.
@@ -469,13 +475,14 @@ product failure.
 ## Acceptance Criteria
 
 This goal is complete only when the real AIMD Desktop document state matches
-the accepted one-row command-strip architecture:
+the accepted tab-strip plus toolbar architecture:
 
 - global topbar owns document identity and global commands;
 - project rail owns project commands;
-- document command strip owns tabs, mode switching, find, save, compact state,
-  and current-document menu;
-- document surface starts immediately below that single command strip;
+- document tab strip owns open tabs;
+- document toolbar owns mode switching, find, save, compact state, and
+  current-document menu;
+- document surface starts immediately below that toolbar;
 - current-document menu contains only current-document commands;
 - launch/no-document state hides current-document controls and inspector;
 - inspector tabs are fixed as `大纲 / Git / 资源`, with selected white/paper tab

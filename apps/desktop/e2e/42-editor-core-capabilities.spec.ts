@@ -262,7 +262,28 @@ test.describe("Editor core capabilities", () => {
     await page.locator("#empty-open").click();
     await page.locator("#mode-source").click();
 
+    const stripHeightBeforeFind = await page.locator("#document-command-strip").evaluate(
+      (el) => el.getBoundingClientRect().height,
+    );
     await page.keyboard.press(process.platform === "darwin" ? "Meta+H" : "Control+H");
+    await expect(page.locator("#find-toggle")).toBeVisible();
+    await expect(page.locator("#find-toggle")).toHaveAttribute("aria-expanded", "true");
+    await expect(page.locator("#find-bar")).toBeVisible();
+    await expect(page.locator(".find-replace-group")).toBeVisible();
+    const findMetrics = await page.evaluate(() => {
+      const strip = document.querySelector("#document-command-strip")!.getBoundingClientRect();
+      const toggle = document.querySelector("#find-toggle")!.getBoundingClientRect();
+      const bar = document.querySelector("#find-bar")!.getBoundingClientRect();
+      return {
+        stripHeight: strip.height,
+        barTop: bar.top,
+        toggleBottom: toggle.bottom,
+      };
+    });
+    expect(findMetrics.stripHeight).toBe(stripHeightBeforeFind);
+    expect(findMetrics.barTop).toBeGreaterThanOrEqual(findMetrics.toggleBottom);
+    await page.locator("#find-input").pressSequentially("A");
+    await expect(page.locator("#find-input")).toBeFocused();
     await page.locator("#find-input").fill("Alpha");
     await page.locator("#replace-input").fill("Omega");
     await page.locator("#replace-all").click();

@@ -481,17 +481,17 @@
     }
 
     .doc-strip {
-      display: grid;
-      grid-template-columns: minmax(0, 1fr) auto;
+      display: flex;
       align-items: end;
-      gap: 12px;
-      min-height: 42px;
+      min-width: 0;
+      min-height: 40px;
       padding: 6px 12px 0;
       border-bottom: 1px solid var(--line);
       background: var(--rail-soft);
     }
 
     .scene-launch .doc-strip,
+    .scene-launch .command-strip,
     .scene-launch .mode-strip {
       display: none;
     }
@@ -502,6 +502,7 @@
       gap: 4px;
       min-width: 0;
       overflow: hidden;
+      align-self: end;
     }
 
     .tab {
@@ -560,9 +561,10 @@
       display: inline-flex;
       align-items: center;
       align-self: center;
-      gap: 7px;
-      padding-bottom: 6px;
+      gap: 6px;
       min-width: 0;
+      width: 100%;
+      white-space: nowrap;
     }
 
     .dirty-state {
@@ -575,12 +577,13 @@
       white-space: nowrap;
     }
 
+    .command-strip,
     .mode-strip {
       display: flex;
       align-items: center;
-      gap: 12px;
+      gap: 8px;
       min-height: 40px;
-      padding: 7px 14px;
+      padding: 6px 12px;
       border-bottom: 1px solid var(--line);
       background: rgba(255,255,255,0.46);
     }
@@ -595,7 +598,7 @@
 
     .segmented button {
       height: 26px;
-      padding: 0 11px;
+      padding: 0 9px;
       border-radius: 7px;
       color: var(--muted);
       font-size: 12px;
@@ -609,6 +612,74 @@
     }
 
     .mode-spacer { flex: 1 1 auto; }
+
+    .find-wrap {
+      position: relative;
+      display: inline-flex;
+      align-items: center;
+      flex: 0 0 auto;
+    }
+
+    .find-popover {
+      position: absolute;
+      top: calc(100% + 6px);
+      left: 0;
+      z-index: 20;
+      display: grid;
+      gap: 5px;
+      width: 286px;
+      padding: 5px;
+      border: 1px solid rgba(36, 30, 20, 0.11);
+      border-radius: 8px;
+      background: rgba(255,253,248,0.98);
+      box-shadow: 0 22px 54px -36px rgba(35, 28, 14, 0.42), 0 7px 18px -16px rgba(35, 28, 14, 0.24), inset 0 1px 0 rgba(255,255,255,0.78);
+    }
+
+    .find-row {
+      display: flex;
+      align-items: center;
+      gap: 3px;
+      min-width: 0;
+      min-height: 30px;
+      padding: 0 3px 0 7px;
+      border-radius: 7px;
+      background: rgba(36, 30, 20, 0.035);
+    }
+
+    .find-popover input {
+      min-width: 0;
+      flex: 1 1 auto;
+      height: 28px;
+      border: 0;
+      border-radius: 7px;
+      padding: 0 6px;
+      background: transparent;
+      color: var(--ink);
+      font: 12px/1 var(--sans);
+      outline: none;
+    }
+
+    .find-count {
+      min-width: 32px;
+      color: var(--muted);
+      font: 650 11px/1 var(--mono);
+      text-align: center;
+    }
+
+    .find-popover .icon-btn {
+      width: 24px;
+      height: 24px;
+      border-radius: 6px;
+    }
+
+    .find-text-btn {
+      height: 24px;
+      padding: 0 7px;
+      border-radius: 6px;
+      color: var(--muted);
+      font-size: 11.5px;
+      font-weight: 620;
+    }
 
     .canvas {
       position: relative;
@@ -772,12 +843,12 @@
     }
 
     .menu-doc {
-      top: 111px;
+      top: 151px;
       right: 298px;
     }
 
     .menu-kebab {
-      top: 109px;
+      top: 149px;
       right: 296px;
     }
 
@@ -803,12 +874,12 @@
     }
 
     .callout-strip {
-      top: 116px;
+      top: 156px;
       right: 304px;
     }
 
     .callout-kebab {
-      top: 156px;
+      top: 196px;
       right: 300px;
     }
 
@@ -940,6 +1011,7 @@
     .scene-launch .menu,
     .scene-launch .callout,
     .scene-launch .doc-strip,
+    .scene-launch .command-strip,
     .scene-launch .mode-strip,
     .scene-anti .source-editor,
     .scene-anti .menu-doc,
@@ -1033,13 +1105,10 @@
       }
 
       .doc-strip {
-        grid-template-columns: minmax(0, 1fr);
-        gap: 6px;
         padding-bottom: 6px;
       }
 
       .active-doc-actions {
-        justify-self: end;
         padding-bottom: 0;
       }
 
@@ -1059,7 +1128,7 @@
       <div class="brief-head">
         <div class="kicker">AIMD COMPACT CHROME</div>
         <h1>去掉文档标题栏后的当前文档操作设计</h1>
-        <p>问题不是保存按钮本身，而是保存区域带着重复标题、路径、状态芯片，形成一整层无效 chrome。方案是删除文档标题栏，把当前文档操作压回标签行右侧。</p>
+        <p>问题不是保存按钮本身，而是保存区域带着重复标题、路径、状态芯片，形成一整层无效 chrome。方案是删除文档标题栏，让标签层只负责切换文档，文档工具栏在其下方集中承载当前文档操作。</p>
         <div class="metric">
           <div class="metric-card">
             <div class="metric-value">3 -> 2</div>
@@ -1075,11 +1144,11 @@
       <nav class="scene-switcher" aria-label="场景切换">
         <button class="scene-btn is-active" type="button" data-scene="recommended">
           <span class="scene-index">01</span>
-          <span><span class="scene-title">推荐文档态</span><span class="scene-note">身份在顶栏，操作在标签行</span></span>
+          <span><span class="scene-title">推荐文档态</span><span class="scene-note">身份在顶栏，工具在标签下</span></span>
         </button>
         <button class="scene-btn" type="button" data-scene="menu">
           <span class="scene-index">02</span>
-          <span><span class="scene-title">文档菜单展开</span><span class="scene-note">从标签行右侧打开</span></span>
+          <span><span class="scene-title">文档菜单展开</span><span class="scene-note">从文档工具栏右侧打开</span></span>
         </button>
         <button class="scene-btn" type="button" data-scene="source">
           <span class="scene-index">03</span>
@@ -1098,8 +1167,9 @@
       <section class="rules">
         <h2>设计规则</h2>
         <div class="rule">删除文档标题栏。文档标题、路径、项目关系已经在顶部 scope 和标签里表达。</div>
-        <div class="rule">标签行成为当前文档操作带：左侧是打开的文档，右侧是当前标签的保存、文档菜单。</div>
-        <div class="rule">模式切换和查找保留一行，因为它们是编辑/阅读视图控制，不属于文档身份。</div>
+        <div class="rule">标签行只承载打开的文档，保证多个 tab 有足够横向空间。</div>
+        <div class="rule">文档工具栏位于标签下方：模式切换、查找、状态、保存、文档菜单压成同一层。</div>
+        <div class="rule">查找不横向撑开工具栏；点击后在按钮下方弹出小搜索框，替换只在源码模式作为第二行出现。</div>
         <div class="rule">未保存状态用活动标签 dirty 点和右侧「未保存」短状态表达，不再占一整行芯片。</div>
         <div class="rule">无文档时不显示保存、文档菜单、检查器。启动页只保留最近、创建、打开。</div>
       </section>
@@ -1147,15 +1217,15 @@
                   <div class="tab is-active"><span class="tab-title">Quarterly Report</span><span class="tag">AIMD</span><button class="tab-close"><span data-icon="close"></span></button></div>
                   <div class="tab"><span class="tab-title">product-direction</span><span class="tag">MD</span><button class="tab-close"><span data-icon="close"></span></button></div>
                 </div>
+              </div>
+              <div class="command-strip">
                 <div class="active-doc-actions">
+                  <div class="segmented"><button class="is-active">预览</button><button>可视编辑</button><button>Markdown</button></div>
+                  <span class="find-wrap"><button class="icon-btn" title="查找"><span data-icon="search"></span></button></span>
+                  <div class="mode-spacer"></div>
                   <button class="btn primary compact"><span data-icon="save"></span><span>保存</span></button>
                   <button class="btn subtle compact"><span data-icon="document"></span><span>文档</span><span class="chev" data-icon="chev-down"></span></button>
                 </div>
-              </div>
-              <div class="mode-strip">
-                <div class="segmented"><button class="is-active">预览</button><button>可视编辑</button><button>Markdown</button></div>
-                <div class="mode-spacer"></div>
-                <button class="btn ghost compact">查找</button>
               </div>
               <div class="canvas">
                 <article class="doc-paper">
@@ -1171,7 +1241,7 @@
 
             <aside class="inspector">
               <div class="inspector-title">当前文档</div>
-              <div class="inspector-tabs"><button class="is-active">大纲</button><button>资源</button><button>Git</button></div>
+              <div class="inspector-tabs"><button class="is-active">大纲</button><button>Git</button><button>资源</button></div>
               <div class="outline">
                 <div class="outline-row is-active">季度复盘</div>
                 <div class="outline-row">目标与结果</div>
@@ -1180,8 +1250,8 @@
               </div>
             </aside>
           </div>
-          <div class="callout callout-strip"><strong>当前文档操作不消失</strong>只是从独立标题栏移到活动标签行右侧。它仍然明确作用于当前标签。</div>
-          <footer class="footer">编辑区上方只剩：标签行 + 模式工具行</footer>
+          <div class="callout callout-strip"><strong>当前文档操作不消失</strong>只是从独立标题栏移到标签下方的文档工具栏。它仍然明确作用于当前标签。</div>
+          <footer class="footer">编辑区上方只剩：全局顶栏 + 标签行 + 单行文档工具栏</footer>
         </section>
 
         <section class="scene scene-menu" data-scene-panel="menu">
@@ -1220,15 +1290,15 @@
                   <div class="tab is-active"><span class="tab-title">Quarterly Report</span><span class="tag">AIMD</span><button class="tab-close"><span data-icon="close"></span></button></div>
                   <div class="tab"><span class="tab-title">product-direction</span><span class="tag">MD</span><button class="tab-close"><span data-icon="close"></span></button></div>
                 </div>
+              </div>
+              <div class="command-strip">
                 <div class="active-doc-actions">
+                  <div class="segmented"><button class="is-active">预览</button><button>可视编辑</button><button>Markdown</button></div>
+                  <span class="find-wrap"><button class="icon-btn" title="查找"><span data-icon="search"></span></button></span>
+                  <div class="mode-spacer"></div>
                   <button class="btn primary compact"><span data-icon="save"></span><span>保存</span></button>
                   <button class="btn subtle compact"><span data-icon="document"></span><span>文档</span><span class="chev" data-icon="chev-down"></span></button>
                 </div>
-              </div>
-              <div class="mode-strip">
-                <div class="segmented"><button class="is-active">预览</button><button>可视编辑</button><button>Markdown</button></div>
-                <div class="mode-spacer"></div>
-                <button class="btn ghost compact">查找</button>
               </div>
               <div class="canvas">
                 <article class="doc-paper">
@@ -1242,7 +1312,7 @@
             </section>
             <aside class="inspector">
               <div class="inspector-title">当前文档</div>
-              <div class="inspector-tabs"><button class="is-active">大纲</button><button>资源</button><button>Git</button></div>
+              <div class="inspector-tabs"><button class="is-active">大纲</button><button>Git</button><button>资源</button></div>
             </aside>
           </div>
           <div class="menu menu-doc">
@@ -1258,7 +1328,7 @@
             <div class="menu-item"><span data-icon="close"></span><span>关闭当前标签页</span><small>Cmd W</small></div>
           </div>
           <div class="callout callout-kebab"><strong>菜单仍叫「文档」</strong>不回退到裸省略号。它是活动标签的操作菜单。</div>
-          <footer class="footer">文档菜单从标签行右侧展开，不占用额外标题栏</footer>
+          <footer class="footer">文档菜单从文档工具栏右侧展开，不占用额外标题栏</footer>
         </section>
 
         <section class="scene scene-source" data-scene-panel="source">
@@ -1297,16 +1367,22 @@
                   <div class="tab is-active"><span class="tab-title">Quarterly Report</span><span class="dirty-dot"></span><button class="tab-close"><span data-icon="close"></span></button></div>
                   <div class="tab"><span class="tab-title">product-direction</span><span class="tag">MD</span><button class="tab-close"><span data-icon="close"></span></button></div>
                 </div>
+              </div>
+              <div class="command-strip">
                 <div class="active-doc-actions">
+                  <div class="segmented"><button>预览</button><button>可视编辑</button><button class="is-active">Markdown</button></div>
+                  <span class="find-wrap">
+                    <button class="icon-btn" title="查找"><span data-icon="search"></span></button>
+                    <span class="find-popover">
+                      <span class="find-row"><span data-icon="search"></span><input value="文档入口"><span class="find-count">1/3</span><button class="icon-btn"><span data-icon="chev-up"></span></button><button class="icon-btn"><span data-icon="chev-down"></span></button><button class="icon-btn"><span data-icon="close"></span></button></span>
+                      <span class="find-row"><input value="文档命令"><button class="find-text-btn">替换</button><button class="find-text-btn">全部</button></span>
+                    </span>
+                  </span>
                   <span class="dirty-state"><span class="dirty-dot"></span>未保存</span>
+                  <div class="mode-spacer"></div>
                   <button class="btn primary compact"><span data-icon="save"></span><span>保存</span></button>
                   <button class="btn subtle compact"><span data-icon="document"></span><span>文档</span><span class="chev" data-icon="chev-down"></span></button>
                 </div>
-              </div>
-              <div class="mode-strip">
-                <div class="segmented"><button>预览</button><button>可视编辑</button><button class="is-active">Markdown</button></div>
-                <div class="mode-spacer"></div>
-                <button class="btn ghost compact">查找</button>
               </div>
               <div class="canvas">
                 <pre class="source-editor"># 季度复盘
@@ -1324,7 +1400,7 @@
             </section>
             <aside class="inspector">
               <div class="inspector-title">当前文档</div>
-              <div class="inspector-tabs"><button class="is-active">大纲</button><button>资源</button><button>Git</button></div>
+              <div class="inspector-tabs"><button class="is-active">大纲</button><button>Git</button><button>资源</button></div>
             </aside>
           </div>
           <footer class="footer">源码态同样不恢复文档标题栏</footer>
@@ -1436,7 +1512,7 @@
               <div class="mode-strip">
                 <div class="segmented"><button class="is-active">预览</button><button>可视编辑</button><button>Markdown</button></div>
                 <div class="mode-spacer"></div>
-                <button class="btn ghost compact">查找</button>
+                <button class="icon-btn" title="查找"><span data-icon="search"></span></button>
               </div>
               <div class="canvas">
                 <article class="doc-paper">
@@ -1449,7 +1525,7 @@
             </section>
             <aside class="inspector">
               <div class="inspector-title">当前文档</div>
-              <div class="inspector-tabs"><button class="is-active">大纲</button><button>资源</button><button>Git</button></div>
+              <div class="inspector-tabs"><button class="is-active">大纲</button><button>Git</button><button>资源</button></div>
             </aside>
           </div>
           <div class="anti-note"><strong>反例</strong><br>这个标题栏重复了顶栏 scope 和活动标签标题，还把编辑区继续往下压。</div>
@@ -1467,6 +1543,7 @@
       document: '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"><path d="M9 1.5H4a1 1 0 0 0-1 1v11a1 1 0 0 0 1 1h8a1 1 0 0 0 1-1v-8L9 1.5z"/><path d="M9 1.5v4h4"/></svg>',
       'open-document': '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"><path d="M3 13h10"/><path d="M4 3h8v7H4z"/></svg>',
       source: '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"><path d="m5.5 4-3 4 3 4M10.5 4l3 4-3 4"/></svg>',
+      search: '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.45" stroke-linecap="round" stroke-linejoin="round"><circle cx="7" cy="7" r="4.2"/><path d="m10.2 10.2 3.1 3.1"/></svg>',
       save: '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3.5v9a1 1 0 0 0 1 1h8a1 1 0 0 0 1-1V5.5L11 3H4a1 1 0 0 0-1 .5z"/><path d="M5 3.5V7h6V3.5M5 13.5V10h6v3.5"/></svg>',
       refresh: '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"><path d="M13 7a5 5 0 0 0-8.6-3.2L3 5.2"/><path d="M3 2.5v2.7h2.7M3 9a5 5 0 0 0 8.6 3.2L13 10.8"/><path d="M13 13.5v-2.7h-2.7"/></svg>',
       close: '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><path d="m4 4 8 8M12 4 4 12"/></svg>',

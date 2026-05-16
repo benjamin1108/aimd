@@ -95,19 +95,17 @@ test.describe("Narrow viewport (< 760px) layout", () => {
     await expect(page.locator("#reader h1")).toHaveText("AIMD 样例");
   });
 
-  test("at 600px workspace-head does not exceed 120px when a doc is open", async ({ page }) => {
+  test("at 600px document command strip stays compact when a doc is open", async ({ page }) => {
     await page.setViewportSize({ width: 600, height: 800 });
     await installTauriMock(page);
     await page.goto("/");
     await page.locator("#empty-open").click();
     await expect(page.locator("#reader")).toBeVisible();
 
-    const headHeight = await page.locator(".workspace-head").evaluate(
+    const stripHeight = await page.locator("#document-command-strip").evaluate(
       (el) => el.getBoundingClientRect().height,
     );
-    // Before fix: flex: 1 1 240px on .doc-meta in column-direction caused ~300px
-    // After fix: flex: 0 0 auto resets the height to content-only (~70px)
-    expect(headHeight).toBeLessThan(120);
+    expect(stripHeight).toBeLessThan(120);
   });
 
   test("source-mode preview pane only collapses below 760px", async ({ page }) => {

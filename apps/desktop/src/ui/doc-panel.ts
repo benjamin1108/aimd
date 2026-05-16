@@ -21,9 +21,8 @@ import type { SidebarDocTab } from "../core/types";
 import { activeTab, displayTabTitle } from "../document/open-document-state";
 
 export function setSidebarDocTab(tab: SidebarDocTab) {
-  if (tab === "git" && !state.git.isRepo) {
-    state.sidebarDocTab = "outline";
-  } else if (tab === "assets" && (!state.doc || state.mainView === "git-diff" || !state.uiSettings.showAssetPanel)) {
+  const hasContext = Boolean(state.doc || state.mainView === "git-diff");
+  if (!hasContext) {
     state.sidebarDocTab = "outline";
   } else if (tab === "health") {
     state.sidebarDocTab = "outline";
@@ -34,9 +33,7 @@ export function setSidebarDocTab(tab: SidebarDocTab) {
 }
 
 export function renderDocPanelTabs() {
-  const showGit = state.git.isRepo;
   const inDiffView = state.mainView === "git-diff";
-  const showAssets = Boolean(state.doc && !inDiffView && state.uiSettings.showAssetPanel);
   const showSection = Boolean(state.doc || inDiffView);
   const activeDocumentTab = inDiffView ? null : activeTab();
   const activeDiffTab = inDiffView
@@ -44,7 +41,7 @@ export function renderDocPanelTabs() {
     : null;
   inspectorEl().hidden = !showSection;
   outlineSectionEl().hidden = !showSection;
-  outlineSectionEl().style.setProperty("--doc-panel-tab-count", String(1 + (showAssets ? 1 : 0) + (showGit ? 1 : 0)));
+  outlineSectionEl().style.setProperty("--doc-panel-tab-count", "3");
   sidebarWorkspaceDocResizerEl().hidden = true;
   outlineSectionEl().classList.toggle("is-collapsed", state.docPanelCollapsed);
   inspectorEl().classList.toggle("is-collapsed", state.docPanelCollapsed);
@@ -65,12 +62,13 @@ export function renderDocPanelTabs() {
     : activeDocumentTab
       ? `当前文档 · ${displayTabTitle(activeDocumentTab.doc)}`
       : "项目检查";
-  gitTabEl().hidden = !showGit;
-  assetTabEl().hidden = !showAssets;
+  gitTabEl().hidden = false;
+  assetTabEl().hidden = false;
   healthTabEl().hidden = true;
-  outlineSectionEl().classList.toggle("has-git-tab", showGit);
-  if (!showGit && state.sidebarDocTab === "git") state.sidebarDocTab = "outline";
-  if (state.sidebarDocTab === "assets" && !showAssets) state.sidebarDocTab = "outline";
+  outlineSectionEl().classList.add("has-git-tab");
+  if (!showSection && (state.sidebarDocTab === "git" || state.sidebarDocTab === "assets")) {
+    state.sidebarDocTab = "outline";
+  }
   if (state.sidebarDocTab === "health") state.sidebarDocTab = "outline";
 
   const active = state.sidebarDocTab;

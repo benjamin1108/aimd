@@ -17,8 +17,8 @@ export function lightNormalize(root: HTMLElement) {
   root.querySelectorAll<HTMLElement>("h1[style], h2[style], h3[style], h4[style], h5[style], h6[style], p[style]").forEach((el) => el.removeAttribute("style"));
 }
 
-/** Hard cap on document title (H1) text length. Above this, the workspace-head
- *  doc-title and the inline editor's H1 itself start to crowd surrounding UI;
+/** Hard cap on document title (H1) text length. Above this, the active tab
+ *  title and the inline editor's H1 itself start to crowd surrounding UI;
  *  more importantly, an unbounded H1 lets a single Backspace-merge accident
  *  push the layout into a state the user can't recover from without undo. */
 export const MAX_TITLE_LENGTH = 100;

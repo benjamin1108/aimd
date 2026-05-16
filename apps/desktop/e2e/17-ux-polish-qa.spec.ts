@@ -301,33 +301,32 @@ test.describe("F. 副作用：非编辑区 user-select 边界", () => {
     expect(userSelect).toBe("none");
   });
 
-  test("sidebar 品牌区与导航不可选中", async ({ page }) => {
+  test("sidebar 项目 rail 与导航不可选中", async ({ page }) => {
     // ux-product-audit P2-1：默认允许选中文本，但 sidebar 这类 UI chrome
     // 仍要禁选，避免双击高亮干扰拖拽 / 调整。
-    // 注：.doc-title 在 workspace-head 里（不是 sidebar），它属于"标题文字
-    // 用户可能要复制"，应该是可选的；这里只校验 sidebar chrome。
+    // 文档身份已经搬到顶栏 scope / 活动标签；这里只校验 sidebar chrome。
     await installTauriMock(page);
     await page.goto("/");
     await page.locator("#empty-open").click();
 
     const brandSelect = await page.evaluate(() => {
-      const el = document.querySelector<HTMLElement>(".sidebar .brand-name");
+      const el = document.querySelector<HTMLElement>(".sidebar #workspace-root-label");
       if (!el) return "missing";
       return getComputedStyle(el).userSelect;
     });
     expect(brandSelect).toBe("none");
   });
 
-  test("doc-title 在 workspace-head 中保持可选中（用户要能复制标题）", async ({ page }) => {
+  test("document command strip chrome remains non-selectable", async ({ page }) => {
     await installTauriMock(page);
     await page.goto("/");
     await page.locator("#empty-open").click();
 
-    const titleSelect = await page.evaluate(() => {
-      const el = document.querySelector<HTMLElement>(".workspace-head .doc-title");
+    const stripSelect = await page.evaluate(() => {
+      const el = document.querySelector<HTMLElement>("#document-command-strip");
       if (!el) return "missing";
       return getComputedStyle(el).userSelect;
     });
-    expect(titleSelect).toBe("text");
+    expect(stripSelect).toBe("none");
   });
 });

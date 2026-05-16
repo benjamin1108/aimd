@@ -93,57 +93,67 @@
   }
   .sidebar,
   .inspector { display: none; }
-  .doc-path,
-  .doc-state-badges {
-    max-width: calc(100vw - 52px);
+  .document-tab-strip {
+    padding: 7px 10px 0;
   }
-  .workspace-head {
+  .document-command-strip {
     grid-template-columns: minmax(0, 1fr);
-    align-items: flex-start;
-    gap: 8px;
+    gap: 6px;
     min-height: 0;
-    padding: 9px 12px;
+    padding: 6px 10px 8px;
   }
-  .doc-meta {
+  .tab-bar,
+  .doc-toolbar {
     width: 100%;
   }
   .starter-actions,
   .head-actions {
-    width: 100%;
+    width: auto;
     justify-content: flex-end;
   }
-  .head-actions .primary-btn {
-    flex: 1 1 auto;
+  .head-actions .primary-btn,
+  .document-menu-btn {
+    flex: 0 0 auto;
   }
   .doc-toolbar {
     flex-wrap: wrap;
-    gap: 8px;
-    padding: 8px 12px;
+    justify-content: flex-start;
+    gap: 6px;
+    padding: 0 0 8px;
   }
-  .doc-toolbar-spacer {
-    display: none;
-  }
-  .toolbar-group--mode { flex: 1 1 100%; }
+  .toolbar-group--mode { flex: 0 1 auto; min-width: 0; }
   .mode-switch {
-    flex: 1 1 100%;
+    flex: 0 1 auto;
+    min-width: 0;
   }
   .mode-btn {
-    flex: 1 1 0;
+    flex: 0 1 auto;
+    min-width: 0;
+    padding: 0 8px;
     justify-content: center;
   }
   .doc-state-badges {
+    max-width: calc(100vw - 52px);
     min-height: 18px;
-    margin-top: 3px;
   }
   .doc-state-badge {
     height: 16px;
     font-size: 10px;
   }
   .find-bar {
-    flex: 1 1 100%;
+    left: 0;
+    width: min(286px, calc(100vw - 20px));
+    max-width: calc(100vw - 20px);
+  }
+  .find-bar.is-replace {
+    width: min(306px, calc(100vw - 20px));
+    max-width: calc(100vw - 20px);
   }
   .find-input {
     width: 0;
+  }
+  .find-replace-group {
+    width: 100%;
   }
   .empty-state {
     padding: 24px 18px 24px;

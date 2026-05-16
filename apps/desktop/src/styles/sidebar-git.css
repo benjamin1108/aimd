@@ -1,39 +1,39 @@
 /* Sidebar document panel tabs and Git workspace controls. */
 
-.doc-panel-tabs {
+.doc-panel-head {
   display: grid;
-  grid-template-columns: repeat(var(--doc-panel-tab-count, 1), minmax(0, 1fr)) auto;
+  grid-template-columns: minmax(0, 1fr) auto;
   align-items: center;
   gap: 5px;
   padding: 0 6px 6px;
-  color: var(--ink-muted);
-  font-size: 11px;
-  font-weight: 600;
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
 }
 
-#outline-section.has-git-tab .doc-panel-tabs {
+.doc-panel-tabs {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  align-items: center;
   gap: 4px;
+  min-width: 0;
+  padding: 3px;
+  border: 1px solid var(--hairline);
+  border-radius: 10px;
+  background: rgba(36, 30, 20, 0.04);
+  color: var(--ink-muted);
 }
 
 .doc-panel-tab {
-  min-height: var(--size-control-sm);
+  height: 26px;
+  min-height: 26px;
   min-width: 0;
-  border-radius: var(--radius-control-sm);
+  border-radius: 7px;
   color: var(--ink-muted);
-  font-size: 11px;
-  font-weight: 600;
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
+  font-size: 12px;
+  font-weight: 650;
+  letter-spacing: 0;
   transition: background var(--t-fast) var(--ease),
               color var(--t-fast) var(--ease),
               transform var(--t-fast) var(--ease),
               box-shadow var(--t-fast) var(--ease);
-}
-
-#outline-section:not(.has-git-tab) .doc-panel-tab {
-  justify-self: stretch;
 }
 
 .doc-panel-tab:hover {
@@ -42,8 +42,8 @@
 }
 
 .doc-panel-tab.is-active {
-  background: var(--surface-control);
-  color: var(--ink);
+  background: var(--surface-panel);
+  color: var(--ink-strong);
   box-shadow: var(--shadow-control);
 }
 

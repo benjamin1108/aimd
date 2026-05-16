@@ -34,9 +34,12 @@ export const ICONS = {
   plus: `<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><path d="M8 3v10M3 8h10"/></svg>`,
   refresh: `<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"><path d="M13 7a5 5 0 0 0-8.6-3.2L3 5.2"/><path d="M3 2.5v2.7h2.7M3 9a5 5 0 0 0 8.6 3.2L13 10.8"/><path d="M13 13.5v-2.7h-2.7"/></svg>`,
   chevron: `<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="m6 4 4 4-4 4"/></svg>`,
+  chevronUp: `<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.55" stroke-linecap="round" stroke-linejoin="round"><path d="m4.5 9.5 3.5-3.5 3.5 3.5"/></svg>`,
+  chevronDown: `<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.55" stroke-linecap="round" stroke-linejoin="round"><path d="m4.5 6.5 3.5 3.5 3.5-3.5"/></svg>`,
   read: `<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12.5V4a1 1 0 0 1 1.2-1l4.3 1 4.3-1A1 1 0 0 1 13 4v8.5"/><path d="M7.5 4v9"/></svg>`,
   edit: `<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"><path d="M11.2 2.5 13.5 4.8 5.4 12.9l-3 .7.7-3z"/><path d="m10.2 3.5 2.3 2.3"/></svg>`,
   source: `<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"><path d="m5.5 4-3 4 3 4M10.5 4l3 4-3 4"/></svg>`,
+  search: `<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.45" stroke-linecap="round" stroke-linejoin="round"><circle cx="7.1" cy="7.1" r="3.75"/><path d="m10 10 3.05 3.05"/></svg>`,
   save: `<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3.5v9a1 1 0 0 0 1 1h8a1 1 0 0 0 1-1V5.5L11 3H4a1 1 0 0 0-1 .5z"/><path d="M5 3.5V7h6V3.5M5 13.5V10h6v3.5"/></svg>`,
   close: `<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><path d="m4 4 8 8M12 4 4 12"/></svg>`,
   play: `<svg viewBox="0 0 16 16" fill="none"><path d="M5 3.7v8.6a.8.8 0 0 0 1.2.7l6.5-4.3a.8.8 0 0 0 0-1.4L6.2 3A.8.8 0 0 0 5 3.7Z" fill="currentColor"/></svg>`,
@@ -155,7 +158,7 @@ export const state: {
     error: "",
     selectedPath: "",
   },
-  uiSettings: { showAssetPanel: false, debugMode: false },
+  uiSettings: { debugMode: false },
   // Tracks whether the inline editor's DOM has been mutated by user input since
   // the last flush / paint. flushInline skips its (expensive) turndown call when
   // false — this is what keeps mode hops snappy on long documents.

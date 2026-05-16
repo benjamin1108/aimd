@@ -215,18 +215,6 @@ async function openThreeTabs(page: Page) {
   await expect(page.locator(".open-tab")).toHaveCount(3);
 }
 
-async function forceDirtyMarkdownRequiresAimd(page: Page) {
-  await page.evaluate(async () => {
-    const { state } = await import("/src/core/state.ts");
-    const { updateChrome } = await import("/src/ui/chrome.ts");
-    if (!state.doc) throw new Error("expected active doc");
-    state.doc.dirty = true;
-    state.doc.requiresAimdSave = true;
-    state.doc.needsAimdSave = true;
-    updateChrome();
-  });
-}
-
 async function ensureInspectorTabReachable(page: Page, tabSelector: string) {
   const inspectorDisplay = await page.locator("#inspector").evaluate((el) => getComputedStyle(el).display);
   if (inspectorDisplay === "none") return false;
@@ -265,33 +253,36 @@ async function expectDesktopThreeColumns(page: Page, minWorkspace = 560) {
   await expect(page.locator(".inspector-scroll")).toHaveCSS("overflow-y", "auto");
 }
 
-async function expectHeaderAndTabsStable(page: Page) {
+async function expectCommandStripAndTabsStable(page: Page) {
   const metrics = await page.evaluate(() => {
     const box = (selector: string) => document.querySelector(selector)?.getBoundingClientRect();
     const intersects = (a?: DOMRect, b?: DOMRect) => Boolean(a && b
       && a.left < b.right && a.right > b.left && a.top < b.bottom && a.bottom > b.top);
-    const title = box("#doc-title");
     const save = box("#save");
     const more = box("#more-menu-toggle");
     const tab = box(".open-tab");
     const close = box(".open-tab-close");
-    const head = box(".workspace-head");
+    const tabStrip = box("#document-tab-strip");
+    const strip = box("#document-command-strip");
     return {
-      titleSaveOverlap: intersects(title, save),
       saveMoreOverlap: intersects(save, more),
+      tabSaveOverlap: intersects(tab, save),
+      tabStripBottom: tabStrip?.bottom || 0,
+      commandStripTop: strip?.top || 0,
       tabHeight: tab?.height || 0,
       closeWidth: close?.width || 0,
       closeHeight: close?.height || 0,
-      headHeight: head?.height || 0,
+      stripHeight: strip?.height || 0,
     };
   });
-  expect(metrics.titleSaveOverlap).toBe(false);
   expect(metrics.saveMoreOverlap).toBe(false);
+  expect(metrics.tabSaveOverlap).toBe(false);
+  expect(metrics.commandStripTop).toBeGreaterThanOrEqual(metrics.tabStripBottom - 1);
   expect(metrics.tabHeight).toBeGreaterThanOrEqual(30);
   expect(metrics.tabHeight).toBeLessThanOrEqual(36);
   expect(metrics.closeWidth).toBeGreaterThanOrEqual(24);
   expect(metrics.closeHeight).toBeGreaterThanOrEqual(24);
-  expect(metrics.headHeight).toBeLessThanOrEqual(82);
+  expect(metrics.stripHeight).toBeLessThanOrEqual(62);
 }
 
 type VisualState =
@@ -317,7 +308,9 @@ async function setupVisualState(page: Page, stateName: VisualState) {
   }
   if (stateName === "dirty-markdown-requires-aimd") {
     await openDoc(page, "Daily with an intentionally long project filename");
-    await forceDirtyMarkdownRequiresAimd(page);
+    await page.locator("#mode-source").click();
+    await page.locator("#markdown").fill("# Daily with an intentionally long project filename for ellipsis checks\n\n![local](asset://img-001)");
+    await expect(page.locator("#doc-state-badges")).toContainText("保存需选格式");
     return;
   }
   if (stateName === "aimd-git-conflict") {
@@ -342,7 +335,7 @@ test.describe("three-column CSS production polish", () => {
     await page.goto("/");
     await openThreeTabs(page);
     await expectDesktopThreeColumns(page);
-    await expectHeaderAndTabsStable(page);
+    await expectCommandStripAndTabsStable(page);
     await expectNoHorizontalOverflow(page);
   });
 
@@ -354,7 +347,7 @@ test.describe("three-column CSS production polish", () => {
     await openDoc(page, "Quarterly Report.aimd");
     await expect(page.locator("#inspector")).toHaveClass(/is-collapsed/);
     await expect(page.locator("#doc-panel-collapse")).toBeVisible();
-    await expectHeaderAndTabsStable(page);
+    await expectCommandStripAndTabsStable(page);
     await expectNoHorizontalOverflow(page);
   });
 
@@ -392,7 +385,7 @@ test.describe("three-column CSS production polish", () => {
     expect(rowMetrics.rowWidth).toBeLessThanOrEqual(rowMetrics.railWidth);
     expect(rowMetrics.textOverflow).toBe("ellipsis");
     expect(rowMetrics.whiteSpace).toBe("nowrap");
-    await expectHeaderAndTabsStable(page);
+    await expectCommandStripAndTabsStable(page);
   });
 
   test("captures visual QA matrix when AIMD_THREE_COLUMN_SCREENSHOT_DIR is set", async ({ page }) => {
@@ -421,7 +414,7 @@ test.describe("three-column CSS production polish", () => {
         await page.setViewportSize(viewport);
         await setupVisualState(page, stateName);
         await expectNoHorizontalOverflow(page);
-        if (viewport.width >= 1180 && stateName !== "no-project-no-tabs") {
+        if (viewport.width >= 1180 && !["no-project-no-tabs", "project-no-tabs"].includes(stateName)) {
           await expectDesktopThreeColumns(page, viewport.width === 1180 ? 500 : 560);
         }
         await capture(page, `${viewport.width}x${viewport.height}`, stateName);

@@ -120,21 +120,25 @@ async function installSettingsMock(page: Page, opts?: { onSave?: (settings: any)
   }
 }
 
-test.describe("asset panel visibility preference", () => {
-  test("asset panel is hidden by default even when the document has assets", async ({ page }) => {
+test.describe("asset inspector fixed tab behavior", () => {
+  test("resource tab is fixed by default even when legacy settings disable it", async ({ page }) => {
     await installMainMock(page);
     await page.goto("/");
     await page.locator("#empty-open").click();
 
     await expect(page.locator("#reader img")).toHaveCount(1);
     await expect(page.locator("#asset-section")).toBeHidden();
-    await expect(page.locator("#sidebar-tab-assets")).toBeHidden();
+    await expect(page.locator("#sidebar-tab-assets")).toBeVisible();
+    await expect(page.locator("#doc-panel-tabs [role='tab']:not([hidden])")).toHaveText(["大纲", "Git", "资源"]);
+    await page.locator("#sidebar-tab-assets").click();
+    await expect(page.locator("#asset-section")).toBeVisible();
+    await expect(page.locator("#asset-list")).toContainText("img-001");
 
     await page.locator("#more-menu-toggle").click();
     await expect(page.locator("#health-check")).toBeHidden();
   });
 
-  test("resource preference keeps the asset tab target-scoped", async ({ page }) => {
+  test("legacy resource preference cannot remove the fixed asset tab", async ({ page }) => {
     await installMainMock(page, true);
     await page.goto("/");
     await page.locator("#empty-open").click();
@@ -143,11 +147,11 @@ test.describe("asset panel visibility preference", () => {
     await expect(page.locator("#asset-section")).toBeHidden();
     await page.locator("#sidebar-tab-assets").click();
     await expect(page.locator("#asset-section")).toBeVisible();
-    await expect(page.locator("#asset-count")).toHaveCount(0);
+    await expect(page.locator("#asset-list")).toContainText("img-001");
   });
 
   test("asset panel can be selected from the inspector and collapsed", async ({ page }) => {
-    await installMainMock(page, true);
+    await installMainMock(page);
     await page.goto("/");
     await page.locator("#empty-open").click();
 
@@ -161,13 +165,13 @@ test.describe("asset panel visibility preference", () => {
     await expect(page.locator("#outline-section")).not.toHaveClass(/is-collapsed/);
   });
 
-  test("settings update event toggles the resource tab immediately without blanking the page", async ({ page }) => {
+  test("settings update event ignores legacy resource visibility without blanking the page", async ({ page }) => {
     await installMainMock(page, false);
     await page.goto("/");
     await page.locator("#empty-open").click();
 
     await expect(page.locator("#reader img")).toHaveCount(1);
-    await expect(page.locator("#sidebar-tab-assets")).toBeHidden();
+    await expect(page.locator("#sidebar-tab-assets")).toBeVisible();
 
     await page.evaluate(() => (window as any).__aimdEmitTauriEvent("aimd-settings-updated", {
       ai: {
@@ -201,27 +205,26 @@ test.describe("asset panel visibility preference", () => {
       ui: { showAssetPanel: false, debugMode: false },
     }));
 
-    await expect(page.locator("#sidebar-tab-assets")).toBeHidden();
-    await expect(page.locator("#asset-section")).toBeHidden();
-    await expect(page.locator("#outline-panel")).toBeVisible();
+    await expect(page.locator("#sidebar-tab-assets")).toBeVisible();
+    await expect(page.locator("#asset-section")).toBeVisible();
+    await expect(page.locator("#asset-list")).toContainText("img-001");
     await expect(page.locator("#reader img")).toHaveCount(1);
   });
 
-  test("settings page saves the resource panel preference", async ({ page }) => {
+  test("settings page saves debug mode without exposing resource panel preference", async ({ page }) => {
     let saved: any = null;
     await installSettingsMock(page, { onSave: (settings) => { saved = settings; } });
     await page.goto("/settings.html");
 
     await expect(page.locator(".settings-head h1")).toHaveText("AIMD 设置");
     await expect(page.locator(".settings-nav-item")).toHaveText(["常规", "AI / 模型", "网页导入", "格式化", "Git 集成"]);
-    await expect(page.locator("#ui-show-asset-panel")).not.toBeChecked();
+    await expect(page.locator("#ui-show-asset-panel")).toHaveCount(0);
     await expect(page.locator("#ui-debug-mode")).not.toBeChecked();
 
-    await page.locator("#ui-show-asset-panel").check();
     await page.locator("#ui-debug-mode").check();
     await page.locator("#save-settings").click();
 
-    await expect.poll(() => saved?.ui?.showAssetPanel).toBe(true);
+    await expect.poll(() => saved?.ui && Object.prototype.hasOwnProperty.call(saved.ui, "showAssetPanel")).toBe(false);
     await expect.poll(() => saved?.ui?.debugMode).toBe(true);
   });
 });

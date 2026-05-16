@@ -55,16 +55,17 @@ async function installTauriMock(page: Page, opts: { withTour?: boolean } = {}) {
 }
 
 test.describe("顶部工具栏视觉权重", () => {
-  test("⋯ 按钮使用 ghost-btn 而非 secondary-btn", async ({ page }) => {
+  test("文档菜单使用带标签的 secondary 按钮而非裸省略号", async ({ page }) => {
     await installTauriMock(page);
     await page.goto("/");
     await page.locator("#empty-open").click();
     await expect(page.locator("#doc-actions")).toBeVisible();
 
     const more = page.locator("#more-menu-toggle");
-    await expect(more).toHaveClass(/ghost-btn/);
-    await expect(more).toHaveClass(/icon-only/);
-    await expect(more).not.toHaveClass(/secondary-btn/);
+    await expect(more).toHaveClass(/secondary-btn/);
+    await expect(more).toHaveClass(/document-menu-btn/);
+    await expect(more).toContainText("文档");
+    await expect(more).not.toHaveClass(/icon-only/);
   });
 
   test("保存按钮保留 primary-btn 主色权重", async ({ page }) => {
@@ -73,6 +74,39 @@ test.describe("顶部工具栏视觉权重", () => {
     await page.locator("#empty-open").click();
     const save = page.locator("#save");
     await expect(save).toHaveClass(/primary-btn/);
+  });
+
+  test("查找使用极简图标入口和紧凑浮层", async ({ page }) => {
+    await installTauriMock(page);
+    await page.goto("/");
+    await page.locator("#empty-open").click();
+
+    const find = page.locator("#find-toggle");
+    await expect(find).toHaveClass(/ghost-btn/);
+    await expect(find).toHaveClass(/icon-only/);
+    await expect(find).toHaveAttribute("aria-label", "查找");
+    await expect(find).not.toContainText("查找");
+
+    await find.click();
+    await expect(page.locator("#find-bar")).toBeVisible();
+    const metrics = await page.evaluate(() => {
+      const toggle = document.querySelector("#find-toggle")!.getBoundingClientRect();
+      const bar = document.querySelector("#find-bar")!.getBoundingClientRect();
+      const prev = document.querySelector("#find-prev")!;
+      return {
+        toggleWidth: toggle.width,
+        barWidth: bar.width,
+        barTop: bar.top,
+        toggleBottom: toggle.bottom,
+        prevHasIcon: Boolean(prev.querySelector("svg")),
+        prevText: prev.textContent?.trim() || "",
+      };
+    });
+    expect(metrics.toggleWidth).toBeLessThanOrEqual(32);
+    expect(metrics.barWidth).toBeLessThanOrEqual(310);
+    expect(metrics.barTop).toBeGreaterThanOrEqual(metrics.toggleBottom);
+    expect(metrics.prevHasIcon).toBe(true);
+    expect(metrics.prevText).toBe("");
   });
 });
 

@@ -75,7 +75,11 @@ export const APP_TOPBAR_HTML = `
           </div>
 
           <div class="app-menu-wrap">
-            <button id="app-menu-toggle" class="ghost-btn icon-only" type="button" title="应用操作" aria-label="应用操作" aria-haspopup="menu" aria-expanded="false">${ICONS.settings}</button>
+            <button id="app-menu-toggle" class="secondary-btn app-action-btn" type="button" aria-haspopup="menu" aria-expanded="false">
+              <span class="secondary-btn-icon">${ICONS.settings}</span>
+              <span>应用</span>
+              <span class="menu-chevron" aria-hidden="true">▾</span>
+            </button>
             <div id="app-menu" class="action-menu global-menu app-level-menu" role="menu" hidden>
               <div class="action-menu-title">应用</div>
               <button id="new-window" class="action-menu-item" type="button">

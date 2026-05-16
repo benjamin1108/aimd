@@ -156,7 +156,6 @@ export async function refreshGitStatus(silent = false) {
     state.git.status = status.isRepo ? status : null;
     state.git.error = status.error || "";
     if (!status.isRepo) {
-      state.sidebarDocTab = "outline";
       state.git.selectedPath = "";
       state.git.diffTabs = [];
       state.git.diffView = { path: "", diff: null, loading: false, error: "" };

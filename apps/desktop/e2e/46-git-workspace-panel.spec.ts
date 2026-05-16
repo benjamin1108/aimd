@@ -159,21 +159,30 @@ async function installGitWorkspaceMock(page: Page, initialMode: GitMode) {
   }, initialMode);
 }
 
+async function openWorkspaceDocument(page: Page) {
+  await page.locator("#empty-open-workspace").click();
+  await page.locator(".workspace-row", { hasText: "Readme.aimd" }).click();
+  await expect(page.locator("#reader")).toContainText("Document body");
+}
+
 test.describe("Git workspace panel", () => {
-  test("does not show Git tab for a non-Git workspace", async ({ page }) => {
+  test("keeps fixed inspector tabs for a non-Git workspace document", async ({ page }) => {
     await installGitWorkspaceMock(page, "none");
     await page.goto("/");
 
-    await page.locator("#empty-open-workspace").click();
+    await openWorkspaceDocument(page);
     await expect(page.locator("#workspace-root-label")).toHaveText("项目");
-    await expect(page.locator("#sidebar-tab-git")).toBeHidden();
+    await expect(page.locator("#doc-panel-tabs [role='tab']:not([hidden])")).toHaveText(["大纲", "Git", "资源"]);
+    await page.locator("#sidebar-tab-git").click();
+    await expect(page.locator("#git-panel")).toBeVisible();
+    await expect(page.locator("#git-content")).toHaveText("");
   });
 
-  test("shows Git tab for repo while keeping outline selected by default", async ({ page }) => {
+  test("shows Git tab for repo while keeping outline selected by default for the active document", async ({ page }) => {
     await installGitWorkspaceMock(page, "repo");
     await page.goto("/");
 
-    await page.locator("#empty-open-workspace").click();
+    await openWorkspaceDocument(page);
     await expect(page.locator("#sidebar-tab-git")).toBeVisible();
     await expect(page.locator("#sidebar-tab-outline")).toHaveAttribute("aria-selected", "true");
     await expect(page.locator("#outline-panel")).toBeVisible();
@@ -199,7 +208,12 @@ test.describe("Git workspace panel", () => {
 
     await page.locator(".git-file-row[data-path='apps/foo.ts']").locator("[data-git-action='select']").click();
     await expect(page.locator("#git-diff-view")).toBeVisible();
-    await expect(page.locator("#doc-toolbar")).toBeHidden();
+    await expect(page.locator("#doc-toolbar")).toBeVisible();
+    await expect(page.locator("#mode-read")).toBeDisabled();
+    await expect(page.locator("#mode-edit")).toBeDisabled();
+    await expect(page.locator("#mode-source")).toBeDisabled();
+    await expect(page.locator("#find-toggle")).toBeDisabled();
+    await expect(page.locator("#save")).toBeDisabled();
     await expect(page.locator("#format-toolbar")).toBeHidden();
     await expect(page.locator("#git-diff-back")).toHaveCount(0);
     await expect(page.locator(".open-tab.is-active")).toContainText("foo.ts");
@@ -222,7 +236,7 @@ test.describe("Git workspace panel", () => {
     await installGitWorkspaceMock(page, "repo");
     await page.goto("/");
 
-    await page.locator("#empty-open-workspace").click();
+    await openWorkspaceDocument(page);
     await page.locator("#sidebar-tab-git").click();
     await page.locator(".git-file-row[data-path='docs/draft.md']").hover();
     await page.locator(".git-file-row[data-path='docs/draft.md']").locator("[data-git-action='stage-file']").click();
@@ -245,7 +259,7 @@ test.describe("Git workspace panel", () => {
     await page.setViewportSize({ width: 1400, height: 560 });
     await page.goto("/");
 
-    await page.locator("#empty-open-workspace").click();
+    await openWorkspaceDocument(page);
     await page.locator("#sidebar-tab-git").click();
     await expect(page.locator(".git-file-row")).toHaveCount(32);
 
@@ -264,7 +278,7 @@ test.describe("Git workspace panel", () => {
     await installGitWorkspaceMock(page, "conflict");
     await page.goto("/");
 
-    await page.locator("#empty-open-workspace").click();
+    await openWorkspaceDocument(page);
     await page.locator("#sidebar-tab-git").click();
     await expect(page.locator(".git-warning")).toContainText("存在冲突文件");
     await expect(page.locator("[data-git-action='pull']")).toBeDisabled();
@@ -277,9 +291,7 @@ test.describe("Git workspace panel", () => {
     await installGitWorkspaceMock(page, "repo");
     await page.goto("/");
 
-    await page.locator("#empty-open-workspace").click();
-    await page.locator(".workspace-row", { hasText: "Readme.aimd" }).click();
-    await expect(page.locator("#reader")).toContainText("Document body");
+    await openWorkspaceDocument(page);
     await page.locator("#sidebar-tab-git").click();
     await page.locator(".git-file-row[data-path='apps/foo.ts']").locator("[data-git-action='select']").click();
     await expect(page.locator("#git-diff-view")).toBeVisible();
@@ -318,7 +330,7 @@ test.describe("Git workspace panel", () => {
     await installGitWorkspaceMock(page, "repo");
     await page.goto("/");
 
-    await page.locator("#empty-open-workspace").click();
+    await openWorkspaceDocument(page);
     await page.locator("#sidebar-tab-git").click();
     await page.locator(".git-file-row[data-path='apps/foo.ts']").locator("[data-git-action='select']").click();
     await expect(page.locator(".open-tab.is-active")).toContainText("foo.ts");
@@ -333,7 +345,7 @@ test.describe("Git workspace panel", () => {
     await installGitWorkspaceMock(page, "repo");
     await page.goto("/");
 
-    await page.locator("#empty-open-workspace").click();
+    await openWorkspaceDocument(page);
     await page.locator("#workspace-collapse").click();
     await expect(page.locator("#workspace-section")).toHaveClass(/is-collapsed/);
     await expect(page.locator("#workspace-tree")).toBeHidden();

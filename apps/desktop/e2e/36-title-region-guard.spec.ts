@@ -5,9 +5,9 @@ import { test, expect, Page } from "@playwright/test";
  *
  * Bug report: pressing Backspace at the very start of the body paragraph
  * (cursor immediately after the heading) merges that paragraph into the H1.
- * The H1 then grows arbitrarily long; the workspace-head .doc-title
- * (previously without max-width) and the H1 inside the editor pushed
- * .head-actions off the right edge of the viewport. Layout broke.
+ * The H1 then grows arbitrarily long; the H1 inside the editor previously
+ * pushed document chrome actions off the right edge of the viewport. Layout
+ * broke.
  *
  * Two contracts to pin:
  *  A. Backspace at the start of a non-heading block whose previous sibling
@@ -16,8 +16,8 @@ import { test, expect, Page } from "@playwright/test";
  *  B. The H1 text length is hard-capped at MAX_TITLE_LENGTH (100). Typing
  *     beyond it is a no-op; pasting beyond it is truncated by the input
  *     safety net in inline.ts#enforceTitleLength.
- *  C. .head-actions stays inside the viewport even if (somehow) the H1 grew
- *     huge — defended by `.doc-title { max-width: 60vw }` in styles.css.
+ *  C. command-strip document actions stay inside the viewport even if
+ *     (somehow) the H1 grew huge.
  */
 
 async function installTauriMock(page: Page) {
@@ -177,14 +177,14 @@ test.describe("Title region: H1 length is capped", () => {
   });
 });
 
-test.describe("Title region: head-actions never get pushed off-viewport", () => {
+test.describe("Title region: command-strip actions never get pushed off-viewport", () => {
   test("even with a huge H1 the action buttons stay inside the viewport", async ({ page }) => {
     await openInEditMode(page);
 
     // Force a pathological H1 length by writing past the cap before the input
     // listener can fire — simulating the worst case (e.g. an OS-level paste
-    // we couldn't intercept). The .doc-title CSS guard should still keep the
-    // workspace-head laid out.
+    // we couldn't intercept). The command strip should still keep document
+    // actions reachable.
     await page.evaluate(() => {
       const editor = document.querySelector("#inline-editor") as HTMLElement;
       const h1 = editor.querySelector("h1") as HTMLElement;
@@ -194,10 +194,21 @@ test.describe("Title region: head-actions never get pushed off-viewport", () => 
     });
 
     const layout = await page.evaluate(() => {
-      const close = document.querySelector("#close") as HTMLElement;
-      const r = close.getBoundingClientRect();
-      return { right: r.right, vw: window.innerWidth };
+      const save = document.querySelector("#save") as HTMLElement;
+      const menu = document.querySelector("#more-menu-toggle") as HTMLElement;
+      const strip = document.querySelector("#document-command-strip") as HTMLElement;
+      const saveBox = save.getBoundingClientRect();
+      const menuBox = menu.getBoundingClientRect();
+      const stripBox = strip.getBoundingClientRect();
+      return {
+        saveRight: saveBox.right,
+        menuRight: menuBox.right,
+        stripRight: stripBox.right,
+        vw: window.innerWidth,
+      };
     });
-    expect(layout.right).toBeLessThanOrEqual(layout.vw + 1);
+    expect(layout.saveRight).toBeLessThanOrEqual(layout.vw + 1);
+    expect(layout.menuRight).toBeLessThanOrEqual(layout.vw + 1);
+    expect(layout.stripRight).toBeLessThanOrEqual(layout.vw + 1);
   });
 });

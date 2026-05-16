@@ -223,7 +223,6 @@ export type FormatSettings = {
 };
 
 export type UiSettings = {
-  showAssetPanel: boolean;
   debugMode: boolean;
 };
 

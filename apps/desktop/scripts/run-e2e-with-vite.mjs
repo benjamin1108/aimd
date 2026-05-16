@@ -14,7 +14,7 @@ const child = spawn(
   ["node_modules/playwright/cli.js", "test", ...args],
   {
     cwd: process.cwd(),
-    env: { ...process.env, PLAYWRIGHT_NO_WEB_SERVER: "1" },
+    env: { ...process.env, AIMD_PLAYWRIGHT_EXTERNAL_SERVER: "1" },
     stdio: "inherit",
   },
 );

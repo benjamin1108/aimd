@@ -1,7 +1,7 @@
 import { state } from "../core/state";
 import {
   findBarEl, findInputEl, replaceInputEl, findCountEl,
-  findPrevEl, findNextEl, replaceOneEl, replaceAllEl, findCloseEl,
+  findPrevEl, findNextEl, replaceOneEl, replaceAllEl, findCloseEl, findReplaceGroupEl,
   findToggleEl, markdownEl, readerEl, inlineEditorEl, previewEl,
 } from "../core/dom";
 import { setStatus, updateChrome } from "../ui/chrome";
@@ -10,11 +10,11 @@ import { flushInline, insertAtCursor } from "./inline";
 let activeIndex = -1;
 
 export function bindSearch() {
-  findToggleEl().addEventListener("click", () => openFindBar());
+  findToggleEl().addEventListener("click", () => openFindBar(false));
   findCloseEl().addEventListener("click", closeFindBar);
   findInputEl().addEventListener("input", () => {
     activeIndex = -1;
-    findNext();
+    updateFindCount();
   });
   findInputEl().addEventListener("keydown", (event) => {
     if (event.key === "Enter") {
@@ -29,15 +29,20 @@ export function bindSearch() {
   replaceAllEl().addEventListener("click", replaceAll);
 }
 
-export function openFindBar(showReplace = state.mode === "source") {
+export function openFindBar(showReplace = false) {
   if (!state.doc) return;
+  const canReplace = showReplace && state.mode === "source";
+  findToggleEl().classList.add("is-active");
+  findToggleEl().setAttribute("aria-expanded", "true");
   findBarEl().hidden = false;
-  replaceInputEl().hidden = !showReplace;
-  replaceOneEl().hidden = !showReplace;
-  replaceAllEl().hidden = !showReplace;
-  replaceInputEl().disabled = !showReplace;
-  replaceOneEl().disabled = !showReplace;
-  replaceAllEl().disabled = !showReplace;
+  findBarEl().classList.toggle("is-replace", canReplace);
+  findReplaceGroupEl().hidden = !canReplace;
+  replaceInputEl().hidden = !canReplace;
+  replaceOneEl().hidden = !canReplace;
+  replaceAllEl().hidden = !canReplace;
+  replaceInputEl().disabled = !canReplace;
+  replaceOneEl().disabled = !canReplace;
+  replaceAllEl().disabled = !canReplace;
   findInputEl().focus();
   findInputEl().select();
   updateFindCount();
@@ -45,20 +50,23 @@ export function openFindBar(showReplace = state.mode === "source") {
 
 function closeFindBar() {
   findBarEl().hidden = true;
+  findBarEl().classList.remove("is-replace");
+  findToggleEl().classList.remove("is-active");
+  findToggleEl().setAttribute("aria-expanded", "false");
   activeIndex = -1;
   const sel = window.getSelection();
   sel?.removeAllRanges();
 }
 
 function findPrev() {
-  jumpToMatch(-1);
+  jumpToMatch(-1, shouldKeepFindFocus());
 }
 
 function findNext() {
-  jumpToMatch(1);
+  jumpToMatch(1, shouldKeepFindFocus());
 }
 
-function jumpToMatch(direction: 1 | -1) {
+function jumpToMatch(direction: 1 | -1, keepFindFocus = false) {
   const query = findInputEl().value;
   if (!query || !state.doc) {
     updateFindCount();
@@ -77,6 +85,18 @@ function jumpToMatch(direction: 1 | -1) {
     : (activeIndex + direction + matches.length) % matches.length;
   selectMatch(matches[activeIndex]);
   updateFindCount(activeIndex + 1, matches.length);
+  if (keepFindFocus) restoreFindInputFocus();
+}
+
+function shouldKeepFindFocus(): boolean {
+  const active = document.activeElement;
+  return Boolean(active && findBarEl().contains(active));
+}
+
+function restoreFindInputFocus() {
+  window.requestAnimationFrame(() => {
+    findInputEl().focus();
+  });
 }
 
 type Match = { start: number; end: number };

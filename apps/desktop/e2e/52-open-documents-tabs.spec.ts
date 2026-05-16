@@ -132,6 +132,14 @@ async function openWorkspaceAndDocs(page: Page) {
   await page.locator(".workspace-row", { hasText: "Beta.aimd" }).click();
 }
 
+async function replaceSourceMarkdown(page: Page, markdown: string) {
+  const source = page.locator("#markdown");
+  await page.locator("#mode-source").click();
+  await expect(source).toHaveValue("# Alpha\n\nA body");
+  await source.fill(markdown);
+  await expect(source).toHaveValue(markdown);
+}
+
 test.describe("Open Documents tabs", () => {
   test("opens two project files, reuses an already-open path, and keeps per-tab dirty state", async ({ page }) => {
     await installTabsMock(page);
@@ -154,8 +162,7 @@ test.describe("Open Documents tabs", () => {
     await expect(page.locator(".open-tab")).toHaveCount(2);
 
     await page.locator(".open-tab", { hasText: "Alpha" }).locator(".open-tab-main").click();
-    await page.locator("#mode-source").click();
-    await page.locator("#markdown").fill("# Alpha\n\nChanged A");
+    await replaceSourceMarkdown(page, "# Alpha\n\nChanged A");
     await expect(page.locator(".open-tab.is-dirty", { hasText: "Alpha" })).toBeVisible();
     await expect(page.locator(".open-tab.is-dirty", { hasText: "Beta" })).toHaveCount(0);
 
@@ -176,8 +183,7 @@ test.describe("Open Documents tabs", () => {
     await openWorkspaceAndDocs(page);
 
     await page.locator(".open-tab", { hasText: "Alpha" }).locator(".open-tab-main").click();
-    await page.locator("#mode-source").click();
-    await page.locator("#markdown").fill("# Alpha\n\nDirty A");
+    await replaceSourceMarkdown(page, "# Alpha\n\nDirty A");
 
     await page.locator("#more-menu-toggle").click();
     await page.locator("#close").click();
@@ -208,8 +214,7 @@ test.describe("Open Documents tabs", () => {
     await openWorkspaceAndDocs(page);
 
     await page.locator(".open-tab", { hasText: "Alpha" }).locator(".open-tab-main").click();
-    await page.locator("#mode-source").click();
-    await page.locator("#markdown").fill("# Alpha\n\nDirty A");
+    await replaceSourceMarkdown(page, "# Alpha\n\nDirty A");
     await page.keyboard.press(process.platform === "darwin" ? "Meta+W" : "Control+W");
 
     await expect(page.locator(".open-tab")).toHaveCount(2);
@@ -224,8 +229,7 @@ test.describe("Open Documents tabs", () => {
     await openWorkspaceAndDocs(page);
 
     await page.locator(".open-tab", { hasText: "Alpha" }).locator(".open-tab-main").click();
-    await page.locator("#mode-source").click();
-    await page.locator("#markdown").fill("# Alpha\n\nslow-stale");
+    await replaceSourceMarkdown(page, "# Alpha\n\nslow-stale");
     await page.evaluate(async () => {
       const { renderPreview } = await import("/src/ui/outline.ts");
       (window as any).__staleRender = renderPreview();

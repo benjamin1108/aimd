@@ -28,14 +28,6 @@ export function settingsTemplateHTML() {
             </header>
 
             <label class="toggle-field">
-              <input type="checkbox" id="ui-show-asset-panel" />
-              <span class="toggle-field-text">
-                <span class="field-label">检查器显示资源列表</span>
-                <span class="field-hint">在当前文档检查器中显示 AIMD 托管资源列表。关闭后不影响图片保存、资源检查和导出。</span>
-              </span>
-            </label>
-
-            <label class="toggle-field">
               <input type="checkbox" id="ui-debug-mode" />
               <span class="toggle-field-text">
                 <span class="field-label">启用调试模式</span>

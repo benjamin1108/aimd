@@ -330,7 +330,7 @@ test.describe("high-end visual refactor contract", () => {
     expect(sizes.more.width).toBeGreaterThanOrEqual(32);
     expect(sizes.tabClose.width).toBeGreaterThanOrEqual(28);
     expect(sizes.inspectorCollapse.width).toBeGreaterThanOrEqual(28);
-    expect(sizes.inspectorTab.height).toBeGreaterThanOrEqual(28);
+    expect(sizes.inspectorTab.height).toBeGreaterThanOrEqual(26);
     expect(sizes.projectIcon.width).toBeGreaterThanOrEqual(30);
   });
 
@@ -360,10 +360,22 @@ test.describe("high-end visual refactor contract", () => {
     await expectNoHorizontalOverflow(page);
   });
 
-  test("header, status chips, tabs, and updater progress use stable refined geometry", async ({ page }) => {
+  test("command strip, compact state, tabs, and updater progress use stable refined geometry", async ({ page }) => {
     await installHighEndMock(page);
     await page.setViewportSize({ width: 1180, height: 760 });
     await openProjectAndDoc(page, true);
+    await page.locator("#mode-source").click();
+    await page.locator("#markdown").fill([
+      "# A very long document title that must never squeeze the header controls",
+      "",
+      "<<<<<<< HEAD",
+      "Local",
+      "=======",
+      "Remote",
+      ">>>>>>> branch",
+    ].join("\n"));
+    await expect(page.locator("#doc-state-badges")).toContainText("Git 冲突");
+    await page.locator("#mode-read").click();
     await page.locator("#check-updates").evaluate((el) => {
       document.querySelector<HTMLElement>("#update-panel")!.hidden = false;
       document.querySelector<HTMLElement>("#update-progress-wrap")!.hidden = false;
@@ -375,24 +387,33 @@ test.describe("high-end visual refactor contract", () => {
     const metrics = await page.evaluate(() => {
       const rect = (selector: string) => document.querySelector(selector)!.getBoundingClientRect();
       const intersects = (a: DOMRect, b: DOMRect) => a.left < b.right && a.right > b.left && a.top < b.bottom && a.bottom > b.top;
-      const title = rect("#doc-title");
+      const tab = rect(".open-tab.is-active");
       const save = rect("#save");
       const more = rect("#more-menu-toggle");
       const chip = rect(".doc-state-badge");
+      const tabStrip = rect("#document-tab-strip");
+      const strip = rect("#document-command-strip");
+      const surface = rect(".workspace-body");
       const fill = getComputedStyle(document.querySelector("#update-progress-fill")!);
       return {
-        titleSaveOverlap: intersects(title, save),
+        tabSaveOverlap: intersects(tab, save),
         saveMoreOverlap: intersects(save, more),
         chipHeight: chip.height,
         tabHeight: rect(".open-tab").height,
+        tabStripBottom: tabStrip.bottom,
+        commandStripTop: strip.top,
+        stripBottom: strip.bottom,
+        surfaceTop: surface.top,
         progressTransition: fill.transitionProperty,
         progressTransform: fill.transform,
       };
     });
-    expect(metrics.titleSaveOverlap).toBe(false);
+    expect(metrics.tabSaveOverlap).toBe(false);
     expect(metrics.saveMoreOverlap).toBe(false);
+    expect(metrics.commandStripTop).toBeGreaterThanOrEqual(metrics.tabStripBottom - 1);
     expect(metrics.chipHeight).toBeGreaterThanOrEqual(20);
     expect(metrics.tabHeight).toBeGreaterThanOrEqual(34);
+    expect(Math.abs(metrics.surfaceTop - metrics.stripBottom)).toBeLessThanOrEqual(1);
     expect(metrics.progressTransition).toContain("transform");
     expect(metrics.progressTransition).not.toContain("width");
     expect(metrics.progressTransform).not.toBe("none");

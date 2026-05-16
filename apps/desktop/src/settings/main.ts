@@ -37,7 +37,6 @@ const apiKeyMaskEl = $<HTMLElement>(".api-key-mask");
 const apiKeyRevealEl = $<HTMLButtonElement>("#api-key-reveal");
 const apiKeyErrorEl = $<HTMLElement>("#api-key-error");
 const apiBaseEl = $<HTMLInputElement>("#api-base");
-const uiShowAssetPanelEl = $<HTMLInputElement>("#ui-show-asset-panel");
 const uiDebugModeEl = $<HTMLInputElement>("#ui-debug-mode");
 const webClipLlmEnabledEl = $<HTMLInputElement>("#webclip-llm-enabled");
 const webClipProviderEl = $<HTMLSelectElement>("#webclip-provider");
@@ -130,7 +129,6 @@ function readModelRetry(el: HTMLInputElement, fallback: number): number { return
 
 function captureFormToDraft() {
   draft[activeProvider] = readCredFromForm();
-  uiConfig.showAssetPanel = uiShowAssetPanelEl.checked;
   uiConfig.debugMode = uiDebugModeEl.checked;
   const webClipProvider = webClipProviderEl.value as ModelProvider;
   const webClipModel = webClipModelSelectEl.value === customModelValue()
@@ -215,10 +213,8 @@ function fill(settings: AppSettings) {
     modelRetryCount: settings.format?.modelRetryCount ?? DEFAULT_FORMAT_SETTINGS.modelRetryCount,
   };
   uiConfig = {
-    showAssetPanel: settings.ui?.showAssetPanel ?? false,
     debugMode: settings.ui?.debugMode ?? false,
   };
-  uiShowAssetPanelEl.checked = uiConfig.showAssetPanel;
   uiDebugModeEl.checked = uiConfig.debugMode;
   webClipLlmEnabledEl.checked = webClipConfig.llmEnabled;
   webClipProviderEl.value = webClipConfig.provider;
@@ -265,7 +261,6 @@ function readSettings(): AppSettings {
       modelRetryCount: formatConfig.modelRetryCount,
     },
     ui: {
-      showAssetPanel: uiConfig.showAssetPanel,
       debugMode: uiConfig.debugMode,
     },
   };
@@ -304,7 +299,7 @@ apiKeyEl.addEventListener("input", () => {
   syncSaveButton();
 });
 
-[apiBaseEl, modelEl, uiShowAssetPanelEl, uiDebugModeEl, webClipLlmEnabledEl, webClipModelEl, webClipOutputLanguageEl, webClipModelTimeoutEl, webClipModelRetryEl, formatProviderEl, formatModelEl, formatOutputLanguageEl, formatModelTimeoutEl, formatModelRetryEl].forEach((el) => {
+[apiBaseEl, modelEl, uiDebugModeEl, webClipLlmEnabledEl, webClipModelEl, webClipOutputLanguageEl, webClipModelTimeoutEl, webClipModelRetryEl, formatProviderEl, formatModelEl, formatOutputLanguageEl, formatModelTimeoutEl, formatModelRetryEl].forEach((el) => {
   el.addEventListener("input", () => {
     clearConnectionTestState();
     syncSaveButton();
@@ -370,7 +365,6 @@ webClipProviderEl.addEventListener("change", () => {
     : webClipModelSelectEl.value;
   webClipModelDraft[previousProvider] = previousModel;
   draft[activeProvider] = readCredFromForm();
-  uiConfig.showAssetPanel = uiShowAssetPanelEl.checked;
   uiConfig.debugMode = uiDebugModeEl.checked;
   const provider = webClipProviderEl.value as ModelProvider;
   const model = webClipModelDraft[provider] || defaultWebClipModelForProvider({ activeProvider, providers: draft }, provider);

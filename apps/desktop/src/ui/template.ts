@@ -53,106 +53,118 @@ ${APP_TOPBAR_HTML}
       </aside>
 
       <main class="workspace">
-        <header class="workspace-head">
-          <div class="doc-meta">
-            <h1 id="doc-title" class="doc-title">AIMD Desktop</h1>
-            <div id="doc-path" class="doc-path">未打开文档</div>
-            <div id="doc-state-badges" class="doc-state-badges" aria-label="当前文档状态" hidden></div>
+        <div class="document-meta-probe" aria-hidden="true">
+          <span id="doc-title">AIMD Desktop</span>
+          <span id="doc-path">未打开文档</span>
+        </div>
+        <div class="starter-actions" id="starter-actions" hidden></div>
+
+        <header class="document-tab-strip" id="document-tab-strip" hidden>
+          <div class="tab-bar" id="tab-bar">
+            <div class="open-tabs" id="open-tabs" role="tablist" aria-label="打开的文档"></div>
           </div>
+        </header>
 
-          <div class="starter-actions" id="starter-actions" hidden></div>
+        <header class="document-command-strip" id="document-command-strip" hidden>
+          <div class="doc-toolbar" id="doc-toolbar">
+            <div class="toolbar-group toolbar-group--mode">
+              <div class="mode-switch" role="tablist">
+                <button id="mode-read" class="mode-btn" role="tab" aria-selected="true" type="button" disabled>
+                  <span>预览</span>
+                </button>
+                <button id="mode-edit" class="mode-btn" role="tab" aria-selected="false" type="button" disabled>
+                  <span>可视编辑</span>
+                </button>
+                <button id="mode-source" class="mode-btn" role="tab" aria-selected="false" type="button" disabled>
+                  <span>Markdown</span>
+                </button>
+              </div>
+            </div>
 
-          <div class="head-actions" id="doc-actions" hidden>
-            <button id="save" class="primary-btn" type="button" disabled>
-              <span class="primary-btn-icon">${ICONS.save}</span>
-              <span id="save-label">保存</span>
-            </button>
-            <div class="more-menu-wrap">
-              <button id="more-menu-toggle" class="ghost-btn icon-only" type="button" title="当前文档操作" aria-haspopup="menu" aria-expanded="false">⋯</button>
-              <div id="more-menu" class="action-menu" role="menu" hidden>
-                <div class="action-menu-title">当前文档</div>
-                <button id="save-as" class="action-menu-item" type="button" disabled>
-                  <span class="action-menu-icon">${ICONS.save}</span>
-                  <span>另存为...</span>
-                  <small>⇧⌘S</small>
+            <div class="find-cluster">
+              <button id="find-toggle" class="ghost-btn icon-only command-find-btn" type="button" aria-label="查找" title="查找" aria-controls="find-bar" aria-expanded="false" disabled>
+                <span class="secondary-btn-icon">${ICONS.search}</span>
+              </button>
+
+              <div id="find-bar" class="find-bar" role="search" hidden>
+                <div class="find-row">
+                  <span class="find-bar-icon" aria-hidden="true">${ICONS.search}</span>
+                  <input id="find-input" class="find-input" type="search" placeholder="查找" autocomplete="off" />
+                  <span id="find-count" class="find-count">0/0</span>
+                  <span class="find-nav" aria-hidden="true"></span>
+                  <button id="find-prev" class="find-icon-btn" type="button" title="上一个" aria-label="上一个">${ICONS.chevronUp}</button>
+                  <button id="find-next" class="find-icon-btn" type="button" title="下一个" aria-label="下一个">${ICONS.chevronDown}</button>
+                  <button id="find-close" class="find-icon-btn find-close-btn" type="button" title="关闭" aria-label="关闭">${ICONS.close}</button>
+                </div>
+                <div class="find-replace-group" hidden>
+                  <input id="replace-input" class="find-input replace-input" type="text" placeholder="替换" autocomplete="off" />
+                  <button id="replace-one" class="find-text-btn" type="button">替换</button>
+                  <button id="replace-all" class="find-text-btn" type="button">全部</button>
+                </div>
+              </div>
+            </div>
+
+            <div id="doc-state-badges" class="doc-state-badges" aria-label="当前文档状态" hidden></div>
+
+            <div class="head-actions command-actions" id="doc-actions" hidden>
+              <button id="save" class="primary-btn command-save-btn" type="button" disabled>
+                <span class="primary-btn-icon">${ICONS.save}</span>
+                <span id="save-label">保存</span>
+              </button>
+              <div class="more-menu-wrap">
+                <button id="more-menu-toggle" class="secondary-btn document-menu-btn" type="button" title="当前文档操作" aria-haspopup="menu" aria-expanded="false">
+                  <span class="secondary-btn-icon">${ICONS.document}</span>
+                  <span>文档</span>
+                  <span class="menu-chevron" aria-hidden="true">▾</span>
                 </button>
-                <button id="format-document" class="action-menu-item" type="button" disabled>
-                  <span class="action-menu-icon">${ICONS.sparkle}</span>
-                  <span>一键格式化</span>
-                  <small>AI</small>
-                </button>
-                <button id="package-local-images" class="action-menu-item" type="button" disabled>
-                  <span class="action-menu-icon">${ICONS.image}</span>
-                  <span>嵌入本地图片 / 保存为 AIMD</span>
-                  <small>资源</small>
-                </button>
-                <button id="health-check" class="action-menu-item" type="button" disabled hidden>
-                  <span class="action-menu-icon">${ICONS.info}</span>
-                  <span>检查当前文档资源</span>
-                </button>
-                <hr class="action-menu-divider" role="separator">
-                <button id="export-markdown" class="action-menu-item" type="button" disabled>
-                  <span class="action-menu-icon">${ICONS.source}</span>
-                  <span>导出 Markdown</span>
-                  <small>.md</small>
-                </button>
-                <button id="export-html" class="action-menu-item" type="button" disabled>
-                  <span class="action-menu-icon">${ICONS.htmlDocument}</span>
-                  <span>导出 HTML</span>
-                  <small>.html</small>
-                </button>
-                <button id="export-pdf" class="action-menu-item" type="button" disabled>
-                  <span class="action-menu-icon">${ICONS.pdfDocument}</span>
-                  <span>导出 PDF</span>
-                  <small>.pdf</small>
-                </button>
-                <hr class="action-menu-divider" role="separator">
-                <button id="close" class="action-menu-item" type="button" disabled>
-                  <span class="action-menu-icon">${ICONS.close}</span>
-                  <span>关闭当前标签页</span>
-                  <small>⌘W</small>
-                </button>
+                <div id="more-menu" class="action-menu" role="menu" hidden>
+                  <div class="action-menu-title">文档</div>
+                  <button id="save-as" class="action-menu-item" type="button" disabled>
+                    <span class="action-menu-icon">${ICONS.save}</span>
+                    <span>另存为...</span>
+                    <small>⇧⌘S</small>
+                  </button>
+                  <button id="format-document" class="action-menu-item" type="button" disabled>
+                    <span class="action-menu-icon">${ICONS.sparkle}</span>
+                    <span>一键格式化</span>
+                    <small>AI</small>
+                  </button>
+                  <button id="package-local-images" class="action-menu-item" type="button" disabled>
+                    <span class="action-menu-icon">${ICONS.image}</span>
+                    <span>嵌入本地图片 / 保存为 AIMD</span>
+                    <small>资源</small>
+                  </button>
+                  <button id="health-check" class="action-menu-item" type="button" disabled hidden>
+                    <span class="action-menu-icon">${ICONS.info}</span>
+                    <span>检查当前文档资源</span>
+                  </button>
+                  <hr class="action-menu-divider" role="separator">
+                  <button id="export-markdown" class="action-menu-item" type="button" disabled>
+                    <span class="action-menu-icon">${ICONS.source}</span>
+                    <span>导出 Markdown</span>
+                    <small>.md</small>
+                  </button>
+                  <button id="export-html" class="action-menu-item" type="button" disabled>
+                    <span class="action-menu-icon">${ICONS.htmlDocument}</span>
+                    <span>导出 HTML</span>
+                    <small>.html</small>
+                  </button>
+                  <button id="export-pdf" class="action-menu-item" type="button" disabled>
+                    <span class="action-menu-icon">${ICONS.pdfDocument}</span>
+                    <span>导出 PDF</span>
+                    <small>.pdf</small>
+                  </button>
+                  <hr class="action-menu-divider" role="separator">
+                  <button id="close" class="action-menu-item" type="button" disabled>
+                    <span class="action-menu-icon">${ICONS.close}</span>
+                    <span>关闭当前标签页</span>
+                    <small>⌘W</small>
+                  </button>
+                </div>
               </div>
             </div>
           </div>
         </header>
-
-        <div class="tab-bar" id="tab-bar" hidden>
-          <div class="open-tabs" id="open-tabs" role="tablist" aria-label="打开的文档"></div>
-        </div>
-
-        <div class="doc-toolbar" id="doc-toolbar" hidden>
-          <div class="toolbar-group toolbar-group--mode">
-            <div class="mode-switch" role="tablist">
-              <button id="mode-read" class="mode-btn" role="tab" aria-selected="true" type="button" disabled>
-                <span>预览</span>
-              </button>
-              <button id="mode-edit" class="mode-btn" role="tab" aria-selected="false" type="button" disabled>
-                <span>可视编辑</span>
-              </button>
-              <button id="mode-source" class="mode-btn" role="tab" aria-selected="false" type="button" disabled>
-                <span>Markdown</span>
-              </button>
-            </div>
-          </div>
-
-          <div class="doc-toolbar-spacer"></div>
-
-          <button id="find-toggle" class="secondary-btn sm" type="button" disabled>
-            <span>查找</span>
-          </button>
-
-          <div id="find-bar" class="find-bar" hidden>
-            <input id="find-input" class="find-input" type="search" placeholder="查找" autocomplete="off" />
-            <input id="replace-input" class="find-input replace-input" type="text" placeholder="替换" autocomplete="off" />
-            <span id="find-count" class="find-count">0/0</span>
-            <button id="find-prev" class="find-icon-btn" type="button" title="上一个" aria-label="上一个">↑</button>
-            <button id="find-next" class="find-icon-btn" type="button" title="下一个" aria-label="下一个">↓</button>
-            <button id="replace-one" class="secondary-btn sm" type="button">替换</button>
-            <button id="replace-all" class="secondary-btn sm" type="button">全部</button>
-            <button id="find-close" class="find-icon-btn" type="button" title="关闭">${ICONS.close}</button>
-          </div>
-        </div>
 
         <div class="format-toolbar" id="format-toolbar" hidden>
           <div class="ft-group">
@@ -411,11 +423,13 @@ ${APP_TOPBAR_HTML}
         <div class="inspector-hr-resizer" id="inspector-hr-resizer" aria-label="调整检查器宽度"></div>
         <section class="nav-section nav-section--inspector" id="outline-section" hidden>
           <div class="inspector-owner" id="inspector-owner">未打开文档</div>
-          <div class="doc-panel-tabs" id="doc-panel-tabs" role="tablist" aria-label="当前文档检查器">
-            <button id="sidebar-tab-outline" class="doc-panel-tab is-active" type="button" role="tab" aria-selected="true" aria-controls="outline-panel">大纲</button>
-            <button id="sidebar-tab-assets" class="doc-panel-tab" type="button" role="tab" aria-selected="false" aria-controls="asset-panel">资源</button>
-            <button id="sidebar-tab-git" class="doc-panel-tab" type="button" role="tab" aria-selected="false" aria-controls="git-panel" hidden>Git</button>
-            <button id="sidebar-tab-health" class="doc-panel-tab" type="button" role="tab" aria-selected="false" aria-controls="health-panel" hidden>健康</button>
+          <div class="doc-panel-head">
+            <div class="doc-panel-tabs" id="doc-panel-tabs" role="tablist" aria-label="当前文档检查器">
+              <button id="sidebar-tab-outline" class="doc-panel-tab is-active" type="button" role="tab" aria-selected="true" aria-controls="outline-panel">大纲</button>
+              <button id="sidebar-tab-git" class="doc-panel-tab" type="button" role="tab" aria-selected="false" aria-controls="git-panel">Git</button>
+              <button id="sidebar-tab-assets" class="doc-panel-tab" type="button" role="tab" aria-selected="false" aria-controls="asset-panel">资源</button>
+              <button id="sidebar-tab-health" class="doc-panel-tab" type="button" role="tab" aria-selected="false" aria-controls="health-panel" hidden>健康</button>
+            </div>
             <button id="doc-panel-collapse" class="section-toggle" type="button" title="折叠检查器" aria-expanded="true">⌃</button>
           </div>
           <div class="section-content inspector-scroll">

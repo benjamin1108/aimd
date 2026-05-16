@@ -4,7 +4,7 @@ import {
   docStateBadgesEl,
   outlineSectionEl, assetSectionEl, assetListEl,
   sidebarOutlineAssetResizerEl,
-  starterActionsEl, docActionsEl, sidebarFootEl,
+  starterActionsEl, documentTabStripEl, documentCommandStripEl, docActionsEl, sidebarFootEl,
   saveEl, saveLabelEl, saveAsEl, closeEl,
   packageLocalImagesEl, healthCheckEl, webImportEl, exportMarkdownEl, exportHtmlEl, exportPdfEl,
   formatDocumentEl,
@@ -49,22 +49,6 @@ function assetItem(asset: AimdAsset) {
   `;
 }
 
-function normalizeForScope(path: string): string {
-  return path.replace(/\\/g, "/").replace(/\/+$/, "").toLowerCase();
-}
-
-function isInsideCurrentProject(path: string): boolean {
-  if (!state.workspace?.root || !path) return false;
-  const root = normalizeForScope(state.workspace.root);
-  const current = normalizeForScope(path);
-  return current === root || current.startsWith(`${root}/`);
-}
-
-function documentFormatLabel(doc: AimdDocument): string {
-  if (doc.isDraft) return "草稿";
-  return doc.format === "markdown" ? "Markdown" : "AIMD";
-}
-
 function basename(path: string): string {
   const parts = path.split(/[\\/]/).filter(Boolean);
   return parts.at(-1) || path || "未命名";
@@ -91,33 +75,33 @@ function renderAppScope(doc: AimdDocument | null, inDiffView: boolean) {
   appScopeSecondaryEl().textContent = "入口按命令域分层";
 }
 
-function renderDocumentStateBadges(doc: AimdDocument | null) {
+function renderDocumentStateBadges(doc: AimdDocument | null, inDiffView: boolean) {
   const container = docStateBadgesEl();
+  if (inDiffView) {
+    container.hidden = false;
+    container.innerHTML = `<span class="doc-state-badge" data-tone="info">只读</span>`;
+    return;
+  }
   if (!doc) {
     container.hidden = true;
     container.innerHTML = "";
     return;
   }
-  const badges: Array<{ text: string; tone?: "warn" | "info" | "strong" }> = [
-    { text: documentFormatLabel(doc), tone: "strong" },
-  ];
+  const badges: Array<{ text: string; tone?: "warn" | "info" | "strong" }> = [];
   const hasConflict = doc.hasGitConflicts || hasGitConflictMarkers(doc.markdown) || hasGitConflictMarkers(doc.html);
   if (doc.dirty) badges.push({ text: "未保存", tone: "warn" });
   if (doc.requiresAimdSave) badges.push({ text: "保存需选格式", tone: "info" });
   if (hasConflict) badges.push({ text: "Git 冲突", tone: "warn" });
   const tab = activeTab();
   if (tab?.recoveryState === "disk-changed") badges.push({ text: "磁盘已变化", tone: "warn" });
-  if (state.workspace?.root && doc.path) {
-    badges.push({ text: isInsideCurrentProject(doc.path) ? "项目内" : "项目外", tone: "info" });
-  }
-  container.hidden = false;
+  container.hidden = badges.length === 0;
   container.innerHTML = badges
     .map((badge) => `<span class="doc-state-badge" data-tone="${badge.tone || "idle"}">${escapeHTML(badge.text)}</span>`)
     .join("");
 }
 
-// 底部 status-pill 只承载稳定摘要和临时反馈；标题区的 doc-state-badges
-// 负责长期可见的格式、脏状态、冲突和项目归属。1.8s 后 success/info 会回退到
+// 底部 status-pill 只承载稳定摘要和临时反馈；命令带里的 doc-state-badges
+// 负责长期可见的脏状态、冲突和保存格式提示。1.8s 后 success/info 会回退到
 // 当前 doc 的稳定态（脏 → 未保存的修改；干净 → 就绪）。
 //
 // state.statusTimer 同时充当"当前是否在临时反馈窗口期"的标志：updateChrome 看到
@@ -214,20 +198,18 @@ export function updateChrome() {
   renderAppScope(doc, inDiffView);
   globalNewProjectAimdEl().disabled = !hasWorkspace;
   globalNewProjectMarkdownEl().disabled = !hasWorkspace;
-  starterActionsEl().hidden = Boolean(doc) || inDiffView;
-  docActionsEl().hidden = !doc || inDiffView;
-  docToolbarEl().hidden = !doc || inDiffView;
+  const hasCurrentTabContext = Boolean(doc || inDiffView);
+  starterActionsEl().hidden = true;
+  documentTabStripEl().hidden = !hasCurrentTabContext;
+  documentCommandStripEl().hidden = !hasCurrentTabContext;
+  docActionsEl().hidden = !hasCurrentTabContext;
+  docToolbarEl().hidden = !hasCurrentTabContext;
   sidebarFootEl().hidden = true;
 
   if (inDiffView) {
     const diffTab = state.git.diffTabs.find((tab) => tab.id === state.openDocuments.activeTabId) || null;
     titleEl().textContent = diffTab?.title || "Git Diff";
     pathEl().textContent = diffTab?.path ? `Git Diff · ${diffTab.directory}` : "Git Diff";
-    docStateBadgesEl().hidden = false;
-    docStateBadgesEl().innerHTML = `
-      <span class="doc-state-badge" data-tone="strong">Git Diff</span>
-      <span class="doc-state-badge" data-tone="info">只读</span>
-    `;
   } else {
     titleEl().textContent = doc ? displayDocTitle(doc) : "AIMD Desktop";
     pathEl().textContent = doc
@@ -235,8 +217,8 @@ export function updateChrome() {
         ? `${doc.path ? formatPathHint(doc.path) : "Markdown 草稿"} · 保存时需选择格式`
         : (doc.path || "未保存草稿 · 保存时选择 .md / .aimd"))
       : "未打开文档";
-    renderDocumentStateBadges(doc);
   }
+  renderDocumentStateBadges(doc, inDiffView);
   // 保存按钮在文档没有变化时禁用：用户的"按钮亮着但其实没活做"会变成第二种困惑。
   // 草稿状态(isDraft)即使 dirty=false 也要保留可点（点击会触发 saveDocumentAs 创建文件）。
   const canSave = Boolean(!inDiffView && doc && (doc.dirty || doc.isDraft));
@@ -250,7 +232,7 @@ export function updateChrome() {
   exportHtmlEl().disabled = !doc || inDiffView;
   exportPdfEl().disabled = !doc || inDiffView;
   findToggleEl().disabled = !doc || inDiffView;
-  closeEl().disabled = !doc || inDiffView;
+  closeEl().disabled = !hasCurrentTabContext;
   // 顶部的主按钮统一显示「保存」：草稿状态下点击仍走 saveDocumentAs 创建文件，
   // 但视觉/语义上对用户都是"保存"动作（与 sidebar-foot 一致）。
   saveLabelEl().textContent = "保存";
@@ -260,7 +242,7 @@ export function updateChrome() {
 
   if (!doc) {
     assetSectionEl().hidden = true;
-    outlineSectionEl().hidden = !state.git.isRepo;
+    outlineSectionEl().hidden = !inDiffView;
     sidebarOutlineAssetResizerEl().hidden = true;
     assetListEl().innerHTML = "";
     emptyEl().hidden = inDiffView;
@@ -272,18 +254,13 @@ export function updateChrome() {
   emptyEl().hidden = true;
   outlineSectionEl().hidden = false;
   const showActiveAssetPanel = state.sidebarDocTab === "assets";
-  const assetVisibilityChanged = assetSectionEl().hidden === showActiveAssetPanel;
   assetSectionEl().hidden = !showActiveAssetPanel;
   sidebarOutlineAssetResizerEl().hidden = true;
-  if (assetVisibilityChanged) {
-    outlineSectionEl().style.flex = "";
-    assetSectionEl().style.flex = "";
-  }
 
   if (doc.assets.length > 0) {
     assetListEl().innerHTML = doc.assets.map(assetItem).join("");
   } else {
-    assetListEl().innerHTML = `<div class="empty-list">当前文档没有 AIMD 托管资源</div>`;
+    assetListEl().innerHTML = "";
   }
 
   // 把当前文档的稳定状态推到底部 status-pill。setStatus 的临时反馈（保存中 /

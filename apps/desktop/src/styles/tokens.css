@@ -128,8 +128,10 @@
 .sidebar *,
 .inspector,
 .inspector *,
-.workspace-head,
-.workspace-head *,
+.document-tab-strip,
+.document-tab-strip *,
+.document-command-strip,
+.document-command-strip *,
 .doc-toolbar,
 .doc-toolbar *,
 .format-toolbar,
@@ -146,8 +148,6 @@
 /* 但是 chrome 区域里的输入控件、标题文字、文档正文仍要可选：
    用户经常要复制文档标题或粘贴路径到 API key 输入框。
    reader / preview / source 都属于"内容区"，强制可选。 */
-.workspace-head .doc-title,
-.workspace-head .doc-path,
 .sidebar .recent-item-title,
 .sidebar .recent-item-meta,
 .sidebar .outline-text,

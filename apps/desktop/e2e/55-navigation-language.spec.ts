@@ -264,7 +264,7 @@ test.describe("Phase 4 navigation language and stable status", () => {
     await page.locator("#more-menu-toggle").click();
     await expect(page.locator("#health-check")).toBeHidden();
     await expect(page.locator("#close")).toContainText("关闭当前标签页");
-    await expect(page.locator("#more-menu")).toContainText("当前文档");
+    await expect(page.locator("#more-menu")).toContainText("文档");
     await expect(page.locator("#more-menu")).not.toContainText("从网页导入");
     await expect(page.locator("#more-menu")).not.toContainText("检查更新");
     await expect(page.locator("#more-menu")).not.toContainText("关于 AIMD");
@@ -287,13 +287,14 @@ test.describe("Phase 4 navigation language and stable status", () => {
     await expect(page.locator("#doc-title")).toHaveText("Daily");
   });
 
-  test("shows stable header badges for format, dirty, draft, requiresAimdSave, conflict, and project scope", async ({ page }) => {
+  test("shows compact command-strip state while identity stays in topbar and tabs", async ({ page }) => {
     await page.goto("/");
     await openProject(page);
     await openDocumentFromProject(page, "Daily.md");
 
-    await expect(page.locator("#doc-state-badges")).toContainText("Markdown");
-    await expect(page.locator("#doc-state-badges")).toContainText("项目内");
+    await expect(page.locator(".open-tab.is-active")).toContainText("MD");
+    await expect(page.locator("#app-scope-primary")).toHaveText("项目 / Daily");
+    await expect(page.locator("#doc-state-badges")).toBeHidden();
     await expect(page.locator("#doc-state-badges")).not.toContainText("未保存");
 
     await page.locator("#mode-source").click();
@@ -306,17 +307,16 @@ test.describe("Phase 4 navigation language and stable status", () => {
     await page.locator("#workspace-close").click();
     await expect(page.locator("#workspace-root-label")).toHaveText("项目");
     await expect(page.locator("#workspace-tree")).toHaveText("打开目录");
-    await expect(page.locator("#doc-state-badges")).not.toContainText("项目内");
     await expect(page.locator(".open-tab")).toHaveCount(1);
 
     await page.locator("#global-new-toggle").click();
     await page.locator("#global-new-draft").click();
-    await expect(page.locator("#doc-state-badges")).toContainText("草稿");
+    await expect(page.locator(".open-tab.is-active")).toContainText("草稿");
     await expect(page.locator("#doc-state-badges")).toContainText("未保存");
 
     await openProject(page);
     await openDocumentFromProject(page, "Conflict.aimd");
-    await expect(page.locator("#doc-state-badges")).toContainText("AIMD");
+    await expect(page.locator(".open-tab.is-active")).toContainText("AIMD");
     await expect(page.locator("#doc-state-badges")).toContainText("Git 冲突");
   });
 
@@ -376,12 +376,17 @@ test.describe("Phase 4 navigation language and stable status", () => {
 
     const metrics = await page.evaluate(() => ({
       bodyOverflow: document.documentElement.scrollWidth - document.documentElement.clientWidth,
+      tabStripHeight: document.querySelector("#document-tab-strip")?.getBoundingClientRect().height || 0,
       tabHeight: document.querySelector("#tab-bar")?.getBoundingClientRect().height || 0,
-      headHeight: document.querySelector(".workspace-head")?.getBoundingClientRect().height || 0,
+      tabBottom: document.querySelector("#document-tab-strip")?.getBoundingClientRect().bottom || 0,
+      commandTop: document.querySelector("#document-command-strip")?.getBoundingClientRect().top || 0,
+      commandStripHeight: document.querySelector("#document-command-strip")?.getBoundingClientRect().height || 0,
     }));
     expect(metrics.bodyOverflow).toBeLessThanOrEqual(1);
+    expect(metrics.tabStripHeight).toBeGreaterThan(0);
     expect(metrics.tabHeight).toBeGreaterThan(0);
-    expect(metrics.headHeight).toBeLessThan(160);
+    expect(metrics.commandTop).toBeGreaterThanOrEqual(metrics.tabBottom - 1);
+    expect(metrics.commandStripHeight).toBeLessThan(160);
     await capturePhase4Screenshot(page, "phase4-navigation-narrow");
   });
 
@@ -427,15 +432,22 @@ test.describe("Phase 4 navigation language and stable status", () => {
         return el ? getComputedStyle(el) : null;
       };
       const tabBar = style("#tab-bar");
+      const commandStrip = style("#document-command-strip");
       const openTabs = style("#open-tabs");
       const tab = style(".open-tab");
       const tabMain = style(".open-tab-main");
       const format = document.querySelector(".open-tab-format")?.textContent || "";
+      const tabStripRect = document.querySelector("#document-tab-strip")?.getBoundingClientRect();
+      const commandStripRect = document.querySelector("#document-command-strip")?.getBoundingClientRect();
       return {
         brand: rect(".brand-mark"),
         topbarIcon: rect("#global-new-toggle .secondary-btn-icon svg"),
         projectIcon: rect("#workspace-open svg"),
         menuIconColumn: style(".action-menu-item")?.gridTemplateColumns || "",
+        commandStripContainsTabs: Boolean(document.querySelector("#document-command-strip #tab-bar")),
+        tabStripBottom: tabStripRect?.bottom || 0,
+        commandStripTop: commandStripRect?.top || 0,
+        commandStripPadding: commandStrip ? `${commandStrip.paddingTop} ${commandStrip.paddingRight} ${commandStrip.paddingBottom} ${commandStrip.paddingLeft}` : "",
         tabBarPadding: tabBar ? `${tabBar.paddingTop} ${tabBar.paddingRight} ${tabBar.paddingBottom} ${tabBar.paddingLeft}` : "",
         tabGap: openTabs?.gap || "",
         tabHeight: rect(".open-tab").height,
@@ -458,7 +470,10 @@ test.describe("Phase 4 navigation language and stable status", () => {
     expect(projectLaunchMetrics.recentItemWidth).toBeGreaterThan(360);
     expect(projectLaunchMetrics.commandCardWidth).toBeGreaterThan(280);
     expect(metrics.menuIconColumn.startsWith("18px ")).toBe(true);
-    expect(metrics.tabBarPadding).toBe("6px 12px 0px 12px");
+    expect(metrics.commandStripContainsTabs).toBe(false);
+    expect(metrics.commandStripTop).toBeGreaterThanOrEqual(metrics.tabStripBottom - 1);
+    expect(metrics.commandStripPadding).toBe("6px 12px 6px 12px");
+    expect(metrics.tabBarPadding).toBe("0px 0px 0px 0px");
     expect(metrics.tabGap).toBe("4px");
     expect(metrics.tabHeight).toBe(34);
     expect(metrics.tabMinWidth).toBe("132px");

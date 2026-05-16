@@ -166,7 +166,7 @@ export function onInlineKeydown(event: KeyboardEvent) {
   // Backspace at the very start of a block must not merge it into an H1-H6
   // sibling above. The default contenteditable Backspace would absorb the
   // body paragraph into the heading, growing the title without bound — the
-  // workspace-head doc-title and the H1 in the editor then push every other
+  // active tab title and the H1 in the editor then push every other
   // header control off-screen, and the user has no good way to recover.
   if (
     event.key === "Backspace" &&

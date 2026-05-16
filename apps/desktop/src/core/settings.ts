@@ -58,7 +58,6 @@ export const DEFAULT_FORMAT_SETTINGS: FormatSettings = {
 };
 
 export const DEFAULT_UI_SETTINGS: UiSettings = {
-  showAssetPanel: false,
   debugMode: false,
 };
 
@@ -188,7 +187,6 @@ export function coerceUiSettings(raw: unknown): UiSettings {
   }
   const obj = raw as Record<string, unknown>;
   return {
-    showAssetPanel: obj.showAssetPanel === true,
     debugMode: obj.debugMode === true,
   };
 }

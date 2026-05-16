@@ -1,6 +1,6 @@
 import { defineConfig, devices } from "@playwright/test";
 
-const useWebServer = process.env.PLAYWRIGHT_NO_WEB_SERVER !== "1";
+const useManagedWebServer = process.env.AIMD_PLAYWRIGHT_EXTERNAL_SERVER !== "1";
 
 export default defineConfig({
   testDir: "./e2e",
@@ -25,7 +25,7 @@ export default defineConfig({
       use: { ...devices["Desktop Chrome"] },
     },
   ],
-  webServer: useWebServer
+  webServer: useManagedWebServer
     ? {
         command: "node node_modules/vite/bin/vite.js --host 127.0.0.1 --port 1420",
         url: "http://127.0.0.1:1420",
