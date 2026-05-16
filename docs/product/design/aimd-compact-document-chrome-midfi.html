@@ -1,0 +1,1495 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>AIMD 文档区轻量化中保真稿</title>
+  <style>
+    :root {
+      --bg: #e8ece8;
+      --shell: #fbfaf6;
+      --paper: #fffdf8;
+      --rail: #ece4d7;
+      --rail-soft: #f4eee4;
+      --line: rgba(36, 30, 20, 0.11);
+      --line-strong: rgba(36, 30, 20, 0.18);
+      --ink: #1f1b16;
+      --muted: #766f64;
+      --faint: #a59b8d;
+      --accent: #2f6f63;
+      --accent-soft: rgba(47, 111, 99, 0.13);
+      --warn: #9f523f;
+      --shadow: 0 32px 86px -48px rgba(29, 25, 18, 0.58), 0 10px 26px -20px rgba(29, 25, 18, 0.28);
+      --control-shadow: 0 1px 0 rgba(255,255,255,0.82) inset, 0 1px 3px rgba(32, 27, 20, 0.12);
+      --popover-shadow: 0 18px 44px -28px rgba(29, 25, 18, 0.44), 0 8px 16px -12px rgba(29, 25, 18, 0.22);
+      --font: "Geist", "Satoshi", "SF Pro Text", "PingFang SC", "Microsoft YaHei", sans-serif;
+      --mono: "SF Mono", "JetBrains Mono", ui-monospace, monospace;
+      --ease: cubic-bezier(0.16, 1, 0.3, 1);
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      min-height: 100dvh;
+      background:
+        radial-gradient(circle at 12% 12%, rgba(47, 111, 99, 0.15), transparent 25%),
+        radial-gradient(circle at 86% 18%, rgba(166, 139, 92, 0.18), transparent 28%),
+        linear-gradient(135deg, #eef1f0 0%, #e0e3de 48%, #f2efe8 100%);
+      color: var(--ink);
+      font-family: var(--font);
+      letter-spacing: 0;
+    }
+
+    button {
+      border: 0;
+      background: transparent;
+      color: inherit;
+      font: inherit;
+      cursor: pointer;
+    }
+
+    svg {
+      display: block;
+      width: 16px;
+      height: 16px;
+    }
+
+    .page {
+      display: grid;
+      grid-template-columns: 316px minmax(0, 1fr);
+      gap: 18px;
+      min-height: 100dvh;
+      padding: 18px;
+    }
+
+    .brief {
+      display: grid;
+      grid-template-rows: auto auto minmax(0, 1fr);
+      border: 1px solid rgba(255,255,255,0.72);
+      border-radius: 18px;
+      background: rgba(250, 249, 245, 0.82);
+      box-shadow: var(--shadow);
+      overflow: hidden;
+    }
+
+    .brief-head {
+      padding: 18px 18px 14px;
+      border-bottom: 1px solid var(--line);
+      background: rgba(255,255,255,0.42);
+    }
+
+    .kicker {
+      color: var(--accent);
+      font: 760 11px/1 var(--mono);
+      text-transform: uppercase;
+    }
+
+    .brief h1 {
+      margin: 9px 0 0;
+      font-size: 20px;
+      line-height: 1.2;
+      font-weight: 760;
+    }
+
+    .brief p {
+      margin: 8px 0 0;
+      color: var(--muted);
+      font-size: 12.5px;
+      line-height: 1.58;
+    }
+
+    .scene-switcher {
+      display: grid;
+      gap: 8px;
+      padding: 14px;
+      border-bottom: 1px solid var(--line);
+    }
+
+    .scene-btn {
+      display: grid;
+      grid-template-columns: 28px minmax(0, 1fr);
+      align-items: center;
+      gap: 9px;
+      padding: 10px;
+      border: 1px solid transparent;
+      border-radius: 12px;
+      color: var(--muted);
+      text-align: left;
+      transition: background 160ms var(--ease), border-color 160ms var(--ease), transform 160ms var(--ease);
+    }
+
+    .scene-btn:hover { background: rgba(255,255,255,0.54); }
+    .scene-btn:active { transform: scale(0.99); }
+    .scene-btn.is-active {
+      border-color: var(--line-strong);
+      background: var(--paper);
+      color: var(--ink);
+      box-shadow: var(--control-shadow);
+    }
+
+    .scene-index {
+      display: grid;
+      place-items: center;
+      width: 28px;
+      height: 28px;
+      border-radius: 9px;
+      background: rgba(36, 30, 20, 0.06);
+      font: 760 11px/1 var(--mono);
+    }
+
+    .scene-btn.is-active .scene-index {
+      background: var(--accent-soft);
+      color: var(--accent);
+    }
+
+    .scene-title {
+      display: block;
+      font-size: 13px;
+      font-weight: 720;
+    }
+
+    .scene-note {
+      display: block;
+      margin-top: 2px;
+      font-size: 11.5px;
+      line-height: 1.36;
+    }
+
+    .rules {
+      padding: 15px 18px 18px;
+      overflow: auto;
+    }
+
+    .rules h2 {
+      margin: 0 0 10px;
+      color: var(--muted);
+      font-size: 12px;
+      font-weight: 760;
+    }
+
+    .rule {
+      display: grid;
+      grid-template-columns: 7px minmax(0, 1fr);
+      gap: 9px;
+      padding: 8px 0;
+      border-top: 1px solid rgba(36, 30, 20, 0.07);
+      color: var(--muted);
+      font-size: 12px;
+      line-height: 1.45;
+    }
+
+    .rule::before {
+      content: "";
+      width: 7px;
+      height: 7px;
+      margin-top: 5px;
+      border-radius: 99px;
+      background: var(--accent);
+    }
+
+    .metric {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 8px;
+      margin-top: 12px;
+    }
+
+    .metric-card {
+      padding: 10px;
+      border: 1px solid var(--line);
+      border-radius: 12px;
+      background: rgba(255,255,255,0.48);
+    }
+
+    .metric-value {
+      font: 760 18px/1 var(--mono);
+      color: var(--ink);
+    }
+
+    .metric-label {
+      margin-top: 4px;
+      color: var(--muted);
+      font-size: 11px;
+      line-height: 1.35;
+    }
+
+    .stage {
+      display: grid;
+      place-items: center;
+      min-width: 0;
+    }
+
+    .aimd-window {
+      position: relative;
+      display: grid;
+      grid-template-rows: auto minmax(0, 1fr) auto;
+      width: min(100%, 1340px);
+      height: min(850px, calc(100dvh - 36px));
+      min-height: 680px;
+      border: 1px solid rgba(255,255,255,0.78);
+      border-radius: 18px;
+      background: var(--shell);
+      box-shadow: var(--shadow);
+      overflow: hidden;
+      isolation: isolate;
+    }
+
+    .scene {
+      display: none;
+      position: absolute;
+      inset: 0;
+    }
+
+    .scene.is-active {
+      display: grid;
+      grid-template-rows: auto minmax(0, 1fr) auto;
+    }
+
+    .topbar {
+      display: grid;
+      grid-template-columns: auto minmax(0, 1fr) auto;
+      align-items: center;
+      gap: 16px;
+      min-height: 62px;
+      padding: 11px 16px;
+      border-bottom: 1px solid var(--line);
+      background: rgba(255,255,255,0.76);
+      backdrop-filter: blur(16px);
+      z-index: 8;
+    }
+
+    .brand {
+      display: inline-flex;
+      align-items: center;
+      gap: 10px;
+      min-width: 0;
+      font-weight: 760;
+    }
+
+    .brand-mark {
+      display: grid;
+      place-items: center;
+      width: 28px;
+      height: 28px;
+      border-radius: 9px;
+      background: #2a231d;
+      color: #fffaf0;
+      font-weight: 780;
+      box-shadow: inset 0 1px 0 rgba(255,255,255,0.18);
+    }
+
+    .scope {
+      display: grid;
+      grid-template-columns: minmax(0, auto) auto minmax(0, 1fr);
+      align-items: center;
+      gap: 8px;
+      min-width: 0;
+      color: var(--muted);
+      font-size: 13px;
+      white-space: nowrap;
+      overflow: hidden;
+    }
+
+    .scope strong,
+    .scope span {
+      min-width: 0;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .scope strong {
+      color: var(--ink);
+      font-weight: 720;
+    }
+
+    .scope .path {
+      font-family: var(--mono);
+      font-size: 11.5px;
+    }
+
+    .top-actions {
+      display: inline-flex;
+      align-items: center;
+      justify-content: flex-end;
+      gap: 8px;
+    }
+
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 7px;
+      height: 32px;
+      min-width: 0;
+      padding: 0 12px;
+      border: 1px solid var(--line-strong);
+      border-radius: 10px;
+      background: var(--paper);
+      color: var(--ink);
+      font-size: 12.5px;
+      font-weight: 620;
+      box-shadow: var(--control-shadow);
+      transition: transform 160ms var(--ease), background 160ms var(--ease);
+      white-space: nowrap;
+    }
+
+    .btn:hover { background: #fffefa; }
+    .btn:active { transform: scale(0.985); }
+    .btn.primary {
+      border-color: rgba(31, 22, 11, 0.2);
+      background: #2f6f63;
+      color: #fffaf0;
+    }
+    .btn.ghost {
+      border-color: transparent;
+      background: transparent;
+      color: var(--muted);
+      box-shadow: none;
+    }
+    .btn.subtle {
+      background: rgba(255,255,255,0.56);
+      color: var(--ink);
+    }
+    .btn.compact {
+      height: 28px;
+      padding: 0 9px;
+      font-size: 12px;
+      border-radius: 8px;
+    }
+    .btn.icon-only {
+      width: 30px;
+      padding: 0;
+    }
+    .btn:disabled {
+      opacity: 0.46;
+      cursor: not-allowed;
+      box-shadow: none;
+    }
+    .chev {
+      width: 9px;
+      height: 9px;
+      opacity: 0.72;
+    }
+
+    .body {
+      display: grid;
+      grid-template-columns: 292px minmax(0, 1fr) 282px;
+      min-height: 0;
+      overflow: hidden;
+    }
+
+    .scene-launch .body {
+      grid-template-columns: 292px minmax(0, 1fr);
+    }
+
+    .scene-launch .inspector {
+      display: none;
+    }
+
+    .project-rail {
+      display: grid;
+      grid-template-rows: auto minmax(0, 1fr);
+      min-width: 0;
+      background: linear-gradient(180deg, rgba(255,255,255,0.22), transparent 38%), var(--rail);
+      border-right: 1px solid var(--line);
+    }
+
+    .rail-head {
+      padding: 16px 14px 10px;
+    }
+
+    .rail-title {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      color: var(--muted);
+      font-size: 12px;
+      font-weight: 760;
+    }
+
+    .rail-tools {
+      display: flex;
+      gap: 6px;
+      margin-top: 12px;
+    }
+
+    .icon-btn {
+      display: grid;
+      place-items: center;
+      width: 30px;
+      height: 30px;
+      border-radius: 9px;
+      color: var(--muted);
+    }
+
+    .icon-btn:hover { background: rgba(255,255,255,0.42); color: var(--ink); }
+
+    .tree {
+      padding: 4px 11px 18px;
+      overflow: auto;
+    }
+
+    .tree-root,
+    .tree-row {
+      display: grid;
+      grid-template-columns: 18px minmax(0, 1fr) auto;
+      align-items: center;
+      gap: 8px;
+      min-height: 30px;
+      padding: 5px 8px;
+      border-radius: 10px;
+      color: var(--muted);
+      font-size: 13px;
+    }
+
+    .tree-root {
+      color: var(--ink);
+      font-weight: 650;
+    }
+
+    .tree-row.is-active {
+      background: rgba(50, 43, 32, 0.1);
+      color: var(--ink);
+    }
+
+    .tree-name {
+      min-width: 0;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .tag {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      height: 19px;
+      padding: 0 7px;
+      border-radius: 99px;
+      background: rgba(36, 30, 20, 0.07);
+      color: var(--muted);
+      font: 760 10.5px/1 var(--mono);
+    }
+
+    .workspace {
+      display: grid;
+      grid-template-rows: auto auto minmax(0, 1fr);
+      min-width: 0;
+      min-height: 0;
+      background: var(--shell);
+    }
+
+    .doc-strip {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) auto;
+      align-items: end;
+      gap: 12px;
+      min-height: 42px;
+      padding: 6px 12px 0;
+      border-bottom: 1px solid var(--line);
+      background: var(--rail-soft);
+    }
+
+    .scene-launch .doc-strip,
+    .scene-launch .mode-strip {
+      display: none;
+    }
+
+    .tabs {
+      display: flex;
+      align-items: end;
+      gap: 4px;
+      min-width: 0;
+      overflow: hidden;
+    }
+
+    .tab {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) auto auto;
+      align-items: center;
+      gap: 7px;
+      width: 208px;
+      height: 34px;
+      min-width: 132px;
+      max-width: 230px;
+      padding: 0 9px 0 12px;
+      border: 1px solid var(--line);
+      border-bottom: 0;
+      border-radius: 10px 10px 0 0;
+      background: rgba(255,255,255,0.42);
+      color: var(--muted);
+      font-size: 12px;
+    }
+
+    .tab.is-active {
+      background: var(--shell);
+      color: var(--ink);
+    }
+
+    .tab-title {
+      min-width: 0;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+      font-weight: 650;
+    }
+
+    .dirty-dot {
+      width: 7px;
+      height: 7px;
+      border-radius: 99px;
+      background: var(--warn);
+    }
+
+    .tab-close {
+      display: grid;
+      place-items: center;
+      width: 24px;
+      height: 24px;
+      border-radius: 8px;
+      color: var(--faint);
+    }
+
+    .tab-close:hover {
+      background: rgba(36, 30, 20, 0.06);
+      color: var(--ink);
+    }
+
+    .active-doc-actions {
+      display: inline-flex;
+      align-items: center;
+      align-self: center;
+      gap: 7px;
+      padding-bottom: 6px;
+      min-width: 0;
+    }
+
+    .dirty-state {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      color: var(--warn);
+      font-size: 11.5px;
+      font-weight: 640;
+      white-space: nowrap;
+    }
+
+    .mode-strip {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      min-height: 40px;
+      padding: 7px 14px;
+      border-bottom: 1px solid var(--line);
+      background: rgba(255,255,255,0.46);
+    }
+
+    .segmented {
+      display: inline-flex;
+      padding: 3px;
+      border: 1px solid var(--line);
+      border-radius: 10px;
+      background: rgba(36, 30, 20, 0.05);
+    }
+
+    .segmented button {
+      height: 26px;
+      padding: 0 11px;
+      border-radius: 7px;
+      color: var(--muted);
+      font-size: 12px;
+      font-weight: 620;
+    }
+
+    .segmented button.is-active {
+      background: var(--paper);
+      color: var(--ink);
+      box-shadow: var(--control-shadow);
+    }
+
+    .mode-spacer { flex: 1 1 auto; }
+
+    .canvas {
+      position: relative;
+      min-height: 0;
+      overflow: hidden;
+      background:
+        linear-gradient(90deg, rgba(255,255,255,0.72), transparent 40%),
+        var(--paper);
+    }
+
+    .doc-paper {
+      width: min(760px, calc(100% - 64px));
+      margin: 24px auto 42px;
+      padding: 40px 46px 58px;
+      border: 1px solid var(--line);
+      border-radius: 16px;
+      background: #fffefa;
+      box-shadow: 0 20px 58px -42px rgba(29, 25, 18, 0.38);
+    }
+
+    .doc-paper h2 {
+      margin: 0;
+      font-size: 30px;
+      line-height: 1.14;
+    }
+
+    .doc-line {
+      height: 12px;
+      margin-top: 14px;
+      border-radius: 99px;
+      background: rgba(36, 30, 20, 0.08);
+    }
+
+    .doc-line:nth-child(3) { width: 82%; }
+    .doc-line:nth-child(4) { width: 68%; }
+    .doc-line:nth-child(5) { width: 76%; }
+    .doc-line:nth-child(6) { width: 54%; }
+
+    .source-editor {
+      height: calc(100% - 48px);
+      margin: 24px;
+      padding: 18px 20px;
+      border: 1px solid var(--line);
+      border-radius: 14px;
+      background: #fffefa;
+      box-shadow: inset 0 1px 0 rgba(255,255,255,0.8);
+      color: #433c32;
+      font: 12.5px/1.68 var(--mono);
+      white-space: pre-wrap;
+      overflow: auto;
+    }
+
+    .inspector {
+      min-width: 0;
+      background: linear-gradient(180deg, rgba(255,255,255,0.34), transparent 38%), var(--rail-soft);
+      border-left: 1px solid var(--line);
+      padding: 16px 12px;
+      overflow: auto;
+    }
+
+    .inspector-title {
+      color: var(--muted);
+      font-size: 12px;
+      font-weight: 760;
+      margin-bottom: 10px;
+    }
+
+    .inspector-tabs {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 4px;
+      padding: 3px;
+      border: 1px solid var(--line);
+      border-radius: 10px;
+      background: rgba(36, 30, 20, 0.04);
+    }
+
+    .inspector-tabs button {
+      height: 26px;
+      border-radius: 7px;
+      color: var(--muted);
+      font-size: 12px;
+      font-weight: 650;
+    }
+
+    .inspector-tabs .is-active {
+      background: var(--paper);
+      color: var(--ink);
+      box-shadow: var(--control-shadow);
+    }
+
+    .outline { margin-top: 14px; }
+
+    .outline-row {
+      padding: 7px 8px;
+      border-radius: 9px;
+      color: var(--muted);
+      font-size: 12px;
+    }
+
+    .outline-row.is-active {
+      background: rgba(47, 111, 99, 0.1);
+      color: var(--accent);
+      font-weight: 680;
+    }
+
+    .footer {
+      display: flex;
+      justify-content: flex-end;
+      min-height: 32px;
+      padding: 7px 14px;
+      border-top: 1px solid var(--line);
+      background: rgba(255,255,255,0.5);
+      color: var(--muted);
+      font-size: 11.5px;
+    }
+
+    .menu {
+      position: absolute;
+      z-index: 20;
+      width: 286px;
+      padding: 6px;
+      border: 1px solid var(--line-strong);
+      border-radius: 12px;
+      background: rgba(255,253,248,0.98);
+      box-shadow: var(--popover-shadow);
+    }
+
+    .menu-title {
+      padding: 7px 9px 6px;
+      color: var(--muted);
+      font-size: 11px;
+      font-weight: 780;
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+    }
+
+    .menu-item {
+      display: grid;
+      grid-template-columns: 18px minmax(0, 1fr) auto;
+      align-items: center;
+      gap: 8px;
+      min-height: 34px;
+      padding: 7px 9px;
+      border-radius: 9px;
+      color: var(--ink);
+      font-size: 13px;
+    }
+
+    .menu-item:hover { background: rgba(36, 30, 20, 0.055); }
+
+    .menu-item small {
+      color: var(--muted);
+      font: 700 11px/1 var(--mono);
+    }
+
+    .menu hr {
+      border: 0;
+      border-top: 1px solid var(--line);
+      margin: 5px;
+    }
+
+    .menu-doc {
+      top: 111px;
+      right: 298px;
+    }
+
+    .menu-kebab {
+      top: 109px;
+      right: 296px;
+    }
+
+    .callout {
+      position: absolute;
+      z-index: 12;
+      max-width: 284px;
+      padding: 10px 12px;
+      border: 1px solid rgba(47, 111, 99, 0.24);
+      border-radius: 12px;
+      background: rgba(243, 250, 247, 0.96);
+      color: #285e54;
+      box-shadow: 0 14px 34px -26px rgba(47, 111, 99, 0.55);
+      font-size: 12px;
+      line-height: 1.45;
+    }
+
+    .callout strong {
+      display: block;
+      margin-bottom: 3px;
+      color: #1f4f47;
+      font-size: 12px;
+    }
+
+    .callout-strip {
+      top: 116px;
+      right: 304px;
+    }
+
+    .callout-kebab {
+      top: 156px;
+      right: 300px;
+    }
+
+    .launch {
+      display: grid;
+      grid-template-columns: minmax(0, 1.08fr) minmax(320px, 0.92fr);
+      gap: 28px;
+      height: 100%;
+      padding: 38px;
+      overflow: auto;
+    }
+
+    .launch h2 {
+      margin: 0;
+      max-width: 360px;
+      font-size: 31px;
+      line-height: 1.1;
+      font-weight: 780;
+    }
+
+    .launch-copy {
+      margin: 14px 0 0;
+      max-width: 420px;
+      color: var(--muted);
+      font-size: 14px;
+      line-height: 1.65;
+    }
+
+    .recent-panel {
+      margin-top: 28px;
+      padding: 16px;
+      border: 1px solid var(--line);
+      border-radius: 17px;
+      background: rgba(255,255,255,0.58);
+      box-shadow: 0 18px 48px -40px rgba(29, 25, 18, 0.38);
+    }
+
+    .section-head {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      margin-bottom: 12px;
+      font-weight: 720;
+      font-size: 14px;
+    }
+
+    .recent-item {
+      display: grid;
+      grid-template-columns: 34px minmax(0, 1fr) auto;
+      align-items: center;
+      gap: 12px;
+      min-height: 58px;
+      padding: 11px 12px;
+      border: 1px solid rgba(36, 30, 20, 0.07);
+      border-radius: 12px;
+      background: rgba(255,255,255,0.68);
+    }
+
+    .icon-tile {
+      display: grid;
+      place-items: center;
+      width: 34px;
+      height: 34px;
+      border-radius: 11px;
+      background: rgba(47, 111, 99, 0.1);
+      color: var(--accent);
+    }
+
+    .item-title {
+      display: block;
+      min-width: 0;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+      font-weight: 710;
+    }
+
+    .item-meta {
+      display: block;
+      margin-top: 2px;
+      color: var(--muted);
+      font: 11px/1.25 var(--mono);
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .launch-side {
+      padding-top: 87px;
+    }
+
+    .group-label {
+      margin: 0 0 10px;
+      color: var(--muted);
+      font-size: 11px;
+      font-weight: 760;
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+    }
+
+    .command-card {
+      display: grid;
+      grid-template-columns: 34px minmax(0, 1fr);
+      align-items: center;
+      gap: 12px;
+      min-height: 62px;
+      width: 100%;
+      padding: 12px;
+      border: 1px solid var(--line);
+      border-radius: 13px;
+      background: rgba(255,255,255,0.58);
+      box-shadow: var(--control-shadow);
+      text-align: left;
+    }
+
+    .command-card + .command-card { margin-top: 9px; }
+    .command-group + .command-group { margin-top: 25px; }
+
+    .scene-recommended .menu,
+    .scene-recommended .source-editor,
+    .scene-menu .source-editor,
+    .scene-menu .callout-strip,
+    .scene-source .doc-paper,
+    .scene-source .menu,
+    .scene-source .callout,
+    .scene-launch .doc-paper,
+    .scene-launch .source-editor,
+    .scene-launch .menu,
+    .scene-launch .callout,
+    .scene-launch .doc-strip,
+    .scene-launch .mode-strip,
+    .scene-anti .source-editor,
+    .scene-anti .menu-doc,
+    .scene-anti .callout-strip {
+      display: none;
+    }
+
+    .legacy-head {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) auto;
+      align-items: center;
+      min-height: 76px;
+      padding: 12px 20px;
+      border-bottom: 1px solid rgba(159, 82, 63, 0.28);
+      background: rgba(255, 246, 240, 0.82);
+    }
+
+    .legacy-head .doc-title {
+      margin: 0;
+      font-size: 17px;
+      line-height: 1.2;
+      font-weight: 720;
+    }
+
+    .legacy-head .doc-path {
+      margin-top: 3px;
+      color: var(--muted);
+      font: 11.5px/1.3 var(--mono);
+    }
+
+    .scene-anti .workspace {
+      grid-template-rows: auto auto auto minmax(0, 1fr);
+    }
+
+    .scene-anti .doc-strip {
+      min-height: 42px;
+    }
+
+    .scene-anti .doc-paper {
+      margin-top: 24px;
+    }
+
+    .anti-note {
+      position: absolute;
+      z-index: 14;
+      top: 116px;
+      right: 306px;
+      max-width: 294px;
+      padding: 10px 12px;
+      border: 1px solid rgba(159, 82, 63, 0.28);
+      border-radius: 12px;
+      background: rgba(255, 246, 240, 0.96);
+      color: var(--warn);
+      font-size: 12px;
+      line-height: 1.45;
+      box-shadow: 0 14px 34px -26px rgba(159, 82, 63, 0.5);
+    }
+
+    .scene-recommended .legacy-head,
+    .scene-menu .legacy-head,
+    .scene-source .legacy-head,
+    .scene-launch .legacy-head,
+    .scene-recommended .anti-note,
+    .scene-menu .anti-note,
+    .scene-source .anti-note,
+    .scene-launch .anti-note {
+      display: none;
+    }
+
+    @media (max-width: 980px) {
+      .page {
+        grid-template-columns: minmax(0, 1fr);
+      }
+
+      .rules {
+        display: none;
+      }
+
+      .aimd-window {
+        min-height: 720px;
+      }
+
+      .body,
+      .scene-launch .body {
+        grid-template-columns: minmax(0, 1fr);
+      }
+
+      .project-rail,
+      .inspector {
+        display: none;
+      }
+
+      .doc-strip {
+        grid-template-columns: minmax(0, 1fr);
+        gap: 6px;
+        padding-bottom: 6px;
+      }
+
+      .active-doc-actions {
+        justify-self: end;
+        padding-bottom: 0;
+      }
+
+      .launch {
+        grid-template-columns: minmax(0, 1fr);
+      }
+
+      .launch-side {
+        padding-top: 0;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="page">
+    <aside class="brief">
+      <div class="brief-head">
+        <div class="kicker">AIMD COMPACT CHROME</div>
+        <h1>去掉文档标题栏后的当前文档操作设计</h1>
+        <p>问题不是保存按钮本身，而是保存区域带着重复标题、路径、状态芯片，形成一整层无效 chrome。方案是删除文档标题栏，把当前文档操作压回标签行右侧。</p>
+        <div class="metric">
+          <div class="metric-card">
+            <div class="metric-value">3 -> 2</div>
+            <div class="metric-label">编辑区上方层级</div>
+          </div>
+          <div class="metric-card">
+            <div class="metric-value">-76px</div>
+            <div class="metric-label">删除重复标题栏</div>
+          </div>
+        </div>
+      </div>
+
+      <nav class="scene-switcher" aria-label="场景切换">
+        <button class="scene-btn is-active" type="button" data-scene="recommended">
+          <span class="scene-index">01</span>
+          <span><span class="scene-title">推荐文档态</span><span class="scene-note">身份在顶栏，操作在标签行</span></span>
+        </button>
+        <button class="scene-btn" type="button" data-scene="menu">
+          <span class="scene-index">02</span>
+          <span><span class="scene-title">文档菜单展开</span><span class="scene-note">从标签行右侧打开</span></span>
+        </button>
+        <button class="scene-btn" type="button" data-scene="source">
+          <span class="scene-index">03</span>
+          <span><span class="scene-title">源码编辑态</span><span class="scene-note">保存、文档菜单仍贴近当前标签</span></span>
+        </button>
+        <button class="scene-btn" type="button" data-scene="launch">
+          <span class="scene-index">04</span>
+          <span><span class="scene-title">启动态</span><span class="scene-note">无当前文档，不显示文档操作</span></span>
+        </button>
+        <button class="scene-btn" type="button" data-scene="anti">
+          <span class="scene-index">05</span>
+          <span><span class="scene-title">反例</span><span class="scene-note">重复标题栏继续压低编辑区</span></span>
+        </button>
+      </nav>
+
+      <section class="rules">
+        <h2>设计规则</h2>
+        <div class="rule">删除文档标题栏。文档标题、路径、项目关系已经在顶部 scope 和标签里表达。</div>
+        <div class="rule">标签行成为当前文档操作带：左侧是打开的文档，右侧是当前标签的保存、文档菜单。</div>
+        <div class="rule">模式切换和查找保留一行，因为它们是编辑/阅读视图控制，不属于文档身份。</div>
+        <div class="rule">未保存状态用活动标签 dirty 点和右侧「未保存」短状态表达，不再占一整行芯片。</div>
+        <div class="rule">无文档时不显示保存、文档菜单、检查器。启动页只保留最近、创建、打开。</div>
+      </section>
+    </aside>
+
+    <main class="stage">
+      <div class="aimd-window">
+        <section class="scene scene-recommended is-active" data-scene-panel="recommended">
+          <header class="topbar">
+            <div class="brand"><span class="brand-mark">A</span><span>AIMD</span></div>
+            <div class="scope">
+              <strong>项目 / Quarterly Report.aimd</strong>
+              <span>/</span>
+              <span class="path">~/Reports/Quarterly Report.aimd</span>
+            </div>
+            <div class="top-actions">
+              <button class="btn"><span data-icon="plus"></span><span>新建</span><span class="chev" data-icon="chev-down"></span></button>
+              <button class="btn"><span data-icon="folder"></span><span>打开</span><span class="chev" data-icon="chev-down"></span></button>
+              <button class="btn"><span data-icon="menu"></span><span>应用</span><span class="chev" data-icon="chev-down"></span></button>
+            </div>
+          </header>
+
+          <div class="body">
+            <aside class="project-rail">
+              <div class="rail-head">
+                <div class="rail-title"><span>项目</span><span data-icon="chev-up"></span></div>
+                <div class="rail-tools">
+                  <button class="icon-btn" title="打开目录"><span data-icon="folder"></span></button>
+                  <button class="icon-btn" title="刷新项目"><span data-icon="refresh"></span></button>
+                  <button class="icon-btn" title="新建项目文件"><span data-icon="plus"></span></button>
+                  <button class="icon-btn" title="关闭项目"><span data-icon="close"></span></button>
+                </div>
+              </div>
+              <div class="tree">
+                <div class="tree-root"><span data-icon="chev-down"></span><span class="tree-name">Reports</span></div>
+                <div class="tree-row"><span data-icon="document"></span><span class="tree-name">ai-daily-2026-04-30</span><span class="tag">AIMD</span></div>
+                <div class="tree-row is-active"><span data-icon="document"></span><span class="tree-name">Quarterly Report</span><span class="tag">AIMD</span></div>
+                <div class="tree-row"><span data-icon="source"></span><span class="tree-name">product-direction</span><span class="tag">MD</span></div>
+              </div>
+            </aside>
+
+            <section class="workspace">
+              <div class="doc-strip">
+                <div class="tabs">
+                  <div class="tab is-active"><span class="tab-title">Quarterly Report</span><span class="tag">AIMD</span><button class="tab-close"><span data-icon="close"></span></button></div>
+                  <div class="tab"><span class="tab-title">product-direction</span><span class="tag">MD</span><button class="tab-close"><span data-icon="close"></span></button></div>
+                </div>
+                <div class="active-doc-actions">
+                  <button class="btn primary compact"><span data-icon="save"></span><span>保存</span></button>
+                  <button class="btn subtle compact"><span data-icon="document"></span><span>文档</span><span class="chev" data-icon="chev-down"></span></button>
+                </div>
+              </div>
+              <div class="mode-strip">
+                <div class="segmented"><button class="is-active">预览</button><button>可视编辑</button><button>Markdown</button></div>
+                <div class="mode-spacer"></div>
+                <button class="btn ghost compact">查找</button>
+              </div>
+              <div class="canvas">
+                <article class="doc-paper">
+                  <h2>季度复盘</h2>
+                  <div class="doc-line"></div>
+                  <div class="doc-line"></div>
+                  <div class="doc-line"></div>
+                  <div class="doc-line"></div>
+                  <div class="doc-line"></div>
+                </article>
+              </div>
+            </section>
+
+            <aside class="inspector">
+              <div class="inspector-title">当前文档</div>
+              <div class="inspector-tabs"><button class="is-active">大纲</button><button>资源</button><button>Git</button></div>
+              <div class="outline">
+                <div class="outline-row is-active">季度复盘</div>
+                <div class="outline-row">目标与结果</div>
+                <div class="outline-row">风险清单</div>
+                <div class="outline-row">下一步</div>
+              </div>
+            </aside>
+          </div>
+          <div class="callout callout-strip"><strong>当前文档操作不消失</strong>只是从独立标题栏移到活动标签行右侧。它仍然明确作用于当前标签。</div>
+          <footer class="footer">编辑区上方只剩：标签行 + 模式工具行</footer>
+        </section>
+
+        <section class="scene scene-menu" data-scene-panel="menu">
+          <header class="topbar">
+            <div class="brand"><span class="brand-mark">A</span><span>AIMD</span></div>
+            <div class="scope">
+              <strong>项目 / Quarterly Report.aimd</strong>
+              <span>/</span>
+              <span class="path">~/Reports/Quarterly Report.aimd</span>
+            </div>
+            <div class="top-actions">
+              <button class="btn"><span data-icon="plus"></span><span>新建</span><span class="chev" data-icon="chev-down"></span></button>
+              <button class="btn"><span data-icon="folder"></span><span>打开</span><span class="chev" data-icon="chev-down"></span></button>
+              <button class="btn"><span data-icon="menu"></span><span>应用</span><span class="chev" data-icon="chev-down"></span></button>
+            </div>
+          </header>
+          <div class="body">
+            <aside class="project-rail">
+              <div class="rail-head">
+                <div class="rail-title"><span>项目</span><span data-icon="chev-up"></span></div>
+                <div class="rail-tools">
+                  <button class="icon-btn"><span data-icon="folder"></span></button>
+                  <button class="icon-btn"><span data-icon="refresh"></span></button>
+                  <button class="icon-btn"><span data-icon="plus"></span></button>
+                  <button class="icon-btn"><span data-icon="close"></span></button>
+                </div>
+              </div>
+              <div class="tree">
+                <div class="tree-root"><span data-icon="chev-down"></span><span class="tree-name">Reports</span></div>
+                <div class="tree-row is-active"><span data-icon="document"></span><span class="tree-name">Quarterly Report</span><span class="tag">AIMD</span></div>
+              </div>
+            </aside>
+            <section class="workspace">
+              <div class="doc-strip">
+                <div class="tabs">
+                  <div class="tab is-active"><span class="tab-title">Quarterly Report</span><span class="tag">AIMD</span><button class="tab-close"><span data-icon="close"></span></button></div>
+                  <div class="tab"><span class="tab-title">product-direction</span><span class="tag">MD</span><button class="tab-close"><span data-icon="close"></span></button></div>
+                </div>
+                <div class="active-doc-actions">
+                  <button class="btn primary compact"><span data-icon="save"></span><span>保存</span></button>
+                  <button class="btn subtle compact"><span data-icon="document"></span><span>文档</span><span class="chev" data-icon="chev-down"></span></button>
+                </div>
+              </div>
+              <div class="mode-strip">
+                <div class="segmented"><button class="is-active">预览</button><button>可视编辑</button><button>Markdown</button></div>
+                <div class="mode-spacer"></div>
+                <button class="btn ghost compact">查找</button>
+              </div>
+              <div class="canvas">
+                <article class="doc-paper">
+                  <h2>季度复盘</h2>
+                  <div class="doc-line"></div>
+                  <div class="doc-line"></div>
+                  <div class="doc-line"></div>
+                  <div class="doc-line"></div>
+                </article>
+              </div>
+            </section>
+            <aside class="inspector">
+              <div class="inspector-title">当前文档</div>
+              <div class="inspector-tabs"><button class="is-active">大纲</button><button>资源</button><button>Git</button></div>
+            </aside>
+          </div>
+          <div class="menu menu-doc">
+            <div class="menu-title">文档</div>
+            <div class="menu-item"><span data-icon="save"></span><span>另存为...</span><small>Shift Cmd S</small></div>
+            <div class="menu-item"><span data-icon="sparkle"></span><span>一键格式化</span><small>AI</small></div>
+            <div class="menu-item"><span data-icon="image"></span><span>嵌入本地图片 / 保存为 AIMD</span><small>资源</small></div>
+            <hr>
+            <div class="menu-item"><span data-icon="source"></span><span>导出 Markdown</span><small>.md</small></div>
+            <div class="menu-item"><span data-icon="document"></span><span>导出 HTML</span><small>.html</small></div>
+            <div class="menu-item"><span data-icon="document"></span><span>导出 PDF</span><small>.pdf</small></div>
+            <hr>
+            <div class="menu-item"><span data-icon="close"></span><span>关闭当前标签页</span><small>Cmd W</small></div>
+          </div>
+          <div class="callout callout-kebab"><strong>菜单仍叫「文档」</strong>不回退到裸省略号。它是活动标签的操作菜单。</div>
+          <footer class="footer">文档菜单从标签行右侧展开，不占用额外标题栏</footer>
+        </section>
+
+        <section class="scene scene-source" data-scene-panel="source">
+          <header class="topbar">
+            <div class="brand"><span class="brand-mark">A</span><span>AIMD</span></div>
+            <div class="scope">
+              <strong>项目 / Quarterly Report.aimd</strong>
+              <span>/</span>
+              <span class="path">~/Reports/Quarterly Report.aimd</span>
+            </div>
+            <div class="top-actions">
+              <button class="btn"><span data-icon="plus"></span><span>新建</span><span class="chev" data-icon="chev-down"></span></button>
+              <button class="btn"><span data-icon="folder"></span><span>打开</span><span class="chev" data-icon="chev-down"></span></button>
+              <button class="btn"><span data-icon="menu"></span><span>应用</span><span class="chev" data-icon="chev-down"></span></button>
+            </div>
+          </header>
+          <div class="body">
+            <aside class="project-rail">
+              <div class="rail-head">
+                <div class="rail-title"><span>项目</span><span data-icon="chev-up"></span></div>
+                <div class="rail-tools">
+                  <button class="icon-btn"><span data-icon="folder"></span></button>
+                  <button class="icon-btn"><span data-icon="refresh"></span></button>
+                  <button class="icon-btn"><span data-icon="plus"></span></button>
+                  <button class="icon-btn"><span data-icon="close"></span></button>
+                </div>
+              </div>
+              <div class="tree">
+                <div class="tree-root"><span data-icon="chev-down"></span><span class="tree-name">Reports</span></div>
+                <div class="tree-row is-active"><span data-icon="document"></span><span class="tree-name">Quarterly Report</span><span class="tag">AIMD</span></div>
+              </div>
+            </aside>
+            <section class="workspace">
+              <div class="doc-strip">
+                <div class="tabs">
+                  <div class="tab is-active"><span class="tab-title">Quarterly Report</span><span class="dirty-dot"></span><button class="tab-close"><span data-icon="close"></span></button></div>
+                  <div class="tab"><span class="tab-title">product-direction</span><span class="tag">MD</span><button class="tab-close"><span data-icon="close"></span></button></div>
+                </div>
+                <div class="active-doc-actions">
+                  <span class="dirty-state"><span class="dirty-dot"></span>未保存</span>
+                  <button class="btn primary compact"><span data-icon="save"></span><span>保存</span></button>
+                  <button class="btn subtle compact"><span data-icon="document"></span><span>文档</span><span class="chev" data-icon="chev-down"></span></button>
+                </div>
+              </div>
+              <div class="mode-strip">
+                <div class="segmented"><button>预览</button><button>可视编辑</button><button class="is-active">Markdown</button></div>
+                <div class="mode-spacer"></div>
+                <button class="btn ghost compact">查找</button>
+              </div>
+              <div class="canvas">
+                <pre class="source-editor"># 季度复盘
+
+## 目标与结果
+
+本季度重点是把文档入口、项目入口和应用入口拆开，让用户不用在重复按钮之间判断作用域。
+
+## 当前问题
+
+- 文档标题栏和顶部 scope 重复
+- 保存区域压低编辑区
+- 文档菜单入口和应用菜单入口容易混淆</pre>
+              </div>
+            </section>
+            <aside class="inspector">
+              <div class="inspector-title">当前文档</div>
+              <div class="inspector-tabs"><button class="is-active">大纲</button><button>资源</button><button>Git</button></div>
+            </aside>
+          </div>
+          <footer class="footer">源码态同样不恢复文档标题栏</footer>
+        </section>
+
+        <section class="scene scene-launch" data-scene-panel="launch">
+          <header class="topbar">
+            <div class="brand"><span class="brand-mark">A</span><span>AIMD</span></div>
+            <div class="scope">
+              <strong>项目 / Reports</strong>
+              <span>/</span>
+              <span class="path">未打开文档</span>
+            </div>
+            <div class="top-actions">
+              <button class="btn"><span data-icon="plus"></span><span>新建</span><span class="chev" data-icon="chev-down"></span></button>
+              <button class="btn"><span data-icon="folder"></span><span>打开</span><span class="chev" data-icon="chev-down"></span></button>
+              <button class="btn"><span data-icon="menu"></span><span>应用</span><span class="chev" data-icon="chev-down"></span></button>
+            </div>
+          </header>
+          <div class="body">
+            <aside class="project-rail">
+              <div class="rail-head">
+                <div class="rail-title"><span>项目</span><span data-icon="chev-up"></span></div>
+                <div class="rail-tools">
+                  <button class="icon-btn"><span data-icon="folder"></span></button>
+                  <button class="icon-btn"><span data-icon="refresh"></span></button>
+                  <button class="icon-btn"><span data-icon="plus"></span></button>
+                  <button class="icon-btn"><span data-icon="close"></span></button>
+                </div>
+              </div>
+              <div class="tree">
+                <div class="tree-root"><span data-icon="chev-down"></span><span class="tree-name">Reports</span></div>
+                <div class="tree-row"><span data-icon="document"></span><span class="tree-name">Quarterly Report</span><span class="tag">AIMD</span></div>
+                <div class="tree-row"><span data-icon="source"></span><span class="tree-name">product-direction</span><span class="tag">MD</span></div>
+              </div>
+            </aside>
+            <section class="workspace">
+              <div class="canvas">
+                <div class="launch">
+                  <div>
+                    <h2>继续处理文档</h2>
+                    <p class="launch-copy">从最近打开的文档继续，或开始新的内容。</p>
+                    <section class="recent-panel">
+                      <div class="section-head"><span>最近打开</span><button>清空</button></div>
+                      <div class="recent-item">
+                        <span class="icon-tile" data-icon="source"></span>
+                        <span><span class="item-title">AWS Interconnect Architecture Guide</span><span class="item-meta">.../Desktop/AWS Interconnect Architecture Guide_v1.md</span></span>
+                        <span class="tag">MD</span>
+                      </div>
+                    </section>
+                  </div>
+                  <div class="launch-side">
+                    <div class="command-group">
+                      <div class="group-label">创建</div>
+                      <button class="command-card"><span class="icon-tile" data-icon="plus"></span><span><span class="item-title">空白 AIMD 草稿</span><span class="item-meta">从一页空白文档开始</span></span></button>
+                      <button class="command-card"><span class="icon-tile" data-icon="link"></span><span><span class="item-title">从网页导入</span><span class="item-meta">提取网页内容为草稿</span></span></button>
+                    </div>
+                    <div class="command-group">
+                      <div class="group-label">打开</div>
+                      <button class="command-card"><span class="icon-tile" data-icon="open-document"></span><span><span class="item-title">打开 AIMD / Markdown</span><span class="item-meta">选择本地文档继续编辑</span></span></button>
+                      <button class="command-card"><span class="icon-tile" data-icon="folder"></span><span><span class="item-title">打开项目目录</span><span class="item-meta">浏览并编辑项目文件</span></span></button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </section>
+          </div>
+          <footer class="footer">没有当前文档时，不显示标签行、保存、文档菜单、检查器</footer>
+        </section>
+
+        <section class="scene scene-anti" data-scene-panel="anti">
+          <header class="topbar">
+            <div class="brand"><span class="brand-mark">A</span><span>AIMD</span></div>
+            <div class="scope">
+              <strong>项目 / Quarterly Report.aimd</strong>
+              <span>/</span>
+              <span class="path">~/Reports/Quarterly Report.aimd</span>
+            </div>
+            <div class="top-actions">
+              <button class="btn"><span data-icon="plus"></span><span>新建</span><span class="chev" data-icon="chev-down"></span></button>
+              <button class="btn"><span data-icon="folder"></span><span>打开</span><span class="chev" data-icon="chev-down"></span></button>
+              <button class="btn"><span data-icon="menu"></span><span>应用</span><span class="chev" data-icon="chev-down"></span></button>
+            </div>
+          </header>
+          <div class="body">
+            <aside class="project-rail">
+              <div class="rail-head"><div class="rail-title"><span>项目</span><span data-icon="chev-up"></span></div></div>
+              <div class="tree">
+                <div class="tree-root"><span data-icon="chev-down"></span><span class="tree-name">Reports</span></div>
+                <div class="tree-row is-active"><span data-icon="document"></span><span class="tree-name">Quarterly Report</span><span class="tag">AIMD</span></div>
+              </div>
+            </aside>
+            <section class="workspace">
+              <div class="legacy-head">
+                <div>
+                  <h2 class="doc-title">Quarterly Report</h2>
+                  <div class="doc-path">~/Reports/Quarterly Report.aimd</div>
+                </div>
+                <div class="active-doc-actions">
+                  <button class="btn primary"><span data-icon="save"></span><span>保存</span></button>
+                  <button class="btn subtle"><span data-icon="document"></span><span>文档</span><span class="chev" data-icon="chev-down"></span></button>
+                </div>
+              </div>
+              <div class="doc-strip">
+                <div class="tabs">
+                  <div class="tab is-active"><span class="tab-title">Quarterly Report</span><span class="tag">AIMD</span><button class="tab-close"><span data-icon="close"></span></button></div>
+                </div>
+              </div>
+              <div class="mode-strip">
+                <div class="segmented"><button class="is-active">预览</button><button>可视编辑</button><button>Markdown</button></div>
+                <div class="mode-spacer"></div>
+                <button class="btn ghost compact">查找</button>
+              </div>
+              <div class="canvas">
+                <article class="doc-paper">
+                  <h2>季度复盘</h2>
+                  <div class="doc-line"></div>
+                  <div class="doc-line"></div>
+                  <div class="doc-line"></div>
+                </article>
+              </div>
+            </section>
+            <aside class="inspector">
+              <div class="inspector-title">当前文档</div>
+              <div class="inspector-tabs"><button class="is-active">大纲</button><button>资源</button><button>Git</button></div>
+            </aside>
+          </div>
+          <div class="anti-note"><strong>反例</strong><br>这个标题栏重复了顶栏 scope 和活动标签标题，还把编辑区继续往下压。</div>
+          <footer class="footer">不要保留这一层</footer>
+        </section>
+      </div>
+    </main>
+  </div>
+
+  <script>
+    const icons = {
+      plus: '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.55" stroke-linecap="round"><path d="M8 3v10M3 8h10"/></svg>',
+      folder: '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"><path d="M2 4.3v7.9c0 .7.6 1.3 1.3 1.3h9.4c.7 0 1.3-.6 1.3-1.3V5.9c0-.7-.6-1.3-1.3-1.3H8L6.5 3H3.3C2.6 3 2 3.6 2 4.3Z"/></svg>',
+      menu: '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.45" stroke-linecap="round"><path d="M3 4.5h10M3 8h10M3 11.5h10"/></svg>',
+      document: '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"><path d="M9 1.5H4a1 1 0 0 0-1 1v11a1 1 0 0 0 1 1h8a1 1 0 0 0 1-1v-8L9 1.5z"/><path d="M9 1.5v4h4"/></svg>',
+      'open-document': '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"><path d="M3 13h10"/><path d="M4 3h8v7H4z"/></svg>',
+      source: '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"><path d="m5.5 4-3 4 3 4M10.5 4l3 4-3 4"/></svg>',
+      save: '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3.5v9a1 1 0 0 0 1 1h8a1 1 0 0 0 1-1V5.5L11 3H4a1 1 0 0 0-1 .5z"/><path d="M5 3.5V7h6V3.5M5 13.5V10h6v3.5"/></svg>',
+      refresh: '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"><path d="M13 7a5 5 0 0 0-8.6-3.2L3 5.2"/><path d="M3 2.5v2.7h2.7M3 9a5 5 0 0 0 8.6 3.2L13 10.8"/><path d="M13 13.5v-2.7h-2.7"/></svg>',
+      close: '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><path d="m4 4 8 8M12 4 4 12"/></svg>',
+      link: '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"><path d="M7 9.4 9.4 7M6.7 5.6 8.2 4a2.6 2.6 0 0 1 3.7 3.7l-1.4 1.5M9.5 10.4 8 12a2.6 2.6 0 0 1-3.7-3.7L5.6 7"/></svg>',
+      image: '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="2.5" width="12" height="11" rx="1.5"/><circle cx="6" cy="6.5" r="1.2"/><path d="m2.5 12 3.5-3.5 3 3 2-2 2.5 2.5"/></svg>',
+      sparkle: '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.35" stroke-linecap="round" stroke-linejoin="round"><path d="M8.5 1.8 9.8 5l3.4 1.2-3.4 1.3-1.3 3.4-1.3-3.4-3.4-1.3L7.2 5z"/><path d="M3.2 9.8 3.8 11l1.2.5-1.2.5-.6 1.3-.5-1.3-1.2-.5 1.2-.5z"/></svg>',
+      'chev-down': '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="m4 6 4 4 4-4"/></svg>',
+      'chev-up': '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="m4 10 4-4 4 4"/></svg>'
+    };
+
+    document.querySelectorAll("[data-icon]").forEach((node) => {
+      node.innerHTML = icons[node.dataset.icon] || "";
+    });
+
+    const buttons = document.querySelectorAll("[data-scene]");
+    const panels = document.querySelectorAll("[data-scene-panel]");
+    buttons.forEach((button) => {
+      button.addEventListener("click", () => {
+        const scene = button.dataset.scene;
+        buttons.forEach((item) => item.classList.toggle("is-active", item === button));
+        panels.forEach((panel) => panel.classList.toggle("is-active", panel.dataset.scenePanel === scene));
+      });
+    });
+  </script>
+</body>
+</html>
