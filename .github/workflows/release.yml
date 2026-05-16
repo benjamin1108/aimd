@@ -92,6 +92,27 @@ jobs:
           rustc --version
           cargo metadata --locked --no-deps --format-version 1 >/dev/null
 
+      - name: Rust cache target diagnostics
+        shell: bash
+        run: |
+          set -euo pipefail
+          echo "target_dir=${PWD}/target"
+          if [ ! -d target ]; then
+            echo "target_status=missing"
+            exit 0
+          fi
+          du -sh target || true
+          if [ ! -d target/release ]; then
+            echo "target_release_status=missing"
+            exit 0
+          fi
+          du -sh target/release || true
+          echo "release_deps_rlib_count=$(find target/release/deps -maxdepth 1 -type f -name '*.rlib' 2>/dev/null | wc -l | tr -d ' ')"
+          echo "release_deps_rmeta_count=$(find target/release/deps -maxdepth 1 -type f -name '*.rmeta' 2>/dev/null | wc -l | tr -d ' ')"
+          find target/release -maxdepth 2 -type f \( -name 'aimd*' -o -name '*.rlib' -o -name '*.rmeta' \) -print 2>/dev/null \
+            | sort \
+            | head -n 40
+
       - name: Windows build tool cache
         if: runner.os == 'Windows'
         uses: actions/cache@v4
@@ -160,6 +181,28 @@ jobs:
           target\release\aimd.exe version
           target\release\aimd.exe set-title --help
           target\release\aimd.exe skill doctor --json
+
+      - name: Rust build output diagnostics
+        if: always()
+        shell: bash
+        run: |
+          set -euo pipefail
+          echo "target_dir=${PWD}/target"
+          if [ ! -d target ]; then
+            echo "target_status=missing"
+            exit 0
+          fi
+          du -sh target || true
+          if [ ! -d target/release ]; then
+            echo "target_release_status=missing"
+            exit 0
+          fi
+          du -sh target/release || true
+          echo "release_deps_rlib_count=$(find target/release/deps -maxdepth 1 -type f -name '*.rlib' 2>/dev/null | wc -l | tr -d ' ')"
+          echo "release_deps_rmeta_count=$(find target/release/deps -maxdepth 1 -type f -name '*.rmeta' 2>/dev/null | wc -l | tr -d ' ')"
+          find target/release -maxdepth 2 -type f \( -name 'aimd*' -o -name '*.rlib' -o -name '*.rmeta' \) -print 2>/dev/null \
+            | sort \
+            | head -n 40
 
       - name: Upload release assets
         env:
