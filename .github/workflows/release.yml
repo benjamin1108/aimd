@@ -93,6 +93,7 @@ jobs:
           cargo metadata --locked --no-deps --format-version 1 >/dev/null
 
       - name: Rust cache target diagnostics
+        continue-on-error: true
         shell: bash
         run: |
           set -euo pipefail
@@ -111,7 +112,8 @@ jobs:
           echo "release_deps_rmeta_count=$(find target/release/deps -maxdepth 1 -type f -name '*.rmeta' 2>/dev/null | wc -l | tr -d ' ')"
           find target/release -maxdepth 2 -type f \( -name 'aimd*' -o -name '*.rlib' -o -name '*.rmeta' \) -print 2>/dev/null \
             | sort \
-            | head -n 40
+            | head -n 40 \
+            || true
 
       - name: Windows build tool cache
         if: runner.os == 'Windows'
@@ -184,6 +186,7 @@ jobs:
 
       - name: Rust build output diagnostics
         if: always()
+        continue-on-error: true
         shell: bash
         run: |
           set -euo pipefail
@@ -202,7 +205,8 @@ jobs:
           echo "release_deps_rmeta_count=$(find target/release/deps -maxdepth 1 -type f -name '*.rmeta' 2>/dev/null | wc -l | tr -d ' ')"
           find target/release -maxdepth 2 -type f \( -name 'aimd*' -o -name '*.rlib' -o -name '*.rmeta' \) -print 2>/dev/null \
             | sort \
-            | head -n 40
+            | head -n 40 \
+            || true
 
       - name: Upload release assets
         env:
