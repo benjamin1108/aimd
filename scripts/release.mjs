@@ -2,6 +2,8 @@
 import { execFileSync } from "node:child_process";
 import {
   REPO_ROOT,
+  RELEASE_WORKFLOW_FILE,
+  RELEASE_WORKFLOW_REF,
   assertTagMatchesVersion,
   bumpVersion,
   ensureCommandsAvailable,
@@ -24,6 +26,8 @@ const RELEASE_FILES = new Set([
   "apps/desktop/src/updater/release.ts",
   "README.md",
 ]);
+const WORKFLOW_DISPATCH_ATTEMPTS = 3;
+const WORKFLOW_DISPATCH_RETRY_DELAY_MS = 5000;
 
 function parseArgs(argv) {
   const args = [...argv];
@@ -135,8 +139,67 @@ function pushRepublishTag(tag, dryRun) {
   runCommand("git", ["push", "origin", tag], { cwd: REPO_ROOT, dryRun });
 }
 
+function sleep(ms) {
+  Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, ms);
+}
+
+function activeReleaseWorkflowRun(tag) {
+  try {
+    const output = execFileSync("gh", [
+      "run",
+      "list",
+      "--workflow",
+      RELEASE_WORKFLOW_FILE,
+      "--branch",
+      RELEASE_WORKFLOW_REF,
+      "--limit",
+      "20",
+      "--json",
+      "databaseId,displayTitle,headBranch,status,conclusion",
+    ], {
+      cwd: REPO_ROOT,
+      encoding: "utf8",
+      stdio: ["ignore", "pipe", "ignore"],
+    });
+    const runs = JSON.parse(output);
+    return runs.find((run) => (
+      run.displayTitle === `Release ${tag}`
+      && run.headBranch === RELEASE_WORKFLOW_REF
+      && run.status !== "completed"
+    ));
+  } catch {
+    return null;
+  }
+}
+
 function triggerReleaseWorkflow(tag, dryRun) {
-  runCommand("gh", releaseWorkflowDispatchArgs(tag), { cwd: REPO_ROOT, dryRun });
+  const args = releaseWorkflowDispatchArgs(tag);
+  if (dryRun) {
+    runCommand("gh", args, { cwd: REPO_ROOT, dryRun });
+    return;
+  }
+  for (let attempt = 1; attempt <= WORKFLOW_DISPATCH_ATTEMPTS; attempt += 1) {
+    try {
+      runCommand("gh", args, { cwd: REPO_ROOT });
+      return;
+    } catch (error) {
+      const delay = WORKFLOW_DISPATCH_RETRY_DELAY_MS * attempt;
+      const retrying = attempt < WORKFLOW_DISPATCH_ATTEMPTS;
+      const nextAction = retrying ? `retrying in ${delay / 1000}s` : "checking for an active run";
+      console.warn(
+        `release ${tag}: workflow dispatch failed on attempt ${attempt}/${WORKFLOW_DISPATCH_ATTEMPTS}; ${nextAction}`,
+      );
+      sleep(delay);
+      const activeRun = activeReleaseWorkflowRun(tag);
+      if (activeRun) {
+        console.log(`release ${tag}: workflow dispatch is already active as run ${activeRun.databaseId}`);
+        return;
+      }
+      if (!retrying) {
+        throw error;
+      }
+    }
+  }
 }
 
 try {
