@@ -76,10 +76,10 @@ jobs:
       - name: Rust cache
         uses: Swatinem/rust-cache@v2
         with:
-          prefix-key: v1-rust
+          prefix-key: v2-release-rust
           shared-key: ${{ steps.cache-inputs.outputs.rust_cache_hash }}
           add-rust-environment-hash-key: "false"
-          cache-on-failure: true
+          cache-on-failure: false
           cache-bin: false
 
       - name: Rust toolchain check
