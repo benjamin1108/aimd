@@ -41,8 +41,23 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: 20
-          cache: npm
-          cache-dependency-path: apps/desktop/package-lock.json
+
+      - name: Compute cache inputs
+        id: cache-inputs
+        run: node scripts/gha-cache-inputs.mjs
+
+      - name: Locate npm cache
+        id: npm-cache
+        shell: bash
+        run: echo "dir=$(npm config get cache)" >> "$GITHUB_OUTPUT"
+
+      - name: NPM cache
+        uses: actions/cache@v4
+        with:
+          path: ${{ steps.npm-cache.outputs.dir }}
+          key: npm-${{ runner.os }}-${{ runner.arch }}-${{ steps.cache-inputs.outputs.npm_lock_hash }}
+          restore-keys: |
+            npm-${{ runner.os }}-${{ runner.arch }}-
 
       - name: Setup Rust
         uses: dtolnay/rust-toolchain@stable
@@ -51,6 +66,7 @@ jobs:
         uses: Swatinem/rust-cache@v2
         with:
           prefix-key: v1-rust
+          shared-key: ${{ steps.cache-inputs.outputs.rust_cache_hash }}
           cache-on-failure: true
           cache-bin: false
 
@@ -71,14 +87,24 @@ jobs:
           path: |
             ~\AppData\Local\tauri
             ~\AppData\Local\ms-playwright
-          key: windows-build-tools-${{ runner.arch }}-${{ hashFiles('Cargo.lock', 'apps/desktop/src-tauri/Cargo.lock', 'apps/desktop/package-lock.json') }}
+          key: windows-build-tools-${{ runner.arch }}-${{ steps.cache-inputs.outputs.desktop_tools_hash }}
           restore-keys: |
             windows-build-tools-${{ runner.arch }}-
 
+      - name: macOS build tool cache
+        if: runner.os == 'macOS'
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/Library/Caches/tauri
+            ~/Library/Caches/ms-playwright
+          key: macos-build-tools-${{ runner.arch }}-${{ steps.cache-inputs.outputs.desktop_tools_hash }}
+          restore-keys: |
+            macos-build-tools-${{ runner.arch }}-
+
       - name: Install frontend dependencies
-        if: runner.os != 'Windows'
         working-directory: apps/desktop
-        run: npm ci
+        run: npm ci --prefer-offline
 
       - name: Version check
         env:
@@ -118,7 +144,7 @@ jobs:
           TAURI_SIGNING_PRIVATE_KEY_PATH: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PATH }}
           TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
         run: |
-          .\scripts\build-windows-installer.ps1 -SkipEnv
+          .\scripts\build-windows-installer.ps1 -SkipEnv -SkipNpmInstall
           target\release\aimd.exe version
           target\release\aimd.exe set-title --help
           target\release\aimd.exe skill doctor --json
