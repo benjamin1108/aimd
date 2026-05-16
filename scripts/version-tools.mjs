@@ -281,10 +281,34 @@ export function executableForPlatform(command) {
   return command;
 }
 
+function windowsShellQuote(value) {
+  const text = String(value);
+  if (/^[A-Za-z0-9_./:=+-]+$/.test(text)) return text;
+  return `"${text.replace(/"/g, '\\"')}"`;
+}
+
+function execCommandSync(command, args, { cwd = REPO_ROOT, stdio = "inherit" } = {}) {
+  const executable = executableForPlatform(command);
+  const extension = path.extname(executable).toLowerCase();
+  if (process.platform === "win32" && (extension === ".cmd" || extension === ".bat")) {
+    execFileSync(`${windowsShellQuote(executable)} ${args.map(windowsShellQuote).join(" ")}`, {
+      cwd,
+      stdio,
+      shell: true,
+    });
+    return;
+  }
+  execFileSync(executable, args, {
+    cwd,
+    stdio,
+    shell: false,
+  });
+}
+
 export function ensureCommandsAvailable(commands, { cwd = REPO_ROOT } = {}) {
   for (const command of commands) {
     try {
-      execFileSync(executableForPlatform(command), ["--version"], {
+      execCommandSync(command, ["--version"], {
         cwd,
         stdio: "ignore",
       });
@@ -299,10 +323,9 @@ export function runCommand(command, args, options = {}) {
     console.log(`[dry-run] ${command} ${args.join(" ")}`);
     return;
   }
-  execFileSync(executableForPlatform(command), args, {
+  execCommandSync(command, args, {
     cwd: options.cwd || REPO_ROOT,
     stdio: "inherit",
-    shell: false,
   });
 }
 
