@@ -1,9 +1,7 @@
 name: Release Desktop
+run-name: Release ${{ inputs.tag }}
 
 on:
-  push:
-    tags:
-      - "v*"
   workflow_dispatch:
     inputs:
       tag:
@@ -36,6 +34,8 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.tag }}
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
@@ -45,6 +45,17 @@ jobs:
       - name: Compute cache inputs
         id: cache-inputs
         run: node scripts/gha-cache-inputs.mjs
+
+      - name: Cache scope diagnostics
+        shell: bash
+        run: |
+          set -euo pipefail
+          echo "github.ref=${GITHUB_REF}"
+          echo "github.ref_name=${GITHUB_REF_NAME}"
+          echo "release_tag=${{ inputs.tag }}"
+          echo "npm_lock_hash=${{ steps.cache-inputs.outputs.npm_lock_hash }}"
+          echo "rust_cache_hash=${{ steps.cache-inputs.outputs.rust_cache_hash }}"
+          echo "desktop_tools_hash=${{ steps.cache-inputs.outputs.desktop_tools_hash }}"
 
       - name: Locate npm cache
         id: npm-cache
@@ -67,6 +78,7 @@ jobs:
         with:
           prefix-key: v1-rust
           shared-key: ${{ steps.cache-inputs.outputs.rust_cache_hash }}
+          add-rust-environment-hash-key: "false"
           cache-on-failure: true
           cache-bin: false
 
@@ -109,7 +121,7 @@ jobs:
       - name: Version check
         env:
           CI_RELEASE: "1"
-          RELEASE_TAG: ${{ inputs.tag || github.ref_name }}
+          RELEASE_TAG: ${{ inputs.tag }}
         run: npm run version:check -- --verify-tag
 
       - name: Updater signing secret check
@@ -152,7 +164,7 @@ jobs:
       - name: Upload release assets
         env:
           GH_TOKEN: ${{ github.token }}
-          RELEASE_TAG: ${{ inputs.tag || github.ref_name }}
+          RELEASE_TAG: ${{ inputs.tag }}
         shell: bash
         run: |
           set -euo pipefail
@@ -186,6 +198,8 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.tag }}
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
@@ -195,13 +209,13 @@ jobs:
       - name: Version check
         env:
           CI_RELEASE: "1"
-          RELEASE_TAG: ${{ inputs.tag || github.ref_name }}
+          RELEASE_TAG: ${{ inputs.tag }}
         run: npm run version:check -- --verify-tag
 
       - name: Download uploaded release assets
         env:
           GH_TOKEN: ${{ github.token }}
-          RELEASE_TAG: ${{ inputs.tag || github.ref_name }}
+          RELEASE_TAG: ${{ inputs.tag }}
         run: |
           set -euo pipefail
           mkdir -p dist
@@ -210,7 +224,7 @@ jobs:
 
       - name: Generate and validate latest.json
         env:
-          RELEASE_TAG: ${{ inputs.tag || github.ref_name }}
+          RELEASE_TAG: ${{ inputs.tag }}
         run: |
           set -euo pipefail
           node scripts/updater-manifest.mjs generate --dist dist --tag "$RELEASE_TAG" --output dist/latest.json
@@ -219,7 +233,7 @@ jobs:
       - name: Upload and verify updater manifest
         env:
           GH_TOKEN: ${{ github.token }}
-          RELEASE_TAG: ${{ inputs.tag || github.ref_name }}
+          RELEASE_TAG: ${{ inputs.tag }}
         run: |
           set -euo pipefail
           gh release upload "$RELEASE_TAG" dist/latest.json --clobber

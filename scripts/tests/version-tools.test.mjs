@@ -8,6 +8,7 @@ import {
   bumpVersion,
   computeSyncedFiles,
   executableForPlatform,
+  releaseWorkflowDispatchArgs,
   syncVersion,
   validateReleaseConfig,
 } from "../version-tools.mjs";
@@ -131,6 +132,19 @@ test("syncVersion check ignores Windows CRLF checkout when versions match", () =
 test("tag validation rejects mismatched tags", () => {
   assert.doesNotThrow(() => assertTagMatchesVersion("1.2.3", "v1.2.3"));
   assert.throws(() => assertTagMatchesVersion("1.2.3", "v1.2.4"), /does not match/);
+});
+
+test("release workflow dispatch runs from main while passing the release tag", () => {
+  assert.deepEqual(releaseWorkflowDispatchArgs("v1.2.3"), [
+    "workflow",
+    "run",
+    "release.yml",
+    "--ref",
+    "main",
+    "-f",
+    "tag=v1.2.3",
+  ]);
+  assert.throws(() => releaseWorkflowDispatchArgs(""), /requires a tag/);
 });
 
 test("Windows npm commands resolve to command shims", () => {

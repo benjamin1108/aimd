@@ -5,6 +5,8 @@ import { fileURLToPath } from "node:url";
 
 const THIS_DIR = path.dirname(fileURLToPath(import.meta.url));
 export const REPO_ROOT = path.resolve(THIS_DIR, "..");
+export const RELEASE_WORKFLOW_FILE = "release.yml";
+export const RELEASE_WORKFLOW_REF = "main";
 
 const SEMVER_RE = /^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)(?:-([0-9A-Za-z.-]+))?(?:\+([0-9A-Za-z.-]+))?$/;
 const BUMP_LEVELS = new Set(["patch", "minor", "major"]);
@@ -265,6 +267,16 @@ export function assertTagMatchesVersion(version, tag) {
   if (tag !== `v${version}`) {
     throw new Error(`Release tag ${tag} does not match release.config.json version ${version}`);
   }
+}
+
+export function releaseWorkflowDispatchArgs(tag, ref = RELEASE_WORKFLOW_REF) {
+  if (typeof tag !== "string" || !tag.trim()) {
+    throw new Error("Release workflow dispatch requires a tag");
+  }
+  if (typeof ref !== "string" || !ref.trim()) {
+    throw new Error("Release workflow dispatch requires a branch ref");
+  }
+  return ["workflow", "run", RELEASE_WORKFLOW_FILE, "--ref", ref.trim(), "-f", `tag=${tag.trim()}`];
 }
 
 export function ensureCleanWorktree(root = REPO_ROOT) {

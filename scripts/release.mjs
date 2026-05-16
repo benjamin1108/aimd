@@ -6,6 +6,7 @@ import {
   bumpVersion,
   ensureCommandsAvailable,
   loadReleaseConfig,
+  releaseWorkflowDispatchArgs,
   runCommand,
   syncVersion,
   updateReleaseConfigVersion,
@@ -134,6 +135,10 @@ function pushRepublishTag(tag, dryRun) {
   runCommand("git", ["push", "origin", tag], { cwd: REPO_ROOT, dryRun });
 }
 
+function triggerReleaseWorkflow(tag, dryRun) {
+  runCommand("gh", releaseWorkflowDispatchArgs(tag), { cwd: REPO_ROOT, dryRun });
+}
+
 try {
   const { mode, dryRun, resume } = parseArgs(process.argv.slice(2));
   if (!dryRun) ensureReleaseWorktree({ resume });
@@ -154,18 +159,19 @@ try {
       console.log(`updater ${platform.platform}: ${platform.updaterAsset} + ${platform.signatureAsset}`);
     }
     console.log(republish
-      ? `[dry-run] would check main/origin, delete existing ${tag} release/tag, recreate tag, and push`
-      : `[dry-run] would sync, check, commit, tag ${tag}, and push`);
+      ? `[dry-run] would check main/origin, delete existing ${tag} release/tag, recreate tag, push, and dispatch Release Desktop on main`
+      : `[dry-run] would sync, check, commit, tag ${tag}, push main/tag, and dispatch Release Desktop on main`);
     process.exit(0);
   }
 
   ensureMainBranch();
-  ensureCommandsAvailable(republish ? ["gh", "git"] : ["npm", "cargo", "git"]);
+  ensureCommandsAvailable(republish ? ["gh", "git"] : ["npm", "cargo", "git", "gh"]);
 
   if (republish) {
     syncVersion({ check: true });
     ensureHeadMatchesOriginMain();
     pushRepublishTag(tag, dryRun);
+    triggerReleaseWorkflow(tag, dryRun);
     process.exit(0);
   }
 
@@ -195,6 +201,7 @@ try {
   }
   runCommand("git", ["push", "origin", "main"], { cwd: REPO_ROOT });
   runCommand("git", ["push", "origin", tag], { cwd: REPO_ROOT });
+  triggerReleaseWorkflow(tag, dryRun);
 } catch (error) {
   console.error(error instanceof Error ? error.message : String(error));
   process.exit(1);

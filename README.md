@@ -248,7 +248,9 @@ npx tauri signer generate -w ../../secrets/aimd-updater.key --ci -p ""
 已经安装旧 public key 的用户只能安装旧 private key 签名的更新；丢失 private key
 等同于切断旧版本的在线升级路径。
 
-release tag 推送后会触发 `Release Desktop` workflow：
+发布脚本会先推送 `main` 和 release tag，然后在 `main` ref 上 dispatch
+`Release Desktop` workflow，并把 release tag 作为输入传给构建。这样构建内容来自 tag，
+但 GitHub Actions cache 作用域固定在 `main`，避免每个新 tag 都重新建立一套缓存。
 
 1. 校验 tag 与 `release.config.json` 版本一致。
 2. macOS 构建完整 PKG，并对 PKG 本身生成 updater 签名。
@@ -264,7 +266,7 @@ npm run release -- republish
 ```
 
 `republish` 不要求指定 `patch` / `minor` / `major`，不会自增版本号。它会重新创建
-当前版本 tag，触发 release workflow，workflow 会重新生成签名和 `latest.json`。
+当前版本 tag，并在 `main` ref 上 dispatch release workflow 重新生成签名和 `latest.json`。
 
 打包：
 
