@@ -27,7 +27,8 @@
     "test:e2e": "playwright test",
     "test:updater-telemetry": "node scripts/test-updater-telemetry.mjs",
     "test:e2e:vite": "node scripts/run-e2e-with-vite.mjs",
-    "test:e2e:ui": "playwright test --ui"
+    "test:e2e:ui": "playwright test --ui",
+    "icon:alpha": "node scripts/make-icon-transparent.mjs"
   },
   "dependencies": {
     "@mozilla/readability": "^0.6.0",
