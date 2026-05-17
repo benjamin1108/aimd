@@ -242,6 +242,9 @@ export type GitRepoStatus = {
   clean: boolean;
   conflicted: boolean;
   files: GitChangedFile[];
+  aimdDriverConfigured?: boolean;
+  gitattributesConfigured?: boolean;
+  aimdDriverWarning?: string;
   error?: string;
 };
 
@@ -263,4 +266,5 @@ export type GitDiffTab = {
   loading: boolean;
   error: string;
   scroll: number;
+  requestId?: number;
 };

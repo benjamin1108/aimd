@@ -1,8 +1,35 @@
 use super::*;
 use std::fs;
+use std::path::Path;
+use std::process::Command;
 
 fn root() -> tempfile::TempDir {
     tempfile::tempdir().unwrap()
+}
+
+fn git(repo: &Path, args: &[&str]) {
+    let out = Command::new("git")
+        .args(args)
+        .current_dir(repo)
+        .output()
+        .unwrap();
+    assert!(
+        out.status.success(),
+        "{}",
+        String::from_utf8_lossy(&out.stderr)
+    );
+}
+
+fn repo_with_seed() -> tempfile::TempDir {
+    let dir = root();
+    let repo = dir.path();
+    git(repo, &["init"]);
+    git(repo, &["config", "user.email", "aimd@example.test"]);
+    git(repo, &["config", "user.name", "AIMD Test"]);
+    fs::write(repo.join("tracked.txt"), "old\n").unwrap();
+    git(repo, &["add", "tracked.txt"]);
+    git(repo, &["commit", "-m", "seed"]);
+    dir
 }
 
 #[test]
@@ -53,25 +80,12 @@ fn file_diff_args_keep_textconv_enabled() {
 #[test]
 fn file_diff_uses_configured_textconv_for_aimd() {
     use std::os::unix::fs::PermissionsExt;
-    use std::process::Command;
 
     let dir = root();
     let repo = dir.path();
-    Command::new("git")
-        .args(["init"])
-        .current_dir(repo)
-        .output()
-        .unwrap();
-    Command::new("git")
-        .args(["config", "user.email", "aimd@example.test"])
-        .current_dir(repo)
-        .output()
-        .unwrap();
-    Command::new("git")
-        .args(["config", "user.name", "AIMD Test"])
-        .current_dir(repo)
-        .output()
-        .unwrap();
+    git(repo, &["init"]);
+    git(repo, &["config", "user.email", "aimd@example.test"]);
+    git(repo, &["config", "user.name", "AIMD Test"]);
 
     let textconv = repo.join("textconv.sh");
     fs::write(
@@ -84,22 +98,13 @@ fn file_diff_uses_configured_textconv_for_aimd() {
     fs::set_permissions(&textconv, permissions).unwrap();
 
     fs::write(repo.join(".gitattributes"), "*.aimd diff=aimd\n").unwrap();
-    Command::new("git")
-        .args(["config", "diff.aimd.textconv", textconv.to_str().unwrap()])
-        .current_dir(repo)
-        .output()
-        .unwrap();
+    git(
+        repo,
+        &["config", "diff.aimd.textconv", textconv.to_str().unwrap()],
+    );
     fs::write(repo.join("doc.aimd"), "old semantic\n").unwrap();
-    Command::new("git")
-        .args(["add", "."])
-        .current_dir(repo)
-        .output()
-        .unwrap();
-    Command::new("git")
-        .args(["commit", "-m", "seed"])
-        .current_dir(repo)
-        .output()
-        .unwrap();
+    git(repo, &["add", "."]);
+    git(repo, &["commit", "-m", "seed"]);
 
     fs::write(repo.join("doc.aimd"), "new semantic\n").unwrap();
     let args = git_file_diff_args(false, "doc.aimd");
@@ -108,6 +113,157 @@ fn file_diff_uses_configured_textconv_for_aimd() {
     assert!(diff.contains("--- AIMD main.md ---"));
     assert!(diff.contains("+new semantic"));
     assert!(!diff.contains("Binary files"));
+}
+
+#[test]
+fn binary_diff_detection_ignores_source_text_mentions() {
+    let text_diff = "diff --git a/test.rs b/test.rs\n@@ -1 +1 @@\n+assert!(!diff.contains(\"Binary files\"));\n";
+    assert!(!repo::diff_reports_binary(text_diff));
+    assert!(repo::diff_reports_binary(
+        "diff --git a/image.png b/image.png\nBinary files a/image.png and b/image.png differ\n",
+    ));
+    assert!(repo::diff_reports_binary(
+        "diff --git a/blob.bin b/blob.bin\nGIT binary patch\nliteral 0\n",
+    ));
+}
+
+#[test]
+fn status_discovers_parent_repo_from_workspace_subdir() {
+    let dir = root();
+    let repo = dir.path();
+    git(repo, &["init"]);
+    fs::create_dir_all(repo.join("docs/nested")).unwrap();
+
+    let status = status_for_root(&repo.join("docs/nested")).unwrap();
+    assert!(status.is_repo);
+    assert_eq!(
+        status.root,
+        fs::canonicalize(repo).unwrap().to_string_lossy()
+    );
+}
+
+#[test]
+fn status_warns_for_aimd_changes_without_driver() {
+    let dir = root();
+    let repo = dir.path();
+    git(repo, &["init"]);
+    fs::write(repo.join("doc.aimd"), "semantic\n").unwrap();
+
+    let status = status_for_root(repo).unwrap();
+    assert!(status.is_repo);
+    assert!(!status.aimd_driver_configured);
+    assert!(status
+        .aimd_driver_warning
+        .as_deref()
+        .unwrap_or("")
+        .contains("Git diff 尚未启用"));
+}
+
+#[test]
+fn status_reports_configured_aimd_driver() {
+    let dir = root();
+    let repo = dir.path();
+    git(repo, &["init"]);
+    fs::write(repo.join(".gitattributes"), "*.aimd diff=aimd merge=aimd\n").unwrap();
+    git(repo, &["config", "diff.aimd.textconv", "aimd git-diff"]);
+    fs::write(repo.join("doc.aimd"), "semantic\n").unwrap();
+
+    let status = status_for_root(repo).unwrap();
+    assert!(status.aimd_driver_configured);
+    assert!(status.gitattributes_configured);
+    assert!(status.aimd_driver_warning.is_none());
+}
+
+#[test]
+fn status_expands_untracked_directories_to_files() {
+    let dir = root();
+    let repo = dir.path();
+    git(repo, &["init"]);
+    fs::create_dir_all(repo.join("src/git")).unwrap();
+    fs::write(repo.join("src/git/repo.rs"), "mod repo;\n").unwrap();
+
+    let status = status_for_root(repo).unwrap();
+
+    assert!(status
+        .files
+        .iter()
+        .any(|file| file.path == "src/git/repo.rs"));
+    assert!(!status.files.iter().any(|file| file.path == "src/git/"));
+}
+
+#[test]
+fn file_diff_renders_untracked_file_content() {
+    let dir = root();
+    let repo = dir.path();
+    git(repo, &["init"]);
+    fs::write(repo.join("new.rs"), "fn main() {}\n").unwrap();
+    let status = status_for_root(repo).unwrap();
+
+    let diff = repo::file_diff(repo, "new.rs".to_string(), &status).unwrap();
+
+    assert!(!diff.is_binary);
+    assert!(diff.staged_diff.is_empty());
+    assert!(diff.unstaged_diff.contains("new file mode"));
+    assert!(diff.unstaged_diff.contains("+fn main() {}"));
+}
+
+#[test]
+fn discard_file_reverts_staged_and_unstaged_changes() {
+    let dir = repo_with_seed();
+    let repo = dir.path();
+    fs::write(repo.join("tracked.txt"), "staged\n").unwrap();
+    git(repo, &["add", "tracked.txt"]);
+    fs::write(repo.join("tracked.txt"), "worktree\n").unwrap();
+
+    git_discard_file(
+        repo.to_str().unwrap().to_string(),
+        "tracked.txt".to_string(),
+    )
+    .unwrap();
+
+    assert_eq!(
+        fs::read_to_string(repo.join("tracked.txt")).unwrap(),
+        "old\n"
+    );
+    assert!(status_for_root(repo).unwrap().clean);
+}
+
+#[test]
+fn discard_file_removes_untracked_file() {
+    let dir = repo_with_seed();
+    let repo = dir.path();
+    fs::write(repo.join("scratch.txt"), "scratch\n").unwrap();
+
+    git_discard_file(
+        repo.to_str().unwrap().to_string(),
+        "scratch.txt".to_string(),
+    )
+    .unwrap();
+
+    assert!(!repo.join("scratch.txt").exists());
+    assert!(status_for_root(repo).unwrap().clean);
+}
+
+#[test]
+fn discard_all_reverts_tracked_staged_and_untracked_files() {
+    let dir = repo_with_seed();
+    let repo = dir.path();
+    fs::write(repo.join("tracked.txt"), "staged\n").unwrap();
+    git(repo, &["add", "tracked.txt"]);
+    fs::write(repo.join("tracked.txt"), "worktree\n").unwrap();
+    fs::write(repo.join("added.txt"), "added\n").unwrap();
+    git(repo, &["add", "added.txt"]);
+    fs::write(repo.join("scratch.txt"), "scratch\n").unwrap();
+
+    let status = git_discard_all(repo.to_str().unwrap().to_string()).unwrap();
+
+    assert_eq!(
+        fs::read_to_string(repo.join("tracked.txt")).unwrap(),
+        "old\n"
+    );
+    assert!(!repo.join("added.txt").exists());
+    assert!(!repo.join("scratch.txt").exists());
+    assert!(status.clean);
 }
 
 #[test]

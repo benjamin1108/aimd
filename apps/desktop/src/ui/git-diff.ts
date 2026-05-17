@@ -24,7 +24,7 @@ import {
 import { clearRenderedSurfaceInteractionStatus } from "../rendered-surface/interactions";
 
 function root(): string | null {
-  return state.workspace?.root || null;
+  return state.git.status?.root || state.workspace?.root || null;
 }
 
 function lineClass(line: string): string {
@@ -238,6 +238,8 @@ export async function closeGitDiffTab(tabId: string): Promise<boolean> {
 async function refreshGitDiffTab(tabId: string) {
   const tab = findGitDiffTab(tabId);
   if (!tab) return;
+  const requestId = (tab.requestId || 0) + 1;
+  tab.requestId = requestId;
   tab.loading = true;
   tab.error = "";
   if (state.openDocuments.activeTabId === tab.id) {
@@ -247,10 +249,13 @@ async function refreshGitDiffTab(tabId: string) {
   }
   try {
     const diff = await invoke<GitFileDiff>("get_git_file_diff", { root: tab.repoRoot, path: tab.path });
+    if (tab.requestId !== requestId) return;
     tab.diff = diff;
   } catch (err) {
+    if (tab.requestId !== requestId) return;
     tab.error = err instanceof Error ? err.message : String(err);
   } finally {
+    if (tab.requestId !== requestId) return;
     tab.loading = false;
     if (state.openDocuments.activeTabId === tab.id) {
       syncActiveGitDiffView(tab);

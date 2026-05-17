@@ -8,8 +8,17 @@ async function installGitWorkspaceMock(page: Page, initialMode: GitMode) {
     const root = "/mock/repo";
     const runtime = {
       mode,
+      driverWarning: false,
       calls: [] as Array<{ cmd: string; args?: Args }>,
     };
+    const withDriver = (value: Record<string, any>) => ({
+      aimdDriverConfigured: !runtime.driverWarning,
+      gitattributesConfigured: !runtime.driverWarning,
+      aimdDriverWarning: runtime.driverWarning
+        ? ".aimd Git diff 尚未启用，设置页启用 Git 集成后才能看到语义 diff"
+        : undefined,
+      ...value,
+    });
     const workspace = () => ({
       root,
       tree: {
@@ -35,16 +44,16 @@ async function installGitWorkspaceMock(page: Page, initialMode: GitMode) {
     });
     const status = () => {
       if (runtime.mode === "none") {
-        return {
+        return withDriver({
           isRepo: false,
           root,
           clean: true,
           conflicted: false,
           files: [],
-        };
+        });
       }
       if (runtime.mode === "conflict") {
-        return {
+        return withDriver({
           isRepo: true,
           root,
           branch: "main",
@@ -59,10 +68,10 @@ async function installGitWorkspaceMock(page: Page, initialMode: GitMode) {
             unstaged: "conflicted",
             kind: "conflicted",
           }],
-        };
+        });
       }
       if (runtime.mode === "clean") {
-        return {
+        return withDriver({
           isRepo: true,
           root,
           branch: "main",
@@ -72,7 +81,7 @@ async function installGitWorkspaceMock(page: Page, initialMode: GitMode) {
           clean: true,
           conflicted: false,
           files: [],
-        };
+        });
       }
       const files = [
         { path: "apps/foo.ts", staged: "modified", unstaged: "none", kind: "modified" },
@@ -88,7 +97,7 @@ async function installGitWorkspaceMock(page: Page, initialMode: GitMode) {
           });
         }
       }
-      return {
+      return withDriver({
         isRepo: true,
         root,
         branch: "main",
@@ -98,7 +107,7 @@ async function installGitWorkspaceMock(page: Page, initialMode: GitMode) {
         clean: false,
         conflicted: false,
         files,
-      };
+      });
     };
     const handlers: Record<string, (a: Args) => unknown> = {
       load_settings: () => ({ ui: { showAssetPanel: false } }),
@@ -130,6 +139,8 @@ async function installGitWorkspaceMock(page: Page, initialMode: GitMode) {
       }),
       git_stage_file: () => null,
       git_unstage_file: () => null,
+      git_discard_file: () => null,
+      git_discard_all: () => status(),
       git_stage_all: () => null,
       git_unstage_all: () => null,
       git_commit: () => {
@@ -145,6 +156,7 @@ async function installGitWorkspaceMock(page: Page, initialMode: GitMode) {
     (window as any).__aimdGitMock = {
       calls: () => runtime.calls,
       setMode: (next: GitMode) => { runtime.mode = next; },
+      setDriverWarning: (next: boolean) => { runtime.driverWarning = next; },
     };
     (window as any).__TAURI_INTERNALS__ = {
       invoke: async (cmd: string, args?: Args) => {
@@ -216,6 +228,12 @@ test.describe("Git workspace panel", () => {
     expect(Math.abs(tabsAfterGitContent!.y - tabsBeforeGitContent!.y)).toBeLessThanOrEqual(1);
     await expect(page.locator(".git-branch")).toContainText("main");
     await expect(page.locator(".git-meta")).toContainText("origin/main ↑1 ↓2");
+    await expect(page.locator("[data-git-action='pull']")).toBeDisabled();
+    await expect(page.locator(".git-tooltip-host:has([data-git-action='pull'])")).toHaveAttribute("data-tip", "需先提交");
+    const pullBox = await page.locator("[data-git-action='pull']").boundingBox();
+    const pushBox = await page.locator("[data-git-action='push']").boundingBox();
+    expect(pullBox && pushBox).toBeTruthy();
+    expect(pushBox!.x - (pullBox!.x + pullBox!.width)).toBeLessThanOrEqual(8);
     const branchBox = await page.locator(".git-branch").boundingBox();
     const syncBox = await page.locator(".git-sync-actions").boundingBox();
     expect(branchBox && syncBox).toBeTruthy();
@@ -224,10 +242,11 @@ test.describe("Git workspace panel", () => {
     await expect(page.locator(".git-file-row[data-path='apps/foo.ts'] .git-file-name")).toHaveText("foo.ts");
     await expect(page.locator(".git-file-row[data-path='apps/foo.ts'] .git-file-dir")).toHaveText("apps");
     await expect(page.locator(".git-file-row[data-path='docs/draft.md']")).toContainText("NEW");
-    await expect(page.locator(".git-file-row[data-path='docs/draft.md'] .git-mini-btn")).toHaveText(["s", "u"]);
+    await expect(page.locator(".git-file-row[data-path='docs/draft.md'] .git-mini-btn")).toHaveCount(2);
     await expect(page.locator(".git-file-row[data-path='docs/draft.md'] .git-file-status")).toBeVisible();
     const columns = await page.locator(".git-file-row[data-path='docs/draft.md']").evaluate((el) => getComputedStyle(el).gridTemplateColumns);
     expect(columns).toContain("64px");
+    await expect(page.locator("[data-git-action='discard-all']")).toBeEnabled();
     await expect(page.locator("#git-panel")).not.toContainText("diff --git");
     await expect(page.locator("#git-panel")).not.toContainText("??");
 
@@ -281,6 +300,12 @@ test.describe("Git workspace panel", () => {
     await page.locator(".git-file-row[data-path='docs/draft.md']").locator("[data-git-action='stage-file']").click();
     await page.locator(".git-file-row[data-path='apps/foo.ts']").hover();
     await page.locator(".git-file-row[data-path='apps/foo.ts']").locator("[data-git-action='unstage-file']").click();
+    page.once("dialog", (dialog) => dialog.accept());
+    await page.locator(".git-file-row[data-path='docs/draft.md']").click({ button: "right" });
+    await expect(page.locator(".file-ctx-menu")).toBeVisible();
+    await page.locator(".file-ctx-item", { hasText: "删除未跟踪文件" }).click();
+    page.once("dialog", (dialog) => dialog.accept());
+    await page.locator("[data-git-action='discard-all']").click();
     await expect(page.locator("#git-commit-submit")).toBeDisabled();
     await page.locator("#git-commit-message").fill("Update docs");
     await expect(page.locator("#git-commit-submit")).toBeEnabled();
@@ -289,6 +314,8 @@ test.describe("Git workspace panel", () => {
     const calls = await page.evaluate(() => (window as any).__aimdGitMock.calls());
     expect(calls.some((call: any) => call.cmd === "git_stage_file" && call.args.path === "docs/draft.md")).toBeTruthy();
     expect(calls.some((call: any) => call.cmd === "git_unstage_file" && call.args.path === "apps/foo.ts")).toBeTruthy();
+    expect(calls.some((call: any) => call.cmd === "git_discard_file" && call.args.path === "docs/draft.md")).toBeTruthy();
+    expect(calls.some((call: any) => call.cmd === "git_discard_all")).toBeTruthy();
     expect(calls.some((call: any) => call.cmd === "git_commit" && call.args.message === "Update docs")).toBeTruthy();
     expect(calls.filter((call: any) => call.cmd === "get_git_repo_status").length).toBeGreaterThan(1);
   });
@@ -322,8 +349,44 @@ test.describe("Git workspace panel", () => {
     await expect(page.locator(".git-warning")).toContainText("存在冲突文件");
     await expect(page.locator("[data-git-action='pull']")).toBeDisabled();
     await expect(page.locator("[data-git-action='push']")).toBeDisabled();
+    await expect(page.locator("[data-git-action='discard-all']")).toBeDisabled();
     await expect(page.locator("#git-commit-message")).toBeDisabled();
     await expect(page.locator("#git-commit-submit")).toBeDisabled();
+  });
+
+  test("blocks risky Git actions while documents have unsaved edits", async ({ page }) => {
+    await installGitWorkspaceMock(page, "repo");
+    await page.goto("/");
+
+    await openWorkspaceDocument(page);
+    await page.locator("#mode-edit").click();
+    await page.locator("#markdown").fill("# Readme\n\nUnsaved body");
+    await page.locator("#sidebar-tab-git").click();
+
+    await expect(page.locator("#git-content")).toContainText("未保存修改");
+    await expect(page.locator(".git-file-row[data-path='docs/draft.md']").locator("[data-git-action='stage-file']")).toBeDisabled();
+    await expect(page.locator(".git-file-row[data-path='docs/draft.md']").locator("[data-git-action='discard-file']")).toHaveCount(0);
+    await expect(page.locator("[data-git-action='discard-all']")).toBeDisabled();
+    await page.locator(".git-file-row[data-path='docs/draft.md']").click({ button: "right" });
+    await expect(page.locator(".file-ctx-item", { hasText: "删除未跟踪文件" })).toBeDisabled();
+    await expect(page.locator("#git-commit-message")).toBeDisabled();
+    await expect(page.locator("[data-git-action='pull']")).toBeDisabled();
+    await expect(page.locator("[data-git-action='push']")).toBeDisabled();
+  });
+
+  test("surfaces AIMD driver warnings without expanding the Git panel chrome", async ({ page }) => {
+    await installGitWorkspaceMock(page, "repo");
+    await page.goto("/");
+
+    await openWorkspaceDocument(page);
+    await page.evaluate(() => (window as any).__aimdGitMock.setDriverWarning(true));
+    await page.locator("#sidebar-tab-git").click();
+    await page.locator("[data-git-action='refresh']").click();
+
+    await expect(page.locator("#git-content")).toContainText(".aimd Git diff 尚未启用");
+    await expect(page.locator("#git-content")).not.toContainText("项目变更");
+    await expect(page.locator(".git-summary")).toBeVisible();
+    await expect(page.locator(".git-stage-row")).toBeVisible();
   });
 
   test("opens Git diff as a readonly tab without taking over the document tab", async ({ page }) => {

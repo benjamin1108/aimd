@@ -139,6 +139,8 @@ pub fn run() {
             git::git_unstage_file,
             git::git_stage_all,
             git::git_unstage_all,
+            git::git_discard_file,
+            git::git_discard_all,
             git::git_commit,
             git::git_pull,
             git::git_push,
