@@ -16,7 +16,6 @@ env:
   GIT_CONFIG_COUNT: "1"
   GIT_CONFIG_KEY_0: init.defaultBranch
   GIT_CONFIG_VALUE_0: main
-  NODE_OPTIONS: --no-deprecation
 
 jobs:
   build:
@@ -40,11 +39,15 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v5
+        env:
+          NODE_OPTIONS: --no-deprecation
         with:
           ref: ${{ inputs.tag }}
 
       - name: Setup Node.js
         uses: actions/setup-node@v5
+        env:
+          NODE_OPTIONS: --no-deprecation
         with:
           node-version: 20
 
@@ -70,6 +73,8 @@ jobs:
 
       - name: NPM cache
         uses: actions/cache@v5
+        env:
+          NODE_OPTIONS: --no-deprecation
         with:
           path: ${{ steps.npm-cache.outputs.dir }}
           key: npm-${{ runner.os }}-${{ runner.arch }}-${{ steps.cache-inputs.outputs.npm_lock_hash }}
@@ -81,6 +86,8 @@ jobs:
 
       - name: Rust cache
         uses: Swatinem/rust-cache@v2
+        env:
+          NODE_OPTIONS: --no-deprecation
         with:
           prefix-key: v2-release-rust
           shared-key: ${{ steps.cache-inputs.outputs.rust_cache_hash }}
@@ -124,6 +131,8 @@ jobs:
       - name: Windows build tool cache
         if: runner.os == 'Windows'
         uses: actions/cache@v5
+        env:
+          NODE_OPTIONS: --no-deprecation
         with:
           path: |
             ~\AppData\Local\tauri
@@ -135,6 +144,8 @@ jobs:
       - name: macOS build tool cache
         if: runner.os == 'macOS'
         uses: actions/cache@v5
+        env:
+          NODE_OPTIONS: --no-deprecation
         with:
           path: |
             ~/Library/Caches/tauri
@@ -251,11 +262,15 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v5
+        env:
+          NODE_OPTIONS: --no-deprecation
         with:
           ref: ${{ inputs.tag }}
 
       - name: Setup Node.js
         uses: actions/setup-node@v5
+        env:
+          NODE_OPTIONS: --no-deprecation
         with:
           node-version: 20
 

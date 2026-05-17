@@ -11,7 +11,6 @@ env:
   GIT_CONFIG_COUNT: "1"
   GIT_CONFIG_KEY_0: init.defaultBranch
   GIT_CONFIG_VALUE_0: main
-  NODE_OPTIONS: --no-deprecation
 
 jobs:
   version:
@@ -28,9 +27,13 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v5
+        env:
+          NODE_OPTIONS: --no-deprecation
 
       - name: Setup Node.js
         uses: actions/setup-node@v5
+        env:
+          NODE_OPTIONS: --no-deprecation
         with:
           node-version: 20
 
@@ -65,9 +68,13 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v5
+        env:
+          NODE_OPTIONS: --no-deprecation
 
       - name: Setup Node.js
         uses: actions/setup-node@v5
+        env:
+          NODE_OPTIONS: --no-deprecation
         with:
           node-version: 20
 
@@ -82,6 +89,8 @@ jobs:
 
       - name: NPM cache
         uses: actions/cache@v5
+        env:
+          NODE_OPTIONS: --no-deprecation
         with:
           path: ${{ steps.npm-cache.outputs.dir }}
           key: npm-${{ runner.os }}-${{ runner.arch }}-${{ steps.cache-inputs.outputs.npm_lock_hash }}
@@ -103,6 +112,8 @@ jobs:
 
       - name: Rust cache
         uses: Swatinem/rust-cache@v2
+        env:
+          NODE_OPTIONS: --no-deprecation
         with:
           prefix-key: v1-rust
           shared-key: ${{ steps.cache-inputs.outputs.rust_cache_hash }}
