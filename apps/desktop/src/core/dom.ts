@@ -4,6 +4,7 @@ function lazyEl<T extends HTMLElement>(sel: string): () => T {
 }
 
 export const titleEl = lazyEl<HTMLElement>("#doc-title");
+export const appFrameEl = lazyEl<HTMLElement>(".app-frame");
 export const pathEl = lazyEl<HTMLElement>("#doc-path");
 export const docStateBadgesEl = lazyEl<HTMLElement>("#doc-state-badges");
 export const appScopePrimaryEl = lazyEl<HTMLElement>("#app-scope-primary");

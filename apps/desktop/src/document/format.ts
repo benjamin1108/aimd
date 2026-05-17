@@ -8,6 +8,7 @@ import { splitFrontmatter } from "../markdown/frontmatter";
 import { hasGitConflictMarkers } from "./apply";
 import { beginTabOperation, isActiveOperationCurrent } from "./open-document-state";
 import { commitMarkdownChange } from "./markdown-mutation";
+import { beginAiActivity } from "../ui/ai-activity";
 
 let formatting = false;
 let pendingMarkdown = "";
@@ -111,6 +112,7 @@ export async function formatCurrentDocument() {
   const target = beginTabOperation();
   if (!target) return;
   formatting = true;
+  const endAiActivity = beginAiActivity("format");
   setStatus("正在格式化文档...", "loading");
   try {
     const settings = await loadAppSettings();
@@ -147,6 +149,7 @@ export async function formatCurrentDocument() {
     setStatus(`格式化失败: ${String(err)}`, "warn");
   } finally {
     formatting = false;
+    endAiActivity();
   }
 }
 

@@ -91,6 +91,7 @@ export const runtimeStyleWrites = [
 ];
 
 export const pointerEventsNone = [
+  { file: "apps/desktop/src/styles/layout/frame.css", selector: ".ai-edge-flow", reason: "decorative AI activity edge layer" },
   { file: "apps/desktop/src/styles/surfaces/editor.css", selector: ".ft-btn[title]::after", reason: "passive tooltip surface" },
   { file: "apps/desktop/src/styles/surfaces/editor.css", selector: ".inline-editor :where", reason: "decorative placeholder text" },
   { file: "apps/desktop/src/styles/entries/webclip.css", selector: ":host", reason: "host shell lets isolated controls opt into pointer events" },

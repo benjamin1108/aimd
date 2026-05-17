@@ -66,6 +66,15 @@
   --surface-format-tag-hover: rgba(255, 253, 248, 0.58);
   --surface-format-tag-active: rgba(47, 111, 99, 0.08);
   --surface-format-tag-active-border: rgba(47, 111, 99, 0.16);
+  --ai-edge-red: #f36f74;
+  --ai-edge-gold: #e8bc5a;
+  --ai-edge-green: #65c982;
+  --ai-edge-cyan: #55c7d9;
+  --ai-edge-blue: #6e9ff1;
+  --ai-edge-violet: #a98bed;
+  --ai-edge-pink: #e37fbb;
+  --ai-edge-line: rgba(255, 255, 255, 0.72);
+  --ai-edge-wash: rgba(255, 255, 255, 0.22);
 
   /* Ink */
   --ink: #1d1a14;

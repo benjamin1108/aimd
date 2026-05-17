@@ -3,6 +3,7 @@ import { APP_TOPBAR_HTML } from "./topbar-template";
 
 export const APP_HTML = `
   <div class="app-frame">
+    <div id="ai-edge-flow" class="ai-edge-flow" aria-hidden="true"></div>
     <div class="panel" id="panel" data-shell="launch">
 ${APP_TOPBAR_HTML}
 

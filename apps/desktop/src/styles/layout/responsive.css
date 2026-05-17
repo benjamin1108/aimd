@@ -113,7 +113,7 @@
 }
 
 @media (max-width: 760px) {
-  .app-frame { padding: 8px; }
+  .app-frame { --app-frame-gutter: 8px; }
   .panel,
   .panel:not([data-shell="launch"]),
   .panel[data-shell],

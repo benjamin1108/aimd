@@ -16,6 +16,7 @@ import {
 } from "../core/dom";
 import { loadAppSettings } from "../core/settings";
 import type { AimdDocument, WebClipSettings } from "../core/types";
+import { beginAiActivity } from "../ui/ai-activity";
 import { setStatus } from "../ui/chrome";
 import { deleteDraftFile } from "./drafts";
 import {
@@ -60,6 +61,7 @@ type WebClipTask = {
   startedAt: number;
   pendingDraftPath: string;
   applied: boolean;
+  endAiActivity: () => void;
 };
 
 const DEFAULT_REFINE_TIMEOUT_MS = 300_000;
@@ -174,6 +176,12 @@ function setWebClipStatus(text: string, tone: "idle" | "loading" | "success" | "
   setStatus(text, tone, activeTask ? WEB_CLIP_STATUS_ACTION : undefined);
 }
 
+function finishActiveTask(task: WebClipTask) {
+  task.endAiActivity();
+  if (activeTask === task) activeTask = null;
+  setStatusRevealEnabled(false);
+}
+
 async function revealActiveExtractorWindow() {
   const task = activeTask;
   if (!task || !isTauri()) return;
@@ -248,8 +256,7 @@ async function ensureEventListeners() {
       if (!task || event.payload?.requestId !== task.requestId) return;
       if (!task.applied && task.pendingDraftPath) void deleteDraftFile(task.pendingDraftPath);
       void invoke("clear_web_clip_image_proxy", { requestId: task.requestId }).catch(() => {});
-      activeTask = null;
-      setStatusRevealEnabled(false);
+      finishActiveTask(task);
       setStatus("网页导入已取消", "info");
     });
   })();
@@ -286,6 +293,7 @@ async function startImport(url: string, fallbackWindow: boolean) {
     startedAt: performance.now(),
     pendingDraftPath: "",
     applied: false,
+    endAiActivity: beginAiActivity("web-clip"),
   };
   activeTask = task;
   setStatusRevealEnabled(true);
@@ -301,8 +309,7 @@ async function startImport(url: string, fallbackWindow: boolean) {
     });
     if (fallbackWindow) setWebClipStatus("已打开提取窗口", "info");
   } catch (err) {
-    activeTask = null;
-    setStatusRevealEnabled(false);
+    finishActiveTask(task);
     const message = err instanceof Error ? err.message : String(err);
     console.error("Failed to start web import:", err);
     setStatus("启动网页导入失败", "warn");
@@ -328,8 +335,7 @@ async function handleExtracted(payload: ExtractPayload) {
     const error = payload.error || "未提取到正文";
     console.error("[web-clip] extraction failed:", error);
     await closeExtractorForTask(task);
-    activeTask = null;
-    setStatusRevealEnabled(false);
+    finishActiveTask(task);
     lastFailedUrl = task.url;
     setStatus(`提取失败: ${error}`, "warn");
     showPanel({
@@ -429,8 +435,7 @@ async function handleExtracted(payload: ExtractPayload) {
     task.applied = true;
 
     await closeExtractorForTask(task);
-    activeTask = null;
-    setStatusRevealEnabled(false);
+    finishActiveTask(task);
     setStatus("网页草稿已在新窗口打开", "idle");
     console.info("[web-clip] opened web clip draft in a new window", {
       requestId: task.requestId,
@@ -442,8 +447,7 @@ async function handleExtracted(payload: ExtractPayload) {
     console.error("[web-clip] import failed:", err);
     await closeExtractorForTask(task);
     if (!task.applied && task.pendingDraftPath) void deleteDraftFile(task.pendingDraftPath);
-    activeTask = null;
-    setStatusRevealEnabled(false);
+    finishActiveTask(task);
     const message = err instanceof Error ? err.message : String(err);
     setStatus("网页导入失败", "warn");
     showPanel({
