@@ -102,6 +102,7 @@ export const pointerEventsNone = [
   { file: "apps/desktop/src/styles/overlays/tooltips.css", selector: ".ui-tooltip", reason: "passive tooltip surface" },
   { file: "apps/desktop/src/styles/components/settings.css", selector: ".api-key-mask", reason: "masked text overlay passes clicks to input" },
   { file: "apps/desktop/src/styles/components/sidebar-tooltips.css", selector: ".workspace-actions .icon-btn[title]::after", reason: "passive tooltip surface" },
+  { file: "apps/desktop/src/styles/components/sidebar-git.css", selector: ".git-tooltip-host[data-tip]::after", reason: "passive Git action tooltip surface" },
 ];
 
 export const hiddenScrollbars = [

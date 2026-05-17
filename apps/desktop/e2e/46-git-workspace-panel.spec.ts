@@ -354,6 +354,26 @@ test.describe("Git workspace panel", () => {
     await expect(page.locator("#git-commit-submit")).toBeDisabled();
   });
 
+  test("does not let discard-all tooltip block sync buttons", async ({ page }) => {
+    await installGitWorkspaceMock(page, "conflict");
+    await page.goto("/");
+
+    await openWorkspaceDocument(page);
+    await page.locator("#sidebar-tab-git").click();
+    const discardTip = page.locator(".git-tooltip-host:has([data-git-action='discard-all'])");
+    const pullTip = page.locator(".git-tooltip-host:has([data-git-action='pull'])");
+
+    await expect(discardTip).toHaveAttribute("data-tip", "冲突未解决");
+    await expect(pullTip).toHaveAttribute("data-tip", "冲突未解决");
+    await discardTip.hover();
+    await expect.poll(() => discardTip.evaluate((el) => getComputedStyle(el, "::after").opacity)).toBe("1");
+    await expect.poll(() => discardTip.evaluate((el) => getComputedStyle(el, "::after").pointerEvents)).toBe("none");
+
+    await pullTip.hover();
+    await expect.poll(() => discardTip.evaluate((el) => getComputedStyle(el, "::after").opacity)).toBe("0");
+    await expect.poll(() => pullTip.evaluate((el) => getComputedStyle(el, "::after").opacity)).toBe("1");
+  });
+
   test("blocks risky Git actions while documents have unsaved edits", async ({ page }) => {
     await installGitWorkspaceMock(page, "repo");
     await page.goto("/");
