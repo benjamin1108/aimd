@@ -84,6 +84,7 @@ test.describe("Rust invoke_handler 命令注册校验", () => {
     "confirm_discard_changes",
     "confirm_upgrade_to_aimd",
     "confirm_git_config_change",
+    "confirm_git_discard_operation",
     "confirm_keep_online_images",
     "reveal_in_finder",
     "initial_open_path",

@@ -17,6 +17,7 @@ export function bindSearch() {
     const target = event.target as Node | null;
     if (!target) return;
     if (findBarEl().contains(target) || findToggleEl().contains(target)) return;
+    if (target instanceof Element && target.closest("#git-diff-view-mode-cluster")) return;
     closeFindBar();
   });
   findInputEl().addEventListener("input", () => {

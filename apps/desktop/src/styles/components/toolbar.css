@@ -144,7 +144,9 @@
   justify-content: flex-end;
 }
 
-.command-find-btn {
+.command-find-btn,
+.git-diff-view-mode-toggle,
+.git-diff-wrap-toggle {
   width: var(--size-control);
   height: var(--size-control);
   border-radius: var(--radius-control-sm);
@@ -152,18 +154,38 @@
 }
 
 .command-find-btn .secondary-btn-icon svg,
+.git-diff-view-mode-toggle .secondary-btn-icon svg,
+.git-diff-wrap-toggle .secondary-btn-icon svg,
 .viewport-width-toggle .secondary-btn-icon svg {
   width: 15px;
   height: 15px;
 }
 
-.command-find-btn:hover:not(:disabled) {
+.git-diff-view-mode-cluster {
+  display: inline-flex;
+  align-items: center;
+  flex: 0 0 auto;
+  min-width: 0;
+}
+
+.git-diff-view-mode-cluster[hidden] { display: none !important; }
+.command-find-btn:hover:not(:disabled),
+.git-diff-view-mode-toggle:hover:not(:disabled),
+.git-diff-wrap-toggle:hover:not(:disabled) {
   background: var(--surface-muted);
   color: var(--ink-strong);
 }
 
 .command-find-btn.is-active,
-.command-find-btn.is-active:hover:not(:disabled) {
+.command-find-btn.is-active:hover:not(:disabled),
+.git-diff-view-mode-toggle[aria-pressed="true"],
+.git-diff-view-mode-toggle.is-active,
+.git-diff-wrap-toggle[aria-pressed="true"],
+.git-diff-wrap-toggle.is-active,
+.git-diff-view-mode-toggle[aria-pressed="true"]:hover:not(:disabled),
+.git-diff-view-mode-toggle.is-active:hover:not(:disabled),
+.git-diff-wrap-toggle[aria-pressed="true"]:hover:not(:disabled),
+.git-diff-wrap-toggle.is-active:hover:not(:disabled) {
   background-color: var(--nav-active-bg);
   color: var(--nav-active-fg);
   box-shadow: inset 0 0 0 1px var(--nav-active-border);

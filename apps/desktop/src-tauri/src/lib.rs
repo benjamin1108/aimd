@@ -131,6 +131,7 @@ pub fn run() {
             dialogs::confirm_discard_changes,
             dialogs::confirm_upgrade_to_aimd,
             dialogs::confirm_git_config_change,
+            dialogs::confirm_git_discard_operation,
             dialogs::confirm_keep_online_images,
             dialogs::reveal_in_finder,
             git::get_git_repo_status,

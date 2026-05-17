@@ -270,11 +270,15 @@ export function refreshGitAfterDocumentSave() {
 }
 
 export function resetGitState() {
+  const diffViewMode = state.git.diffViewMode;
+  const diffWordWrap = state.git.diffWordWrap;
   state.git = {
     isRepo: false,
     status: null,
     diffTabs: [],
     diffView: { path: "", diff: null, loading: false, error: "" },
+    diffViewMode,
+    diffWordWrap,
     loading: false,
     action: false,
     error: "",
@@ -308,14 +312,22 @@ function commandRoot(): string {
   return repoRoot;
 }
 
-function confirmDiscard(path: string): boolean {
-  const file = state.git.status?.files.find((item) => item.path === path);
-  const action = file?.kind === "untracked" ? "删除这个未跟踪文件" : "放弃这个文件的全部改动";
-  return window.confirm(`${action}？\n\n${path}\n\n此操作不可撤销。`);
+async function confirmGitDiscard(message: string): Promise<boolean> {
+  try {
+    return await invoke<boolean>("confirm_git_discard_operation", { message });
+  } catch {
+    return window.confirm(message);
+  }
 }
 
-function confirmDiscardAll(): boolean {
-  return window.confirm("放弃全部工作区改动？\n\n包括已暂存、未暂存和未跟踪文件。此操作不可撤销。");
+function discardFileMessage(path: string): string {
+  const file = state.git.status?.files.find((item) => item.path === path);
+  const action = file?.kind === "untracked" ? "删除这个未跟踪文件" : "放弃这个文件的全部改动";
+  return `${action}？\n\n${path}\n\n此操作不可撤销。`;
+}
+
+function discardAllMessage(): string {
+  return "放弃全部工作区改动？\n\n包括已暂存、未暂存和未跟踪文件。此操作不可撤销。";
 }
 
 function showGitFileContextMenu(event: MouseEvent, row: HTMLElement) {
@@ -344,9 +356,12 @@ function showGitFileContextMenu(event: MouseEvent, row: HTMLElement) {
       disabled: discardDisabled,
       action: () => {
         dismissContextMenu();
-        if (blockIfDirty("放弃改动")) return;
-        if (!confirmDiscard(path)) return;
-        void runGitAction(() => invoke("git_discard_file", { root: commandRoot(), path }), "已放弃改动", "正在放弃改动");
+        void (async () => {
+          if (blockIfDirty("放弃改动")) return;
+          const confirmed = await confirmGitDiscard(discardFileMessage(path));
+          if (!confirmed) return;
+          await runGitAction(() => invoke("git_discard_file", { root: commandRoot(), path }), "已放弃改动", "正在放弃改动");
+        })();
       },
     },
   ]);
@@ -380,8 +395,11 @@ export function bindGitPanel() {
     }
     if (action === "discard-all") {
       if (blockIfDirty("放弃全部改动")) return;
-      if (!confirmDiscardAll()) return;
-      void runGitAction(() => invoke("git_discard_all", { root: commandRoot() }), "已全部放弃", "正在放弃全部改动");
+      void (async () => {
+        const confirmed = await confirmGitDiscard(discardAllMessage());
+        if (!confirmed) return;
+        await runGitAction(() => invoke("git_discard_all", { root: commandRoot() }), "已全部放弃", "正在放弃全部改动");
+      })();
       return;
     }
     const args = path ? { root: commandRoot(), path } : { root: commandRoot() };

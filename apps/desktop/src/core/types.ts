@@ -104,6 +104,7 @@ export type OutlineNode = {
 
 export type Mode = "read" | "edit";
 export type MainView = "document" | "git-diff";
+export type GitDiffViewMode = "unified" | "side-by-side";
 
 export type MarkdownDraft = { markdown: string; title: string; html: string };
 

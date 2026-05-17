@@ -147,6 +147,21 @@ pub fn confirm_git_config_change(message: String) -> bool {
 }
 
 #[tauri::command]
+pub fn confirm_git_discard_operation(message: String) -> bool {
+    let result = rfd::MessageDialog::new()
+        .set_title("AIMD Git")
+        .set_description(&message)
+        .set_level(rfd::MessageLevel::Warning)
+        .set_buttons(rfd::MessageButtons::OkCancelCustom(
+            "放弃改动".into(),
+            "取消".into(),
+        ))
+        .show();
+    matches!(result, rfd::MessageDialogResult::Ok)
+        || matches!(result, rfd::MessageDialogResult::Custom(s) if s == "放弃改动")
+}
+
+#[tauri::command]
 pub fn confirm_keep_online_images(message: String) -> bool {
     let result = rfd::MessageDialog::new()
         .set_title("AIMD Desktop")

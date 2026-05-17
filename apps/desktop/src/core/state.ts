@@ -1,6 +1,7 @@
 import type {
   AimdDocument,
   GitFileDiff,
+  GitDiffViewMode,
   GitDiffTab,
   GitRepoStatus,
   EditPaneOrder,
@@ -40,6 +41,8 @@ export const ICONS = {
   read: `<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12.5V4a1 1 0 0 1 1.2-1l4.3 1 4.3-1A1 1 0 0 1 13 4v8.5"/><path d="M7.5 4v9"/></svg>`,
   edit: `<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"><path d="M11.2 2.5 13.5 4.8 5.4 12.9l-3 .7.7-3z"/><path d="m10.2 3.5 2.3 2.3"/></svg>`,
   source: `<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"><path d="m5.5 4-3 4 3 4M10.5 4l3 4-3 4"/></svg>`,
+  diffSplit: `<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.35" stroke-linecap="round" stroke-linejoin="round"><path d="M8 2.5v11"/><path d="M3.2 4.8h2.5M3.2 8h2.5M3.2 11.2h2.5M10.3 4.8h2.5M10.3 8h2.5M10.3 11.2h2.5"/></svg>`,
+  wordWrap: `<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.35" stroke-linecap="round" stroke-linejoin="round"><path d="M3 4.5h7.5a2.5 2.5 0 0 1 0 5H5.2"/><path d="m7.3 7.4-2.2 2.1 2.2 2.1"/><path d="M3 12.3h10"/></svg>`,
   swapPanes: `<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.45" stroke-linecap="round" stroke-linejoin="round"><path d="M3 5.5h8.8M9.5 3.2l2.3 2.3-2.3 2.3M13 10.5H4.2M6.5 8.2l-2.3 2.3 2.3 2.3"/></svg>`,
   search: `<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.45" stroke-linecap="round" stroke-linejoin="round"><circle cx="7.1" cy="7.1" r="3.75"/><path d="m10 10 3.05 3.05"/></svg>`,
   viewportWidth: `<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.45" stroke-linecap="round" stroke-linejoin="round"><rect x="2.6" y="3.2" width="10.8" height="9.6" rx="1.5"/><path d="M5.4 6.1h5.2M4.4 8h7.2M5.4 9.9h5.2"/></svg>`,
@@ -105,6 +108,8 @@ export const state: {
       loading: boolean;
       error: string;
     };
+    diffViewMode: GitDiffViewMode;
+    diffWordWrap: boolean;
     loading: boolean;
     action: boolean;
     error: string;
@@ -154,6 +159,8 @@ export const state: {
       loading: false,
       error: "",
     },
+    diffViewMode: "unified",
+    diffWordWrap: false,
     loading: false,
     action: false,
     error: "",

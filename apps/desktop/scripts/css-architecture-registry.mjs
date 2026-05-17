@@ -59,6 +59,21 @@ export const runtimeVars = {
     reason: "measured tooltip portal y coordinate",
     cleanup: "tooltip hides between targets",
   },
+  "--git-diff-old-x": {
+    owner: "ui/git-diff.ts",
+    reason: "old-pane horizontal review scroll offset",
+    cleanup: "git diff surface is re-rendered",
+  },
+  "--git-diff-new-x": {
+    owner: "ui/git-diff.ts",
+    reason: "new-pane horizontal review scroll offset",
+    cleanup: "git diff surface is re-rendered",
+  },
+  "--git-diff-row-height": {
+    owner: "ui/git-diff.ts",
+    reason: "measured wrapped split diff row height",
+    cleanup: "git diff surface is re-rendered or word wrap is disabled",
+  },
 };
 
 export const runtimeStyleWrites = [
@@ -88,6 +103,10 @@ export const runtimeStyleWrites = [
   { file: "apps/desktop/src/ui/doc-panel.ts", pattern: "outlineSectionEl().style.setProperty", owner: "inspector tab count CSS variable" },
   { file: "apps/desktop/src/ui/workspace.ts", pattern: "style=\"${workspaceIndentStyle(depth)}\"", owner: "workspace tree depth CSS variable" },
   { file: "apps/desktop/src/ui/tooltips.ts", pattern: "tooltip.style.setProperty", owner: "tooltip portal measured position" },
+  { file: "apps/desktop/src/ui/git-diff.ts", pattern: "spacer.style.width", owner: "git diff pane horizontal scroll width" },
+  { file: "apps/desktop/src/ui/git-diff.ts", pattern: "split.style.setProperty", owner: "git diff pane horizontal scroll offset" },
+  { file: "apps/desktop/src/ui/git-diff.ts", pattern: "row.style.setProperty", owner: "git diff wrapped row measured height" },
+  { file: "apps/desktop/src/ui/git-diff.ts", pattern: "row.style.removeProperty", owner: "git diff wrapped row measured height cleanup" },
 ];
 
 export const pointerEventsNone = [

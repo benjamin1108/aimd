@@ -117,6 +117,13 @@ ${APP_TOPBAR_HTML}
                 </div>
               </div>
 
+              <div id="git-diff-view-mode-cluster" class="git-diff-view-mode-cluster" hidden>
+                <button id="git-diff-view-mode-toggle" class="ghost-btn icon-only git-diff-view-mode-toggle" type="button" title="当前：统一 Diff" data-tooltip="当前：统一 Diff" aria-label="切换 Git Diff 查看方式" aria-pressed="false" disabled>
+                  <span class="secondary-btn-icon">${ICONS.diffSplit}</span>
+                </button>
+                <button id="git-diff-wrap-toggle" class="ghost-btn icon-only git-diff-wrap-toggle" type="button" title="自动换行：关闭" data-tooltip="自动换行：关闭" aria-label="切换 Git Diff 自动换行" aria-pressed="false" disabled><span class="secondary-btn-icon">${ICONS.wordWrap}</span></button>
+              </div>
+
               <div class="find-cluster">
                 <button id="find-toggle" class="ghost-btn icon-only command-find-btn" type="button" aria-label="查找" title="查找" aria-controls="find-bar" aria-expanded="false" disabled>
                   <span class="secondary-btn-icon">${ICONS.search}</span>

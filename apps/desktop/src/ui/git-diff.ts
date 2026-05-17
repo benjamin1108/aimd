@@ -4,6 +4,8 @@ import {
   emptyEl,
   formatToolbarEl,
   gitDiffContentEl,
+  gitDiffWrapToggleEl,
+  gitDiffViewModeToggleEl,
   gitDiffViewEl,
   readerEl,
 } from "../core/dom";
@@ -16,54 +18,82 @@ import { renderDocPanelTabs } from "./doc-panel";
 import { activateDocumentTab } from "../document/apply";
 import { captureActiveViewState } from "../document/view-state";
 import { gitPathDirectoryLabel, splitGitPath } from "./git-path";
+import { refreshActiveTooltip } from "./tooltips";
 import {
   activeTab,
   bindFacadeFromTab,
   syncActiveTabFromFacade,
 } from "../document/open-document-state";
 import { clearRenderedSurfaceInteractionStatus } from "../rendered-surface/interactions";
+import { buildGitDiffDocument } from "./git-diff-model";
+import { renderSplitDiffDocument } from "./git-diff-render-split";
+import { renderUnifiedDiffDocument } from "./git-diff-render-unified";
+
+let splitResizeObserver: ResizeObserver | null = null;
+let splitLayoutFrame: number | null = null;
 
 function root(): string | null {
   return state.git.status?.root || state.workspace?.root || null;
 }
 
-function lineClass(line: string): string {
-  if (line.startsWith("@@")) return "git-diff-line is-hunk";
-  if (line.startsWith("+") && !line.startsWith("+++")) return "git-diff-line is-add";
-  if (line.startsWith("-") && !line.startsWith("---")) return "git-diff-line is-del";
-  if (
-    line.startsWith("diff --git")
-    || line.startsWith("index ")
-    || line.startsWith("---")
-    || line.startsWith("+++")
-  ) {
-    return "git-diff-line is-meta";
-  }
-  return "git-diff-line";
-}
-
-function renderLines(text: string): string {
-  return text.split("\n")
-    .map((line) => `<div class="${lineClass(line)}">${escapeHTML(line || " ")}</div>`)
-    .join("");
-}
-
-function renderDiffBlock(title: string, text: string): string {
-  return `
-    <section class="git-diff-block">
-      <div class="git-diff-block-title">${escapeHTML(title)}</div>
-      <div class="git-diff-code">${renderLines(text)}</div>
-    </section>`;
-}
-
 function renderDiffBlocks(diff: GitFileDiff): string {
-  const blocks = [
-    diff.stagedDiff ? renderDiffBlock("已暂存差异", diff.stagedDiff) : "",
-    diff.unstagedDiff ? renderDiffBlock("未暂存差异", diff.unstagedDiff) : "",
-  ].filter(Boolean);
-  return blocks.length
-    ? blocks.join("")
-    : `<div class="git-diff-message">没有可显示的文本 diff</div>`;
+  const document = buildGitDiffDocument(diff);
+  return state.git.diffViewMode === "side-by-side"
+    ? renderSplitDiffDocument(document)
+    : renderUnifiedDiffDocument(document);
+}
+
+function syncSplitHorizontalScroll(scroller: HTMLElement) {
+  scroller.querySelectorAll<HTMLElement>(".git-diff-split").forEach((split) => {
+    (["old", "new"] as const).forEach((side) => {
+      const scroll = split.querySelector<HTMLElement>(`[data-diff-x-scroll="${side}"]`);
+      const spacer = scroll?.querySelector<HTMLElement>(".git-diff-x-scroll-spacer");
+      if (!scroll || !spacer) return;
+      const viewports = Array.from(
+        split.querySelectorAll<HTMLElement>(
+          `.git-diff-split-cell--${side} .git-diff-text-viewport:not(.git-diff-placeholder)`,
+        ),
+      );
+      const width = Math.max(scroll.clientWidth, ...viewports.map((viewport) => viewport.scrollWidth));
+      spacer.style.width = `${Math.ceil(width)}px`;
+      split.style.setProperty(`--git-diff-${side}-x`, `${-scroll.scrollLeft}px`);
+      if (scroll.dataset.diffXScrollBound === "true") return;
+      scroll.dataset.diffXScrollBound = "true";
+      scroll.addEventListener(
+        "scroll",
+        () => split.style.setProperty(`--git-diff-${side}-x`, `${-scroll.scrollLeft}px`),
+        { passive: true },
+      );
+    });
+  });
+}
+
+function syncSplitRowHeights(scroller: HTMLElement) {
+  const rows = Array.from(scroller.querySelectorAll<HTMLElement>(".git-diff-split-row"));
+  rows.forEach((row) => row.style.removeProperty("--git-diff-row-height"));
+  if (scroller.dataset.diffWordWrap !== "on") return;
+  rows.forEach((row) => {
+    const measured = Array.from(row.querySelectorAll<HTMLElement>(".git-diff-split-cell:not(.is-placeholder)"))
+      .map((cell) => cell.getBoundingClientRect().height);
+    const height = Math.ceil(Math.max(row.getBoundingClientRect().height, ...measured));
+    if (height > 0) row.style.setProperty("--git-diff-row-height", `${height}px`);
+  });
+}
+
+function scheduleSplitLayout(scroller: HTMLElement) {
+  if (splitLayoutFrame !== null) cancelAnimationFrame(splitLayoutFrame);
+  splitLayoutFrame = requestAnimationFrame(() => {
+    splitLayoutFrame = null;
+    syncSplitHorizontalScroll(scroller);
+    syncSplitRowHeights(scroller);
+  });
+}
+
+function bindSplitLayout(scroller: HTMLElement) {
+  splitResizeObserver?.disconnect();
+  scheduleSplitLayout(scroller);
+  splitResizeObserver = new ResizeObserver(() => scheduleSplitLayout(scroller));
+  splitResizeObserver.observe(scroller);
 }
 
 function gitDiffTabId(repoRoot: string, path: string): string {
@@ -170,13 +200,14 @@ export function renderGitDiffView() {
       ${renderDiffBlocks(view.diff)}`;
   }
   gitDiffContentEl().innerHTML = `
-    <div id="git-diff-scroll" class="git-diff-scroll" data-select-all-scope>${body}</div>
+    <div id="git-diff-scroll" class="git-diff-scroll" data-diff-view-mode="${state.git.diffViewMode}" data-diff-word-wrap="${state.git.diffWordWrap ? "on" : "off"}" data-select-all-scope>${body}</div>
   `;
   const scroller = document.querySelector<HTMLElement>("#git-diff-scroll");
   if (tab && scroller) {
     scroller.scrollTop = tab.scroll || 0;
     scroller.addEventListener("scroll", () => { tab.scroll = scroller.scrollTop; }, { passive: true });
   }
+  if (scroller) bindSplitLayout(scroller);
 }
 
 export async function openGitDiffView(path: string) {
@@ -291,5 +322,19 @@ export async function refreshCurrentGitDiff() {
 }
 
 export function bindGitDiffView() {
+  gitDiffViewModeToggleEl().addEventListener("click", () => {
+    if (state.mainView !== "git-diff" || !activeGitDiffTab()) return;
+    state.git.diffViewMode = state.git.diffViewMode === "side-by-side" ? "unified" : "side-by-side";
+    renderGitDiffView();
+    updateChrome();
+    refreshActiveTooltip(gitDiffViewModeToggleEl());
+  });
+  gitDiffWrapToggleEl().addEventListener("click", () => {
+    if (state.mainView !== "git-diff" || !activeGitDiffTab()) return;
+    state.git.diffWordWrap = !state.git.diffWordWrap;
+    renderGitDiffView();
+    updateChrome();
+    refreshActiveTooltip(gitDiffWrapToggleEl());
+  });
   renderGitDiffView();
 }

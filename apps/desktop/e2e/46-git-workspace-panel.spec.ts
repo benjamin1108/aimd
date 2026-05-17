@@ -87,6 +87,13 @@ async function installGitWorkspaceMock(page: Page, initialMode: GitMode) {
         { path: "apps/foo.ts", staged: "modified", unstaged: "none", kind: "modified" },
         { path: "docs/draft.md", staged: "none", unstaged: "untracked", kind: "untracked" },
       ];
+      if (runtime.mode === "repo") {
+        files.push(
+          { path: "assets/logo.png", staged: "modified", unstaged: "none", kind: "modified" },
+          { path: "docs/empty.md", staged: "modified", unstaged: "none", kind: "modified" },
+          { path: "docs/large.md", staged: "modified", unstaged: "none", kind: "modified" },
+        );
+      }
       if (runtime.mode === "crowded") {
         for (let index = 1; index <= 30; index += 1) {
           files.push({
@@ -109,6 +116,33 @@ async function installGitWorkspaceMock(page: Page, initialMode: GitMode) {
         files,
       });
     };
+    const longChangedLine = "changed line with a very very very very very very very very very very very very very very very very very very very very very very very very very very very very long value that must scroll horizontally inside the viewer instead of stretching the layout";
+    const longOldLine = "old line with a very very very very very very very very very very very very very very very very very very very very very very long value that must not push the new column out of view";
+    const stagedFooDiff = [
+      "diff --git a/apps/foo.ts b/apps/foo.ts",
+      "index abc..def 100644",
+      "--- a/apps/foo.ts",
+      "+++ b/apps/foo.ts",
+      "@@ -1,5 +1,5 @@",
+      " context line",
+      "-old only line",
+      " unchanged anchor",
+      "+new only line",
+      `-${longOldLine}`,
+      `+${longChangedLine}`,
+      " tail line",
+    ].join("\n");
+    const unstagedDraftDiff = [
+      "diff --git a/docs/draft.md b/docs/draft.md",
+      "@@ -0,0 +1 @@",
+      "+new file",
+    ].join("\n");
+    const truncatedLargeDiff = [
+      "diff --git a/docs/large.md b/docs/large.md",
+      "@@ -1 +1 @@",
+      "-old large",
+      "+new large",
+    ].join("\n");
     const handlers: Record<string, (a: Args) => unknown> = {
       load_settings: () => ({ ui: { showAssetPanel: false } }),
       initial_draft_path: () => null,
@@ -128,17 +162,15 @@ async function installGitWorkspaceMock(page: Page, initialMode: GitMode) {
       get_git_repo_status: () => status(),
       get_git_file_diff: (a) => ({
         path: String(a?.path),
-        stagedDiff: String(a?.path).includes("foo")
-          ? "diff --git a/apps/foo.ts b/apps/foo.ts\nindex abc..def 100644\n--- a/apps/foo.ts\n+++ b/apps/foo.ts\n@@ -1,2 +1,2 @@\n-old line\n+changed line with a very very very very very very very very very very very very very very very very very very very very very very very very very very very very long value that must scroll horizontally inside the viewer instead of stretching the layout"
-          : "",
-        unstagedDiff: String(a?.path).includes("draft")
-          ? "diff --git a/docs/draft.md b/docs/draft.md\n@@ -0,0 +1 @@\n+new file"
-          : "",
-        isBinary: false,
-        truncated: false,
+        stagedDiff: String(a?.path).includes("foo") ? stagedFooDiff : "",
+        unstagedDiff: String(a?.path).includes("draft") ? unstagedDraftDiff : "",
+        ...(String(a?.path).includes("large") ? { stagedDiff: truncatedLargeDiff, truncated: true } : {}),
+        isBinary: String(a?.path).includes("logo.png"),
+        truncated: String(a?.path).includes("large"),
       }),
       git_stage_file: () => null,
       git_unstage_file: () => null,
+      confirm_git_discard_operation: () => true,
       git_discard_file: () => null,
       git_discard_all: () => status(),
       git_stage_all: () => null,
@@ -168,6 +200,10 @@ async function installGitWorkspaceMock(page: Page, initialMode: GitMode) {
       transformCallback: (callback: unknown) => callback,
     };
     (window as any).__TAURI__ = { core: { invoke: (cmd: string, args?: Args) => handlers[cmd]?.(args) } };
+    window.confirm = (message?: string) => {
+      runtime.calls.push({ cmd: "window_confirm", args: { message } });
+      return false;
+    };
   }, initialMode);
 }
 
@@ -213,6 +249,8 @@ test.describe("Git workspace panel", () => {
     await page.goto("/");
 
     await openWorkspaceDocument(page);
+    await expect(page.locator("#git-diff-view-mode-cluster")).toBeHidden();
+    await expect(page.locator("#git-diff-wrap-toggle")).toBeHidden();
     await expect(page.locator("#sidebar-tab-git")).toBeVisible();
     await expect(page.locator("#sidebar-tab-outline")).toHaveAttribute("aria-selected", "true");
     await expect(page.locator("#outline-panel")).toBeVisible();
@@ -258,6 +296,19 @@ test.describe("Git workspace panel", () => {
     await expect(page.locator("#mode-edit")).toBeHidden();
     await expect(page.locator("#mode-edit")).toBeHidden();
     await expect(page.locator("#find-toggle")).toBeEnabled();
+    await expect(page.locator("#git-diff-view-mode-cluster")).toBeVisible();
+    await expect(page.locator("#git-diff-view-mode-toggle")).toBeEnabled();
+    await expect(page.locator("#git-diff-view-mode-toggle")).toHaveAttribute("aria-pressed", "false");
+    await expect(page.locator("#git-diff-view-mode-toggle")).toHaveAttribute("data-tooltip", "当前：统一 Diff");
+    await expect(page.locator("#git-diff-wrap-toggle")).toBeEnabled();
+    await expect(page.locator("#git-diff-wrap-toggle")).toHaveAttribute("aria-pressed", "false");
+    await expect(page.locator("#git-diff-wrap-toggle")).toHaveAttribute("data-tooltip", "自动换行：关闭");
+    const viewModeBox = await page.locator("#git-diff-view-mode-toggle").boundingBox();
+    const wrapBox = await page.locator("#git-diff-wrap-toggle").boundingBox();
+    const findBox = await page.locator("#find-toggle").boundingBox();
+    expect(viewModeBox && wrapBox && findBox).toBeTruthy();
+    expect(viewModeBox!.x + viewModeBox!.width).toBeLessThanOrEqual(wrapBox!.x + 2);
+    expect(wrapBox!.x + wrapBox!.width).toBeLessThanOrEqual(findBox!.x + 2);
     await expect(page.locator("#doc-actions")).toBeHidden();
     await expect(page.locator("#more-menu-toggle")).toBeHidden();
     await expect(page.locator("#save")).toBeHidden();
@@ -271,12 +322,144 @@ test.describe("Git workspace panel", () => {
     await expect(page.locator(".git-diff-scope")).toHaveCount(0);
     await expect(page.locator("#git-diff-rendered-surface")).toHaveCount(0);
     await expect(page.locator("#git-diff-view")).not.toContainText("Markdown 渲染预览");
-    await expect(page.locator(".git-diff-line.is-add")).toContainText("+changed line");
-    await expect(page.locator(".git-diff-line.is-del")).toContainText("-old line");
+    await expect(page.locator(".git-diff-code")).toBeVisible();
+    await expect(page.locator(".git-diff-line.is-add").filter({ hasText: "+changed line" })).toBeVisible();
+    await expect(page.locator(".git-diff-line.is-del").filter({ hasText: "-old line" })).toBeVisible();
     await expect(page.locator(".git-diff-line.is-hunk")).toContainText("@@");
     await expect(page.locator(".git-diff-line.is-meta").first()).toContainText("diff --git");
     const overflows = await page.locator(".git-diff-code").first().evaluate((el) => el.scrollWidth > el.clientWidth);
     expect(overflows).toBeTruthy();
+
+    const diffCallsBeforeToggle = await page.evaluate(() => (window as any).__aimdGitMock.calls()
+      .filter((call: any) => call.cmd === "get_git_file_diff").length);
+    await page.locator("#git-diff-view-mode-toggle").click();
+    await expect(page.locator("#git-diff-scroll")).toHaveAttribute("data-diff-view-mode", "side-by-side");
+    await expect(page.locator("#git-diff-view-mode-toggle")).toHaveAttribute("aria-pressed", "true");
+    await expect(page.locator("#git-diff-view-mode-toggle")).toHaveAttribute("data-tooltip", "当前：左右对比");
+    await expect(page.locator(".git-diff-split")).toBeVisible();
+    await expect(page.locator(".git-diff-code")).toHaveCount(0);
+    await expect(page.locator(".git-diff-split-row.is-meta")).toHaveCount(0);
+    await expect(page.locator(".git-diff-split-row.is-hunk")).toHaveCount(0);
+    await expect(page.locator(".git-diff-split")).not.toContainText("@@");
+    const contextRow = page.locator(".git-diff-split-row.is-context", { hasText: "context line" });
+    await expect(contextRow.locator(".git-diff-split-cell--old")).toContainText("context line");
+    await expect(contextRow.locator(".git-diff-split-cell--new")).toContainText("context line");
+    await expect(contextRow.locator(".git-diff-split-cell--old .git-diff-gutter")).toHaveText("1");
+    await expect(contextRow.locator(".git-diff-split-cell--new .git-diff-gutter")).toHaveText("1");
+    const splitGeometry = await page.locator(".git-diff-split").first().evaluate((split) => {
+      const splitRect = split.getBoundingClientRect();
+      const scroller = split.closest<HTMLElement>("#git-diff-scroll");
+      const headings = Array.from(split.querySelectorAll<HTMLElement>(".git-diff-split-heading"))
+        .map((heading) => heading.getBoundingClientRect());
+      const changeRow = split.querySelector<HTMLElement>(".git-diff-split-row.is-change");
+      const oldCell = changeRow?.querySelector<HTMLElement>(".git-diff-split-cell--old");
+      const newCell = changeRow?.querySelector<HTMLElement>(".git-diff-split-cell--new");
+      const oldText = oldCell?.querySelector<HTMLElement>(".git-diff-text");
+      const newText = newCell?.querySelector<HTMLElement>(".git-diff-text");
+      const oldViewport = oldCell?.querySelector<HTMLElement>(".git-diff-text-viewport");
+      const newViewport = newCell?.querySelector<HTMLElement>(".git-diff-text-viewport");
+      const oldXScroll = split.querySelector<HTMLElement>("[data-diff-x-scroll='old']");
+      const newXScroll = split.querySelector<HTMLElement>("[data-diff-x-scroll='new']");
+      const scrollbars = split.querySelector<HTMLElement>(".git-diff-split-scrollbars");
+      const oldRect = oldCell?.getBoundingClientRect();
+      const newRect = newCell?.getBoundingClientRect();
+      return {
+        splitLeft: splitRect.left,
+        splitRight: splitRect.right,
+        splitWidth: splitRect.width,
+        scrollerWidth: scroller?.clientWidth || 0,
+        scrollerPaddingTop: scroller ? getComputedStyle(scroller).paddingTop : "",
+        splitBorderRadius: getComputedStyle(split).borderRadius,
+        oldHeadingWidth: headings[0]?.width || 0,
+        newHeadingLeft: headings[1]?.left || 0,
+        newHeadingWidth: headings[1]?.width || 0,
+        rowHeight: changeRow?.getBoundingClientRect().height || 0,
+        rowLineHeight: oldText ? getComputedStyle(oldText).lineHeight : "",
+        oldCellWidth: oldRect?.width || 0,
+        oldCellBorderTopWidth: oldCell ? getComputedStyle(oldCell).borderTopWidth : "",
+        newCellLeft: newRect?.left || 0,
+        newCellWidth: newRect?.width || 0,
+        rowDisplay: changeRow ? getComputedStyle(changeRow).display : "",
+        rowGrid: changeRow ? getComputedStyle(changeRow).gridTemplateColumns : "",
+        cellWhiteSpace: oldCell ? getComputedStyle(oldCell).whiteSpace : "",
+        oldTextWhiteSpace: oldText ? getComputedStyle(oldText).whiteSpace : "",
+        newTextWhiteSpace: newText ? getComputedStyle(newText).whiteSpace : "",
+        oldTextScrolls: oldViewport ? oldViewport.scrollWidth > oldViewport.clientWidth : false,
+        newTextScrolls: newViewport ? newViewport.scrollWidth > newViewport.clientWidth : false,
+        oldXScrolls: oldXScroll ? oldXScroll.scrollWidth > oldXScroll.clientWidth : false,
+        newXScrolls: newXScroll ? newXScroll.scrollWidth > newXScroll.clientWidth : false,
+        scrollbarsPosition: scrollbars ? getComputedStyle(scrollbars).position : "",
+      };
+    });
+    expect(splitGeometry.scrollerPaddingTop).toBe("0px");
+    expect(splitGeometry.splitBorderRadius).toBe("0px");
+    expect(splitGeometry.splitWidth).toBeGreaterThanOrEqual(splitGeometry.scrollerWidth - 2);
+    expect(splitGeometry.newHeadingLeft).toBeLessThan(splitGeometry.splitRight - 80);
+    expect(Math.abs(splitGeometry.oldHeadingWidth - splitGeometry.newHeadingWidth)).toBeLessThanOrEqual(2);
+    expect(Math.abs(splitGeometry.oldCellWidth - splitGeometry.newCellWidth)).toBeLessThanOrEqual(2);
+    expect(splitGeometry.newCellLeft).toBeGreaterThan(splitGeometry.splitLeft + 200);
+    expect(splitGeometry.oldCellBorderTopWidth).toBe("0px");
+    expect(splitGeometry.cellWhiteSpace).toBe("normal");
+    expect(splitGeometry.oldTextWhiteSpace).toBe("pre");
+    expect(splitGeometry.newTextWhiteSpace).toBe("pre");
+    expect(splitGeometry.rowLineHeight).toBe("18px");
+    expect(splitGeometry.rowHeight).toBeLessThanOrEqual(20);
+    expect(splitGeometry.oldTextScrolls || splitGeometry.newTextScrolls).toBeTruthy();
+    expect(splitGeometry.oldXScrolls && splitGeometry.newXScrolls).toBeTruthy();
+    expect(splitGeometry.scrollbarsPosition).toBe("sticky");
+    const deletedOnly = page.locator(".git-diff-split-row.is-del", { hasText: "old only line" });
+    await expect(deletedOnly.locator(".git-diff-split-cell--old")).toContainText("old only line");
+    await expect(deletedOnly.locator(".git-diff-split-cell--new")).not.toContainText("old only line");
+    const addedOnly = page.locator(".git-diff-split-row.is-add", { hasText: "new only line" });
+    await expect(addedOnly.locator(".git-diff-split-cell--new")).toContainText("new only line");
+    await expect(addedOnly.locator(".git-diff-split-cell--old")).not.toContainText("new only line");
+    const changedRow = page.locator(".git-diff-split-row.is-change", { hasText: "changed line" });
+    await expect(changedRow.locator(".git-diff-split-cell--old")).toContainText("old line");
+    await expect(changedRow.locator(".git-diff-split-cell--new")).toContainText("changed line");
+    const visibleAddText = await addedOnly.locator(".git-diff-split-cell--new .git-diff-text").boundingBox();
+    const visibleAddCell = await addedOnly.locator(".git-diff-split-cell--new").boundingBox();
+    expect(visibleAddText && visibleAddCell).toBeTruthy();
+    expect(visibleAddText!.y).toBeGreaterThanOrEqual(visibleAddCell!.y - 1);
+    expect(visibleAddText!.y + visibleAddText!.height).toBeLessThanOrEqual(
+      visibleAddCell!.y + visibleAddCell!.height + 2,
+    );
+    const splitOverflows = await page.locator(".git-diff-split").first().evaluate((el) => el.scrollWidth > el.clientWidth);
+    expect(splitOverflows).toBeFalsy();
+    const shiftedTextTransform = await page.locator("[data-diff-x-scroll='new']").first().evaluate((scroll) => {
+      scroll.scrollLeft = 80;
+      scroll.dispatchEvent(new Event("scroll"));
+      return getComputedStyle(scroll.closest(".git-diff-split")!.querySelector<HTMLElement>(".git-diff-split-cell--new .git-diff-text")!).transform;
+    });
+    expect(shiftedTextTransform).not.toBe("none");
+    const stickyScrollbarGap = await page.locator("#git-diff-scroll").evaluate((scroller) => {
+      scroller.scrollTop = 220;
+      const viewport = scroller.getBoundingClientRect();
+      const scrollbars = scroller.querySelector<HTMLElement>(".git-diff-split-scrollbars")!.getBoundingClientRect();
+      return Math.round(viewport.bottom - scrollbars.bottom);
+    });
+    expect(Math.abs(stickyScrollbarGap)).toBeLessThanOrEqual(1);
+
+    await page.locator("#git-diff-wrap-toggle").click();
+    await expect(page.locator("#git-diff-wrap-toggle")).toHaveAttribute("aria-pressed", "true");
+    await expect(page.locator("#git-diff-wrap-toggle")).toHaveAttribute("data-tooltip", "自动换行：开启");
+    await expect(page.locator("#git-diff-scroll")).toHaveAttribute("data-diff-word-wrap", "on");
+    const wrappedLongRow = await page.locator(".git-diff-split-row.is-change", { hasText: "very very very" }).evaluate((row) => {
+      const text = row.querySelector<HTMLElement>(".git-diff-split-cell--new .git-diff-text");
+      const scroll = row.closest(".git-diff-split")?.querySelector<HTMLElement>(".git-diff-split-scrollbars");
+      return {
+        rowHeight: row.getBoundingClientRect().height,
+        textWhiteSpace: text ? getComputedStyle(text).whiteSpace : "",
+        textScrolls: text ? text.scrollWidth > text.clientWidth : true,
+        scrollbarsDisplay: scroll ? getComputedStyle(scroll).display : "",
+      };
+    });
+    expect(wrappedLongRow.textWhiteSpace).toBe("pre-wrap");
+    expect(wrappedLongRow.rowHeight).toBeGreaterThan(20);
+    expect(wrappedLongRow.textScrolls).toBeFalsy();
+    expect(wrappedLongRow.scrollbarsDisplay).toBe("none");
+    const diffCallsAfterToggle = await page.evaluate(() => (window as any).__aimdGitMock.calls()
+      .filter((call: any) => call.cmd === "get_git_file_diff").length);
+    expect(diffCallsAfterToggle).toBe(diffCallsBeforeToggle);
 
     await page.locator("#find-toggle").click();
     await expect(page.locator("#find-bar")).toBeVisible();
@@ -286,8 +469,46 @@ test.describe("Git workspace panel", () => {
     await expect(page.locator("#find-count")).toHaveText("1/1");
     await expect.poll(() => page.evaluate(() => String(window.getSelection()))).toContain("changed line");
 
+    await page.locator("#git-diff-view-mode-toggle").click();
+    await expect(page.locator("#find-bar")).toBeVisible();
+    await expect(page.locator("#git-diff-scroll")).toHaveAttribute("data-diff-view-mode", "unified");
+    await expect(page.locator("#git-diff-view-mode-toggle")).toHaveAttribute("aria-pressed", "false");
+    await expect(page.locator(".git-diff-code")).toBeVisible();
+    const diffCallsAfterUnified = await page.evaluate(() => (window as any).__aimdGitMock.calls()
+      .filter((call: any) => call.cmd === "get_git_file_diff").length);
+    expect(diffCallsAfterUnified).toBe(diffCallsBeforeToggle);
+    await page.locator("#find-input").focus();
+    await page.keyboard.press("Enter");
+    await expect(page.locator("#find-count")).toHaveText("1/1");
+    await expect.poll(() => page.evaluate(() => String(window.getSelection()))).toContain("changed line");
+
     await page.locator(".git-file-row[data-path='apps/foo.ts']").locator("[data-git-action='select']").click();
     await expect(page.locator(".open-tab", { hasText: "foo.ts" })).toHaveCount(1);
+  });
+
+  test("keeps binary, empty, and truncated Git diff states readable", async ({ page }) => {
+    await installGitWorkspaceMock(page, "repo");
+    await page.goto("/");
+
+    await openWorkspaceDocument(page);
+    await page.locator("#sidebar-tab-git").click();
+
+    await page.locator(".git-file-row[data-path='assets/logo.png']").locator("[data-git-action='select']").click();
+    await expect(page.locator("#git-diff-view")).toContainText("二进制文件无文本 diff");
+    await expect(page.locator(".git-diff-code")).toHaveCount(0);
+    await expect(page.locator(".git-diff-split")).toHaveCount(0);
+
+    await page.locator(".git-file-row[data-path='docs/empty.md']").locator("[data-git-action='select']").click();
+    await expect(page.locator("#git-diff-view")).toContainText("没有可显示的文本 diff");
+    await expect(page.locator(".git-diff-code")).toHaveCount(0);
+    await expect(page.locator(".git-diff-split")).toHaveCount(0);
+
+    await page.locator(".git-file-row[data-path='docs/large.md']").locator("[data-git-action='select']").click();
+    await expect(page.locator("#git-diff-view")).toContainText("diff 过大，已截断");
+    await expect(page.locator(".git-diff-line.is-add").filter({ hasText: "+new large" })).toBeVisible();
+    await page.locator("#git-diff-view-mode-toggle").click();
+    await expect(page.locator("#git-diff-view")).toContainText("diff 过大，已截断");
+    await expect(page.locator(".git-diff-split-row.is-change", { hasText: "new large" })).toBeVisible();
   });
 
   test("stages, unstages, and commits through fixed commands", async ({ page }) => {
@@ -300,11 +521,9 @@ test.describe("Git workspace panel", () => {
     await page.locator(".git-file-row[data-path='docs/draft.md']").locator("[data-git-action='stage-file']").click();
     await page.locator(".git-file-row[data-path='apps/foo.ts']").hover();
     await page.locator(".git-file-row[data-path='apps/foo.ts']").locator("[data-git-action='unstage-file']").click();
-    page.once("dialog", (dialog) => dialog.accept());
     await page.locator(".git-file-row[data-path='docs/draft.md']").click({ button: "right" });
     await expect(page.locator(".file-ctx-menu")).toBeVisible();
     await page.locator(".file-ctx-item", { hasText: "删除未跟踪文件" }).click();
-    page.once("dialog", (dialog) => dialog.accept());
     await page.locator("[data-git-action='discard-all']").click();
     await expect(page.locator("#git-commit-submit")).toBeDisabled();
     await page.locator("#git-commit-message").fill("Update docs");
@@ -314,6 +533,8 @@ test.describe("Git workspace panel", () => {
     const calls = await page.evaluate(() => (window as any).__aimdGitMock.calls());
     expect(calls.some((call: any) => call.cmd === "git_stage_file" && call.args.path === "docs/draft.md")).toBeTruthy();
     expect(calls.some((call: any) => call.cmd === "git_unstage_file" && call.args.path === "apps/foo.ts")).toBeTruthy();
+    expect(calls.filter((call: any) => call.cmd === "confirm_git_discard_operation").length).toBe(2);
+    expect(calls.some((call: any) => call.cmd === "window_confirm")).toBeFalsy();
     expect(calls.some((call: any) => call.cmd === "git_discard_file" && call.args.path === "docs/draft.md")).toBeTruthy();
     expect(calls.some((call: any) => call.cmd === "git_discard_all")).toBeTruthy();
     expect(calls.some((call: any) => call.cmd === "git_commit" && call.args.message === "Update docs")).toBeTruthy();
@@ -441,6 +662,17 @@ test.describe("Git workspace panel", () => {
     await expect(page.locator(".git-diff-block-title")).toHaveText("未暂存差异");
     await expect(page.locator("#git-diff-view")).toContainText("+new file");
     await expect(page.locator("#git-diff-view")).not.toContainText("没有 已暂存差异");
+    const draftDiffCallsBeforeToggle = await page.evaluate(() => (window as any).__aimdGitMock.calls()
+      .filter((call: any) => call.cmd === "get_git_file_diff").length);
+    await page.locator("#git-diff-view-mode-toggle").click();
+    await expect(page.locator(".git-diff-split")).toBeVisible();
+    await expect(page.locator(".git-diff-block-title")).toHaveText("未暂存差异");
+    const draftAddRow = page.locator(".git-diff-split-row.is-add", { hasText: "new file" });
+    await expect(draftAddRow.locator(".git-diff-split-cell--new")).toContainText("new file");
+    await expect(draftAddRow.locator(".git-diff-split-cell--old")).not.toContainText("new file");
+    const draftDiffCallsAfterToggle = await page.evaluate(() => (window as any).__aimdGitMock.calls()
+      .filter((call: any) => call.cmd === "get_git_file_diff").length);
+    expect(draftDiffCallsAfterToggle).toBe(draftDiffCallsBeforeToggle);
     await page.locator(".workspace-row", { hasText: "Readme.aimd" }).click();
     await expect(page.locator("#reader")).toBeVisible();
     await expect(page.locator("#git-diff-view")).toBeHidden();

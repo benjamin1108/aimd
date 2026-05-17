@@ -4,7 +4,7 @@ let activeTarget: HTMLElement | null = null;
 
 function tooltipTargetFromEventTarget(target: EventTarget | null): HTMLElement | null {
   if (!(target instanceof Element)) return null;
-  return target.closest<HTMLElement>(".format-toolbar [data-tooltip]");
+  return target.closest<HTMLElement>("[data-tooltip]");
 }
 
 function tooltipText(target: HTMLElement): string {
@@ -47,6 +47,19 @@ function hideTooltip(target?: HTMLElement | null) {
   if (target && activeTarget && target !== activeTarget) return;
   activeTarget = null;
   uiTooltipEl().hidden = true;
+}
+
+export function refreshActiveTooltip(target?: HTMLElement | null) {
+  if (!activeTarget || (target && target !== activeTarget)) return;
+  const text = tooltipText(activeTarget);
+  if (!text) {
+    hideTooltip(activeTarget);
+    return;
+  }
+  const tooltip = uiTooltipEl();
+  tooltip.textContent = text;
+  tooltip.hidden = false;
+  positionTooltip(activeTarget);
 }
 
 export function bindTooltips() {

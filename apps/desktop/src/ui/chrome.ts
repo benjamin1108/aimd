@@ -9,6 +9,7 @@ import {
   packageLocalImagesEl, healthCheckEl, webImportEl, exportMarkdownEl, exportHtmlEl, exportPdfEl,
   formatDocumentEl,
   globalNewProjectAimdEl, globalNewProjectMarkdownEl, findToggleEl,
+  gitDiffViewModeClusterEl, gitDiffViewModeToggleEl, gitDiffWrapToggleEl,
   modeReadEl, modeEditEl, docToolbarEl,
 } from "../core/dom";
 import type { AimdAsset, AimdDocument } from "../core/types";
@@ -175,6 +176,9 @@ export function updateChrome() {
     panelEl().style.removeProperty("--inspector-rail-width");
   }
   const inDiffView = state.mainView === "git-diff";
+  const diffTab = inDiffView
+    ? state.git.diffTabs.find((tab) => tab.id === state.openDocuments.activeTabId) || null
+    : null;
   panelEl().dataset.hasDoc = doc ? "true" : "false";
   renderAppScope(doc, inDiffView);
   globalNewProjectAimdEl().disabled = !hasWorkspace;
@@ -186,9 +190,26 @@ export function updateChrome() {
   docActionsEl().hidden = !hasCurrentTabContext || inDiffView;
   docToolbarEl().hidden = !hasCurrentTabContext;
   sidebarFootEl().hidden = true;
+  const showDiffViewMode = Boolean(inDiffView && diffTab);
+  const diffModeToggle = gitDiffViewModeToggleEl();
+  const diffModeTooltip = state.git.diffViewMode === "side-by-side"
+    ? "当前：左右对比"
+    : "当前：统一 Diff";
+  gitDiffViewModeClusterEl().hidden = !showDiffViewMode;
+  diffModeToggle.disabled = !showDiffViewMode;
+  diffModeToggle.classList.toggle("is-active", state.git.diffViewMode === "side-by-side");
+  diffModeToggle.setAttribute("aria-pressed", String(state.git.diffViewMode === "side-by-side"));
+  diffModeToggle.dataset.tooltip = diffModeTooltip;
+  diffModeToggle.title = diffModeTooltip;
+  const diffWrapToggle = gitDiffWrapToggleEl();
+  const diffWrapTooltip = state.git.diffWordWrap ? "自动换行：开启" : "自动换行：关闭";
+  diffWrapToggle.disabled = !showDiffViewMode;
+  diffWrapToggle.classList.toggle("is-active", state.git.diffWordWrap);
+  diffWrapToggle.setAttribute("aria-pressed", String(state.git.diffWordWrap));
+  diffWrapToggle.dataset.tooltip = diffWrapTooltip;
+  diffWrapToggle.title = diffWrapTooltip;
 
   if (inDiffView) {
-    const diffTab = state.git.diffTabs.find((tab) => tab.id === state.openDocuments.activeTabId) || null;
     titleEl().textContent = diffTab?.title || "Git Diff";
     pathEl().textContent = diffTab?.path ? `Git Diff · ${diffTab.directory}` : "Git Diff";
   } else {

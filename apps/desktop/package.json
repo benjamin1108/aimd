@@ -36,6 +36,7 @@
     "@tauri-apps/plugin-process": "^2.3.1",
     "@tauri-apps/plugin-updater": "^2.10.1",
     "@types/turndown": "^5.0.6",
+    "diff2html": "^3.4.56",
     "turndown": "^7.2.4",
     "turndown-plugin-gfm": "^1.0.2"
   },
