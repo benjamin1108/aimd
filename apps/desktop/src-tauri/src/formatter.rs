@@ -72,7 +72,7 @@ pub async fn format_markdown(
 
     let request = GenerateTextRequest {
         system: format_system_prompt(normalize_output_language(output_language), provider, &model),
-        user: markdown,
+        user: format_user_prompt(&markdown),
         temperature: 0.1,
     };
 
@@ -116,7 +116,7 @@ fn format_system_prompt(output_language: &str, provider: &str, model: &str) -> S
         .replace("{target_language}", language_name(output_language))
         .replace("{language_code}", output_language);
     let meta = format!(
-        "Code-side metadata to include under formattedBy:\nprovider: {provider}\nmodel: {model}\nat: {}",
+        "如果输出 YAML frontmatter，formattedBy 必须使用以下代码侧元信息:\nprovider: {provider}\nmodel: {model}\nat: {}",
         Utc::now().to_rfc3339()
     );
     format!(
@@ -125,6 +125,176 @@ fn format_system_prompt(output_language: &str, provider: &str, model: &str) -> S
         policy.trim(),
         meta
     )
+}
+
+fn format_user_prompt(markdown: &str) -> String {
+    format!(
+        "请按系统规则评估并格式化下面这份文档。只读诊断用于帮助判断最低必要干预级别，不得原样输出。\n\n只读诊断:\n{}\n\n<document_markdown>\n{}\n</document_markdown>",
+        format_markdown_diagnostics(markdown),
+        markdown
+    )
+}
+
+fn format_markdown_diagnostics(markdown: &str) -> String {
+    let non_empty_lines = markdown
+        .lines()
+        .filter(|line| !line.trim().is_empty())
+        .count();
+    [
+        format!("- 非空行数: {non_empty_lines}"),
+        format!("- H1 数量: {}", count_h1_headings(markdown)),
+        format!(
+            "- YAML frontmatter: {}",
+            yes_no(has_yaml_frontmatter(markdown))
+        ),
+        format!(
+            "- 应用默认占位标题: {}",
+            yes_no(has_default_placeholder_title(markdown))
+        ),
+        format!(
+            "- 疑似断裂列表或段落: {}",
+            yes_no(has_suspected_broken_list_or_paragraph(markdown))
+        ),
+        format!(
+            "- 连续三个以上空行: {}",
+            yes_no(has_three_or_more_blank_lines(markdown))
+        ),
+    ]
+    .join("\n")
+}
+
+fn yes_no(value: bool) -> &'static str {
+    if value {
+        "是"
+    } else {
+        "否"
+    }
+}
+
+fn has_yaml_frontmatter(markdown: &str) -> bool {
+    let trimmed = markdown.trim_start_matches('\u{feff}').trim_start();
+    trimmed.starts_with("---\n") || trimmed.starts_with("---\r\n")
+}
+
+fn count_h1_headings(markdown: &str) -> usize {
+    markdown
+        .lines()
+        .filter(|line| {
+            let trimmed = line.trim_start();
+            trimmed.starts_with("# ") || trimmed == "#"
+        })
+        .count()
+}
+
+fn has_default_placeholder_title(markdown: &str) -> bool {
+    for line in markdown.lines() {
+        let trimmed = line.trim();
+        if trimmed.is_empty() || trimmed == "---" {
+            continue;
+        }
+        if !trimmed.starts_with('#') {
+            return false;
+        }
+        let title = trimmed.trim_start_matches('#').trim();
+        return matches!(
+            normalize_placeholder_title(title).as_str(),
+            "未命名文档" | "untitled" | "untitled document" | "new document"
+        );
+    }
+    false
+}
+
+fn normalize_placeholder_title(title: &str) -> String {
+    title
+        .trim_matches(|c| matches!(c, '"' | '\'' | '“' | '”' | '‘' | '’'))
+        .trim()
+        .to_lowercase()
+}
+
+fn has_three_or_more_blank_lines(markdown: &str) -> bool {
+    let mut blank_count = 0;
+    for line in markdown.lines() {
+        if line.trim().is_empty() {
+            blank_count += 1;
+            if blank_count >= 3 {
+                return true;
+            }
+        } else {
+            blank_count = 0;
+        }
+    }
+    false
+}
+
+fn has_suspected_broken_list_or_paragraph(markdown: &str) -> bool {
+    let mut in_fence = false;
+    let mut last_list_line_without_terminal = false;
+    let mut blank_after_suspicious_list = false;
+
+    for raw_line in markdown.lines() {
+        let trimmed = raw_line.trim();
+        if trimmed.starts_with("```") || trimmed.starts_with("~~~") {
+            in_fence = !in_fence;
+            continue;
+        }
+        if in_fence {
+            continue;
+        }
+        if is_list_marker_line(trimmed) {
+            last_list_line_without_terminal = !ends_with_terminal_punctuation(trimmed);
+            blank_after_suspicious_list = false;
+            continue;
+        }
+        if trimmed.is_empty() {
+            if last_list_line_without_terminal {
+                blank_after_suspicious_list = true;
+            }
+            continue;
+        }
+        if blank_after_suspicious_list
+            && !is_list_marker_line(trimmed)
+            && !trimmed.starts_with('#')
+            && !raw_line.starts_with(' ')
+            && !raw_line.starts_with('\t')
+        {
+            return true;
+        }
+        last_list_line_without_terminal = false;
+        blank_after_suspicious_list = false;
+    }
+
+    false
+}
+
+fn is_list_marker_line(trimmed: &str) -> bool {
+    trimmed.starts_with("- ")
+        || trimmed.starts_with("* ")
+        || trimmed.starts_with("+ ")
+        || is_ordered_list_marker_line(trimmed)
+}
+
+fn is_ordered_list_marker_line(trimmed: &str) -> bool {
+    let bytes = trimmed.as_bytes();
+    let mut index = 0;
+    while index < bytes.len() && bytes[index].is_ascii_digit() {
+        index += 1;
+    }
+    if index == 0 || index > 4 || index >= bytes.len() {
+        return false;
+    }
+    let rest = &trimmed[index..];
+    rest.starts_with(". ") || rest.starts_with(") ") || rest.starts_with("、")
+}
+
+fn ends_with_terminal_punctuation(text: &str) -> bool {
+    let normalized = text
+        .trim_end_matches(|c| matches!(c, '"' | '\'' | '”' | '’' | ')' | '）' | ']' | '】' | '》'));
+    normalized.chars().last().is_some_and(|c| {
+        matches!(
+            c,
+            '。' | '！' | '？' | '.' | '!' | '?' | '；' | ';' | '：' | ':'
+        )
+    })
 }
 
 fn strip_markdown_fence(text: &str) -> &str {
@@ -229,7 +399,8 @@ mod tests {
     fn prompt_contains_frontmatter_contract_and_language() {
         let prompt = format_system_prompt("en", "dashscope", "qwen-x");
         assert!(prompt.contains("YAML frontmatter"));
-        assert!(prompt.contains("Target output language: English."));
+        assert!(prompt.contains("YAML frontmatter 是可选增强"));
+        assert!(prompt.contains("目标输出语言：English。"));
         assert!(prompt.contains("provider: dashscope"));
         assert!(prompt.contains("model: qwen-x"));
     }
@@ -238,9 +409,29 @@ mod tests {
     fn prompt_requires_needed_quality_judgement() {
         let prompt = format_system_prompt("zh-CN", "dashscope", "qwen-x");
         assert!(prompt.contains("\"needed\""));
-        assert!(prompt.contains("already clean enough"));
+        assert!(prompt.contains("最低必要干预"));
+        assert!(prompt.contains("轻度修复"));
+        assert!(prompt.contains("断裂列表"));
         assert!(prompt.contains("needed=false"));
         assert!(!prompt.contains("exactly one H1"));
+    }
+
+    #[test]
+    fn user_prompt_marks_placeholder_title_and_broken_list() {
+        let prompt = format_user_prompt(
+            "# 未命名文档\n\n1. 需求不足。\n\n4. 核心矛盾在于业务模型缺乏超大 Token 消耗场景且\n\n高频用户不足，建议重新评估。",
+        );
+        assert!(prompt.contains("- 应用默认占位标题: 是"));
+        assert!(prompt.contains("- 疑似断裂列表或段落: 是"));
+        assert!(prompt.contains("<document_markdown>"));
+        assert!(prompt.contains("</document_markdown>"));
+    }
+
+    #[test]
+    fn diagnostics_do_not_mark_clean_short_list_as_broken() {
+        let prompt = format_user_prompt("# 计划\n\n1. 完成实现。\n2. 运行验证。\n");
+        assert!(prompt.contains("- 应用默认占位标题: 否"));
+        assert!(prompt.contains("- 疑似断裂列表或段落: 否"));
     }
 
     #[test]

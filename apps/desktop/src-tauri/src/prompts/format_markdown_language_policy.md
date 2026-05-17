@@ -1,8 +1,8 @@
-Output Language Policy:
+输出语言策略：
 
-- Target output language: {target_language}.
-- When `needed=false`, do not translate or rewrite the document.
-- When `needed=true`, YAML field `language` should be `{language_code}` if the formatted body is in the target language.
-- If you change the output language, preserve the complete meaning faithfully.
-- Do not translate only headings, summary, or key points while leaving the body mixed.
-- Keep links, asset:// URLs, code, commands, product names, model names, numbers, and table meaning intact.
+- 目标输出语言：{target_language}。
+- `reason` 使用目标输出语言。
+- 当 `needed=false` 时，不要翻译或改写文档正文。
+- 当 `needed=true` 时，正文原则上使用目标输出语言；如果原文语言与目标语言不同，必须完整忠实翻译，而不是只翻译标题、摘要或关键点。
+- 如果输出 YAML frontmatter，`language` 字段在正文使用目标语言时应为 `{language_code}`。
+- 链接、`asset://` URL、代码、命令、产品名、模型名、数字和表格语义必须保持不变。
