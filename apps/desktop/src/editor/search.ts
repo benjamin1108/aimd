@@ -2,10 +2,10 @@ import { state } from "../core/state";
 import {
   findBarEl, findInputEl, replaceInputEl, findCountEl,
   findPrevEl, findNextEl, replaceOneEl, replaceAllEl, findCloseEl, findReplaceGroupEl,
-  findToggleEl, markdownEl, readerEl, inlineEditorEl, previewEl, gitDiffContentEl,
+  findToggleEl, markdownEl, readerEl, previewEl, gitDiffContentEl,
 } from "../core/dom";
 import { setStatus, updateChrome } from "../ui/chrome";
-import { flushInline, insertAtCursor } from "./inline";
+import { insertMarkdownAtSelection, replaceAllMarkdown } from "./textarea";
 
 let activeIndex = -1;
 
@@ -38,7 +38,7 @@ export function bindSearch() {
 
 export function openFindBar(showReplace = false) {
   if (!canSearchCurrentView()) return;
-  const canReplace = showReplace && state.mainView !== "git-diff" && state.mode === "source";
+  const canReplace = showReplace && state.mainView !== "git-diff" && state.mode === "edit";
   findToggleEl().classList.add("is-active");
   findToggleEl().setAttribute("aria-expanded", "true");
   findBarEl().hidden = false;
@@ -79,7 +79,6 @@ function jumpToMatch(direction: 1 | -1, keepFindFocus = false) {
     updateFindCount();
     return;
   }
-  if (state.mainView !== "git-diff" && state.mode === "edit" && !flushInline().ok) return;
   const matches = collectMatches(query);
   if (matches.length === 0) {
     activeIndex = -1;
@@ -123,7 +122,7 @@ function collectMatches(query: string): Match[] {
 
 function currentSearchText(): string {
   if (state.mainView === "git-diff") return currentTextRoot().textContent || "";
-  if (state.mode === "source") return markdownEl().value;
+  if (state.mode === "edit") return markdownEl().value;
   const root = currentTextRoot();
   return root.textContent || "";
 }
@@ -133,7 +132,7 @@ function selectMatch(match: Match) {
     selectTextRangeInRoot(currentTextRoot(), match);
     return;
   }
-  if (state.mode === "source") {
+  if (state.mode === "edit") {
     markdownEl().focus();
     markdownEl().setSelectionRange(match.start, match.end);
     const lineHeight = 22;
@@ -158,8 +157,7 @@ function selectTextRangeInRoot(root: HTMLElement, match: Match) {
 
 function currentTextRoot(): HTMLElement {
   if (state.mainView === "git-diff") return gitDiffContentEl();
-  if (state.mode === "edit") return inlineEditorEl();
-  if (state.mode === "source") return previewEl();
+  if (state.mode === "edit") return previewEl();
   return readerEl();
 }
 
@@ -192,7 +190,7 @@ function rangeForTextOffsets(root: HTMLElement, start: number, end: number): Ran
 }
 
 function replaceOne() {
-  if (state.mode !== "source") return;
+  if (state.mode !== "edit") return;
   const query = findInputEl().value;
   if (!query) return;
   const start = markdownEl().selectionStart;
@@ -202,14 +200,14 @@ function replaceOne() {
     findNext();
     return;
   }
-  insertAtCursor(replaceInputEl().value);
+  insertMarkdownAtSelection(replaceInputEl().value);
   activeIndex = -1;
   findNext();
   updateChrome();
 }
 
 function replaceAll() {
-  if (state.mode !== "source" || !state.doc) return;
+  if (state.mode !== "edit" || !state.doc) return;
   const query = findInputEl().value;
   if (!query) return;
   const replacement = replaceInputEl().value;
@@ -220,9 +218,7 @@ function replaceAll() {
     setStatus("未找到可替换内容", "info");
     return;
   }
-  markdownEl().value = after;
-  markdownEl().dispatchEvent(new Event("input"));
-  state.doc.dirty = true;
+  replaceAllMarkdown(after);
   activeIndex = -1;
   updateFindCount();
   setStatus("已完成全部替换", "success");

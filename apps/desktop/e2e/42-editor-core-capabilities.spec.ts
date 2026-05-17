@@ -58,6 +58,7 @@ async function installEditorCoreMock(page: Page) {
       remotePackageCalls: [] as Array<Record<string, unknown>>,
       keepOnlineConfirmCalls: [] as Array<Record<string, unknown>>,
       saveCalls: [] as Array<Record<string, unknown>>,
+      saveMarkdownCalls: [] as Array<Record<string, unknown>>,
     };
     const convertFileSrc = (path: string, protocol = "asset") => `${protocol}://localhost${encodeURI(path)}`;
     const renderFromMarkdown = (markdown: string) => ({
@@ -114,6 +115,10 @@ async function installEditorCoreMock(page: Page) {
       save_aimd: (a) => {
         runtime.saveCalls.push({ ...((a || {}) as Record<string, unknown>) });
         return { ...s.doc, markdown: String((a as any)?.markdown ?? s.doc.markdown), dirty: false };
+      },
+      save_markdown: (a) => {
+        runtime.saveMarkdownCalls.push({ ...((a || {}) as Record<string, unknown>) });
+        return null;
       },
       render_markdown: (a) => renderFromMarkdown(String((a as any)?.markdown ?? "")),
       render_markdown_standalone: (a) => renderFromMarkdown(String((a as any)?.markdown ?? "")),
@@ -221,6 +226,7 @@ async function installEditorCoreMock(page: Page) {
       getRemotePackageCalls: () => runtime.remotePackageCalls,
       getKeepOnlineConfirmCalls: () => runtime.keepOnlineConfirmCalls,
       getSaveCalls: () => runtime.saveCalls,
+      getSaveMarkdownCalls: () => runtime.saveMarkdownCalls,
     };
     (window as any).__TAURI_INTERNALS__ = {
       invoke: async (cmd: string, a?: Args) => {
@@ -249,7 +255,7 @@ test.describe("Editor core capabilities", () => {
     await page.locator("#global-import-md-project").click();
     await expect(page.locator("#doc-title")).toContainText("导入项目");
     await expect(page.locator("#doc-path")).toContainText("saved.aimd");
-    await page.locator("#mode-source").click();
+    await page.locator("#mode-edit").click();
     const md = await page.locator("#markdown").inputValue();
     expect(md).toContain("asset://img-001");
     expect(md).toContain("| A | B |");
@@ -260,7 +266,7 @@ test.describe("Editor core capabilities", () => {
     await installEditorCoreMock(page);
     await page.goto("/");
     await page.locator("#empty-open").click();
-    await page.locator("#mode-source").click();
+    await page.locator("#mode-edit").click();
 
     const stripHeightBeforeFind = await page.locator("#document-command-strip").evaluate(
       (el) => el.getBoundingClientRect().height,
@@ -296,7 +302,7 @@ test.describe("Editor core capabilities", () => {
     await installEditorCoreMock(page);
     await page.goto("/");
     await page.locator("#empty-open").click();
-    await page.locator("#mode-source").click();
+    await page.locator("#mode-edit").click();
 
     const style = await page.locator("#markdown").evaluate((textarea) => {
       const computed = getComputedStyle(textarea);
@@ -343,10 +349,11 @@ test.describe("Editor core capabilities", () => {
     await page.goto("/");
     await page.locator("#empty-open").click();
     await page.locator("#mode-edit").click();
+    await page.locator("#markdown").focus();
 
     await page.locator('[data-cmd="table"]').click();
     await page.locator('[data-cmd="codeblock"]').click();
-    await page.locator("#mode-source").click();
+    await page.locator("#mode-edit").click();
 
     const md = await page.locator("#markdown").inputValue();
     expect(md).toMatch(/\|\s*列 1\s*\|\s*列 2\s*\|\s*列 3\s*\|/);
@@ -360,16 +367,20 @@ test.describe("Editor core capabilities", () => {
     await page.locator("#empty-open").click();
 
     await page.locator("#reader input[type='checkbox']").click();
-    await page.locator("#mode-source").click();
+    await page.locator("#mode-edit").click();
     await expect(page.locator("#markdown")).toHaveValue(/- \[x\] todo/);
 
     await page.locator("#mode-edit").click();
-    await page.locator("#inline-editor img").click();
-    await page.keyboard.press("Escape");
+    await page.locator("#markdown").evaluate((textarea: HTMLTextAreaElement) => {
+      const marker = "![old alt](asset://img-001)";
+      const start = textarea.value.indexOf(marker);
+      textarea.focus();
+      textarea.setSelectionRange(start + 2, start + 9);
+    });
     await page.locator('[data-cmd="image-alt"]').click();
     await page.locator("#image-alt-input").fill("new alt");
     await page.locator("#image-alt-confirm").click();
-    await page.locator("#mode-source").click();
+    await page.locator("#mode-edit").click();
 
     await expect(page.locator("#markdown")).toHaveValue(/!\[new alt\]\(asset:\/\/img-001\)/);
   });
@@ -446,9 +457,9 @@ test.describe("Editor core capabilities", () => {
       naturalWidth: 1,
     });
 
-    await page.locator("#mode-source").click();
+    await page.locator("#mode-edit").click();
     await page.locator("#markdown").fill("# 传统 Markdown\n\n![local](../shared/pic one.png)\n");
-    await expect.poll(async () => page.locator('#reader img[alt="local"][data-aimd-markdown-src="../shared/pic one.png"]').evaluate((img: HTMLImageElement) => ({
+    await expect.poll(async () => page.locator('#preview img[alt="local"][data-aimd-markdown-src="../shared/pic one.png"]').evaluate((img: HTMLImageElement) => ({
       src: img.getAttribute("src") || "",
       localPath: img.dataset.aimdLocalImagePath || "",
       naturalWidth: img.naturalWidth,
@@ -497,7 +508,7 @@ test.describe("Editor core capabilities", () => {
     await page.goto("/");
     await page.locator("#empty-open").click();
 
-    await page.locator("#mode-source").click();
+    await page.locator("#mode-edit").click();
     await page.locator("#markdown").fill("# Save Remote\n\n![remote](https://example.com/a.png)\n");
     await expect(page.locator("#save")).not.toBeDisabled();
     await page.locator("#more-menu-toggle").click();
@@ -517,6 +528,25 @@ test.describe("Editor core capabilities", () => {
     await expect.poll(() => page.evaluate(() => (window as any).__aimdEditorCoreMock.getRemotePackageCalls().length)).toBe(1);
     const packageCalls = await page.evaluate(() => (window as any).__aimdEditorCoreMock.getRemotePackageCalls());
     expect(packageCalls[0].markdown).toContain("https://example.com/a.png");
+  });
+
+  test("saving plain Markdown writes the textarea Markdown without converting through rendered DOM", async ({ page }) => {
+    await installEditorCoreMock(page);
+    await page.goto("/");
+
+    await page.evaluate(() => (window as any).__aimdEditorCoreMock.openMarkdownNext());
+    await page.locator("#empty-open").click();
+    await page.locator("#mode-edit").click();
+    await page.locator("#markdown").fill("# Markdown Save\n\nCustom **source** text\n");
+    await page.locator("#more-menu-toggle").click();
+    await page.locator("#save").click();
+
+    await expect(page.locator("#status")).toContainText("已保存（Markdown）");
+    const calls = await page.evaluate(() => (window as any).__aimdEditorCoreMock.getSaveMarkdownCalls());
+    expect(calls.at(-1)).toMatchObject({
+      path: "/mock/traditional.md",
+      markdown: "# Markdown Save\n\nCustom **source** text\n",
+    });
   });
 
   test("health panel controls are not exposed in the document UI", async ({ page }) => {
@@ -547,11 +577,11 @@ test.describe("Editor core capabilities", () => {
       .toEqual(["https://example.com/a"]);
 
     await page.locator("#mode-edit").click();
-    await page.locator("#inline-editor a", { hasText: "Example" }).click();
+    await page.locator("#preview a", { hasText: "Example" }).click();
     await expect(page.locator("#status")).toContainText("按 Ctrl/⌘ 点击打开链接");
     await expect.poll(() => page.evaluate(() => (window as any).__aimdEditorCoreMock.getOpenedUrls()))
       .toEqual(["https://example.com/a"]);
-    await page.locator("#inline-editor a", { hasText: "Example" }).click({
+    await page.locator("#preview a", { hasText: "Example" }).click({
       modifiers: [process.platform === "darwin" ? "Meta" : "Control"],
     });
     await expect.poll(() => page.evaluate(() => (window as any).__aimdEditorCoreMock.getOpenedUrls()))
@@ -562,7 +592,7 @@ test.describe("Editor core capabilities", () => {
     await installEditorCoreMock(page);
     await page.goto("/");
     await page.locator("#empty-open").click();
-    await page.locator("#mode-source").click();
+    await page.locator("#mode-edit").click();
 
     const longMarkdown = Array.from({ length: 600 }, (_, i) =>
       `## Section ${i + 1}\n\nParagraph ${i + 1} with **bold**, \`code\`, and ![img](asset://img-001).`,

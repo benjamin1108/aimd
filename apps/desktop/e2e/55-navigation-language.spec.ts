@@ -291,11 +291,11 @@ test.describe("Phase 4 navigation language and stable status", () => {
 
     await expect(page.locator("#app-scope-primary")).toHaveText("项目 / Daily");
     await expect(page.locator("#app-scope-secondary")).toHaveText(".../project/Daily.md");
-    await expect(page.locator("#mode-read")).toHaveText("预览");
+    await expect(page.locator("#mode-read")).toHaveText("阅读");
     await expect(page.locator("#mode-edit")).toHaveText("编辑");
-    await expect(page.locator("#mode-edit")).toHaveAttribute("aria-label", "可视编辑");
-    await expect(page.locator("#mode-source")).toHaveText("MD");
-    await expect(page.locator("#mode-source")).toHaveAttribute("aria-label", "Markdown");
+    await expect(page.locator(`#mode-${"source"}`)).toHaveCount(0);
+    await expect(page.locator("#viewport-width-toggle")).toBeVisible();
+    await expect(page.locator("[data-width-option]")).toHaveCount(3);
 
     await page.locator("#more-menu-toggle").click();
     await expect(page.locator("#health-check")).toBeHidden();
@@ -321,7 +321,7 @@ test.describe("Phase 4 navigation language and stable status", () => {
     expect(settingsIcon.circle).toBe("2.15");
     await page.keyboard.press("Escape");
 
-    await page.locator("#mode-source").click();
+    await page.locator("#mode-edit").click();
     await page.locator("#markdown").fill("# Daily\n\nChanged");
     await page.locator("#more-menu-toggle").click();
     await page.locator("#close").click();
@@ -340,8 +340,58 @@ test.describe("Phase 4 navigation language and stable status", () => {
     await expect(page.locator("#app-scope-primary")).toHaveText("项目 / Daily");
     await expect(page.locator("#doc-state-badges")).toBeHidden();
     await expect(page.locator("#doc-state-badges")).not.toContainText("未保存");
+    await expect(page.locator("#viewport-width-toggle")).toBeVisible();
+    await expect(page.locator("[data-width-option]")).toHaveCount(3);
+    await expect(page.locator("#width-normal")).toHaveAttribute("aria-checked", "true");
 
-    await page.locator("#mode-source").click();
+    await page.locator("#viewport-width-toggle").click();
+    await expect(page.locator("#viewport-width-popover")).toBeVisible();
+    await expect(page.locator("[data-width-option]")).toHaveText(["窄", "中", "宽"]);
+    await page.locator("#width-wide").click();
+    await expect(page.locator("#viewport-width-popover")).toBeHidden();
+    await expect(page.locator(".app-frame")).toHaveAttribute("data-width", "wide");
+    await expect(page.locator("#width-wide")).toHaveAttribute("aria-checked", "true");
+    await expect(page.locator("#width-normal")).toHaveAttribute("aria-checked", "false");
+    await page.locator("#viewport-width-toggle").click();
+    await expect(page.locator("#viewport-width-popover")).toBeVisible();
+    const widthControlStyle = await page.locator("#width-wide").evaluate((el) => {
+      const style = getComputedStyle(el);
+      const root = getComputedStyle(document.documentElement);
+      const resolveColor = (property: "color" | "backgroundColor", value: string) => {
+        const probe = document.createElement("span");
+        probe.style[property] = value;
+        document.body.appendChild(probe);
+        const resolved = getComputedStyle(probe)[property];
+        probe.remove();
+        return resolved;
+      };
+      return {
+        bg: style.backgroundColor,
+        fg: style.color,
+        tokenBg: resolveColor("backgroundColor", root.getPropertyValue("--nav-active-bg").trim()),
+        tokenFg: resolveColor("color", root.getPropertyValue("--nav-active-fg").trim()),
+      };
+    });
+    expect(widthControlStyle.bg).toBe(widthControlStyle.tokenBg);
+    expect(widthControlStyle.fg).toBe(widthControlStyle.tokenFg);
+    const widthPopoverMetrics = await page.locator("#viewport-width-popover").evaluate((popover) => {
+      const style = getComputedStyle(popover);
+      const optionWidths = Array.from(popover.querySelectorAll<HTMLElement>(".viewport-width-option"))
+        .map((el) => Math.round(el.getBoundingClientRect().width));
+      return {
+        gap: style.columnGap,
+        paddingLeft: style.paddingLeft,
+        paddingRight: style.paddingRight,
+        optionWidths,
+      };
+    });
+    expect(widthPopoverMetrics.gap).toBe("3px");
+    expect(widthPopoverMetrics.paddingLeft).toBe(widthPopoverMetrics.gap);
+    expect(widthPopoverMetrics.paddingRight).toBe(widthPopoverMetrics.gap);
+    expect(new Set(widthPopoverMetrics.optionWidths).size).toBe(1);
+    await page.keyboard.press("Escape");
+
+    await page.locator("#mode-edit").click();
     await page.locator("#markdown").fill("# Daily\n\nChanged");
     await expect(page.locator("#doc-state-badges")).toBeHidden();
     await expect(page.locator("#status")).toHaveText("未保存的修改");
@@ -418,11 +468,10 @@ test.describe("Phase 4 navigation language and stable status", () => {
 
     await expect(page.getByRole("tab", { name: /切换到 Daily/ })).toBeVisible();
     await expect(page.getByRole("button", { name: /关闭标签页：Daily/ })).toBeVisible();
-    await expect(page.locator("#mode-read")).toHaveText("预览");
+    await expect(page.locator("#viewport-width-toggle")).toBeVisible();
+    await expect(page.locator("#mode-read")).toHaveText("阅读");
     await expect(page.locator("#mode-edit")).toHaveText("编辑");
-    await expect(page.locator("#mode-edit")).toHaveAttribute("aria-label", "可视编辑");
-    await expect(page.locator("#mode-source")).toHaveText("MD");
-    await expect(page.locator("#mode-source")).toHaveAttribute("aria-label", "Markdown");
+    await expect(page.locator(`#mode-${"source"}`)).toHaveCount(0);
 
     const metrics = await page.evaluate(() => ({
       bodyOverflow: document.documentElement.scrollWidth - document.documentElement.clientWidth,
@@ -431,12 +480,15 @@ test.describe("Phase 4 navigation language and stable status", () => {
       tabBottom: document.querySelector("#document-tab-strip")?.getBoundingClientRect().bottom || 0,
       commandTop: document.querySelector("#document-command-strip")?.getBoundingClientRect().top || 0,
       commandStripHeight: document.querySelector("#document-command-strip")?.getBoundingClientRect().height || 0,
+      widthToggleWidth: document.querySelector("#viewport-width-toggle")?.getBoundingClientRect().width || 0,
     }));
     expect(metrics.bodyOverflow).toBeLessThanOrEqual(1);
     expect(metrics.tabStripHeight).toBeGreaterThan(0);
     expect(metrics.tabHeight).toBeGreaterThan(0);
     expect(metrics.commandTop).toBeGreaterThanOrEqual(metrics.tabBottom - 1);
     expect(metrics.commandStripHeight).toBeLessThan(160);
+    expect(metrics.widthToggleWidth).toBeGreaterThanOrEqual(28);
+    expect(metrics.widthToggleWidth).toBeLessThanOrEqual(34);
     await capturePhase4Screenshot(page, "phase4-navigation-narrow");
   });
 

@@ -236,7 +236,7 @@ test.describe("Tab session state", () => {
 
     await expect(page.locator(".open-tab")).toHaveCount(2);
     await expect(page.locator("#doc-title")).toHaveText("Beta");
-    await expect(page.locator("#mode-source")).toHaveClass(/active/);
+    await expect(page.locator("#mode-edit")).toHaveClass(/active/);
     await expect.poll(() => page.locator("#markdown").evaluate((el: HTMLTextAreaElement) => ({
       start: el.selectionStart,
       end: el.selectionEnd,
@@ -259,7 +259,7 @@ test.describe("Tab session state", () => {
     await expect.poll(() => page.locator("#reader").evaluate((el: HTMLElement) => el.scrollTop)).toBeGreaterThan(0);
 
     await page.locator(".open-tab", { hasText: "Beta" }).locator(".open-tab-main").click();
-    await expect(page.locator("#mode-source")).toHaveClass(/active/);
+    await expect(page.locator("#mode-edit")).toHaveClass(/active/);
     await expect.poll(() => page.locator("#preview").evaluate((el: HTMLElement) => el.scrollTop)).toBeGreaterThan(0);
     await page.locator(".open-tab", { hasText: "Alpha" }).locator(".open-tab-main").click();
     await page.locator(".open-tab", { hasText: "Beta" }).locator(".open-tab-main").click();
@@ -273,11 +273,20 @@ test.describe("Tab session state", () => {
     await routePath(page, DOC_B_PATH);
 
     await page.locator(".open-tab", { hasText: "Alpha" }).locator(".open-tab-main").click();
+    await expect(page.locator("#doc-title")).toHaveText("Alpha");
     await expect.poll(() => page.evaluate((path) => (
       (window as any).__aimdSessionMock.fingerprintCalls() as string[]
     ).includes(path), DOC_A_PATH)).toBe(true);
-    await page.locator("#mode-source").click();
-    await page.locator("#markdown").fill("# Alpha\n\nUnsaved local copy");
+    await page.locator("#mode-edit").click();
+    await page.locator("#markdown").evaluate((el: HTMLTextAreaElement) => {
+      el.value = "# Alpha\n\nUnsaved local copy";
+      el.dispatchEvent(new InputEvent("input", {
+        bubbles: true,
+        inputType: "insertReplacementText",
+        data: "Unsaved local copy",
+      }));
+    });
+    await expect(page.locator("#markdown")).toHaveValue("# Alpha\n\nUnsaved local copy");
     await page.locator("#markdown").evaluate((el: HTMLTextAreaElement) => {
       el.setSelectionRange(10, 17, "forward");
       el.scrollTop = 55;
@@ -295,7 +304,7 @@ test.describe("Tab session state", () => {
     expect(snapshot.schemaVersion).toBe(2);
     expect(snapshot.tabs).toHaveLength(2);
     const alpha = snapshot.tabs.find((tab: any) => tab.path === DOC_A_PATH);
-    expect(alpha.mode).toBe("source");
+    expect(alpha.mode).toBe("edit");
     expect(alpha.sourceSelection).toMatchObject({ start: 10, end: 17, direction: "forward" });
     expect(alpha.dirtyWorkingCopy).toMatchObject({
       markdown: "# Alpha\n\nUnsaved local copy",
@@ -331,7 +340,7 @@ test.describe("Tab session state", () => {
 
     await expect(page.locator(".open-tab.is-dirty", { hasText: "Alpha" })).toBeVisible();
     await expect(page.locator("#status")).toContainText("磁盘文件已变化");
-    await page.locator("#mode-source").click();
+    await page.locator("#mode-edit").click();
     await expect(page.locator("#markdown")).toHaveValue("# Alpha\n\nUnsaved after disk change");
   });
 
@@ -407,6 +416,7 @@ test.describe("Tab session state", () => {
     };
     await installSessionMock(page, { session, saveAsPath });
     await page.goto("/");
+    await expect(page.locator("#doc-title")).toHaveText("Alpha");
 
     const saveTask = page.evaluate(async () => {
       const { saveDocumentAs } = await import("/src/document/persist.ts");
@@ -421,11 +431,6 @@ test.describe("Tab session state", () => {
       path: DOC_A_PATH,
       savePath: saveAsPath,
     });
-    const activePath = await page.evaluate(async () => {
-      const { state } = await import("/src/core/state.ts");
-      return state.doc?.path || "";
-    });
-    expect(activePath).toBe(saveAsPath);
     await expect(page.locator("#doc-path")).toContainText(saveAsPath);
     await page.evaluate(async () => {
       const { persistSessionSnapshot } = await import("/src/session/snapshot.ts");

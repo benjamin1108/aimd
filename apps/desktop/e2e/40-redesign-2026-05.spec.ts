@@ -139,7 +139,7 @@ test.describe("保存菜单项：干净时灰，脏时亮", () => {
     await installMock(page, { dirty: false });
     await page.goto("/");
     await page.locator("#empty-open").click();
-    await page.locator("#mode-source").click();
+    await page.locator("#mode-edit").click();
     const textarea = page.locator("#markdown");
     await textarea.fill("# 修改后\n");
     await page.locator("#more-menu-toggle").click();
@@ -152,7 +152,7 @@ test.describe("保存菜单项：干净时灰，脏时亮", () => {
     await installMock(page, { dirty: false });
     await page.goto("/");
     await page.locator("#empty-open").click();
-    await page.locator("#mode-source").click();
+    await page.locator("#mode-edit").click();
     await page.locator("#markdown").fill("# 修改后\n");
     await page.locator("#more-menu-toggle").click();
     await page.locator("#save").click();

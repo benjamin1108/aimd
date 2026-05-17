@@ -237,7 +237,7 @@ test.describe("Git workspace panel", () => {
     await expect(page.locator(".toolbar-group--mode")).toBeHidden();
     await expect(page.locator("#mode-read")).toBeHidden();
     await expect(page.locator("#mode-edit")).toBeHidden();
-    await expect(page.locator("#mode-source")).toBeHidden();
+    await expect(page.locator("#mode-edit")).toBeHidden();
     await expect(page.locator("#find-toggle")).toBeEnabled();
     await expect(page.locator("#doc-actions")).toBeHidden();
     await expect(page.locator("#more-menu-toggle")).toBeHidden();

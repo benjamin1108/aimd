@@ -383,6 +383,24 @@ fn unique_asset_name_triple_conflict() {
 }
 
 #[test]
+fn unique_asset_name_uses_portable_package_filename() {
+    let (id, name) = unique_asset_name(None, "/Users/me/图片/报告?版本.png");
+    assert!(
+        id.starts_with("image-"),
+        "unicode-only ids should use hash fallback"
+    );
+    assert_eq!(name, "报告-版本.png");
+
+    let (id, name) = unique_asset_name(None, r#"bad<name>:*".png"#);
+    assert_eq!(id, "bad-name-001");
+    assert_eq!(name, "bad-name.png");
+
+    let (id, name) = unique_asset_name(None, "CON.png");
+    assert_eq!(id, "CON-file-001");
+    assert_eq!(name, "CON-file.png");
+}
+
+#[test]
 fn find_asset_by_hash_hit_and_miss() {
     let tmp = tempfile::tempdir().unwrap();
     let aimd_path = tmp.path().join("doc.aimd");

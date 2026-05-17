@@ -9,7 +9,7 @@ import {
   packageLocalImagesEl, healthCheckEl, webImportEl, exportMarkdownEl, exportHtmlEl, exportPdfEl,
   formatDocumentEl,
   globalNewProjectAimdEl, globalNewProjectMarkdownEl, findToggleEl,
-  modeReadEl, modeEditEl, modeSourceEl, docToolbarEl,
+  modeReadEl, modeEditEl, docToolbarEl,
 } from "../core/dom";
 import type { AimdAsset, AimdDocument } from "../core/types";
 import { fileStem, extractHeadingTitle } from "../util/path";
@@ -219,7 +219,6 @@ export function updateChrome() {
   saveLabelEl().textContent = "保存";
   modeReadEl().disabled = !doc || inDiffView;
   modeEditEl().disabled = !doc || inDiffView;
-  modeSourceEl().disabled = !doc || inDiffView;
 
   if (!doc) {
     assetSectionEl().hidden = true;

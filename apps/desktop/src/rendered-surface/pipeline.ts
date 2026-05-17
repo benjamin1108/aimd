@@ -1,5 +1,4 @@
 import type { OutlineNode } from "../core/types";
-import { annotateSourceBlocks } from "../editor/source-preserve";
 import {
   hydrateRenderedSurfaceImages,
   stripRenderedFrontmatter,
@@ -22,7 +21,6 @@ export function paintRenderedSurface(
   surfaceCleanups.get(root)?.();
   surfaceCleanups.delete(root);
 
-  root.contentEditable = String(profile.contentEditable);
   root.dataset.renderedSurface = profile.kind;
   root.innerHTML = profile.stripFrontmatter
     ? stripRenderedFrontmatter(renderedHtml)
@@ -30,9 +28,6 @@ export function paintRenderedSurface(
 
   tagAssetImages(root, context.assets);
   prepareRenderedSurfaceInteractions(root, profile, context.callbacks);
-  if (profile.sourceAnnotations && context.sourceModel) {
-    annotateSourceBlocks(root, context.sourceModel);
-  }
 
   const cleanup = bindRenderedSurfaceInteractions(root, profile, context.callbacks);
   surfaceCleanups.set(root, cleanup);

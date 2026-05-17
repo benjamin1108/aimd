@@ -28,7 +28,7 @@ export function isNativeFormTarget(target: EventTarget | null): boolean {
 
 export function isEditableTarget(target: EventTarget | null): boolean {
   const element = elementFromTarget(target);
-  return Boolean(element?.closest("input, textarea, select, [contenteditable='true']"));
+  return Boolean(element?.closest("input, textarea, select"));
 }
 
 export function selectElementContents(element: HTMLElement): boolean {
@@ -106,20 +106,14 @@ function mainSelectAllRoot(): HTMLElement | HTMLTextAreaElement | null {
     return visibleById("git-diff-scroll") || visibleById("git-diff-content");
   }
 
-  const inlineEditor = visibleById("inline-editor");
-  if (inlineEditor && (document.activeElement === inlineEditor || selectionInside(inlineEditor))) {
-    return inlineEditor;
-  }
-
   if (lastSelectableRoot && isVisible(lastSelectableRoot)) {
     if (lastSelectableRoot.id === "git-diff-scroll" || lastSelectableRoot.id === "git-diff-content") return lastSelectableRoot;
-    if (lastSelectableRoot.closest("#reader, #inline-editor, #preview, #format-preview-text, #health-list, .debug-list")) {
+    if (lastSelectableRoot.closest("#reader, #preview, #format-preview-text, #health-list, .debug-list")) {
       return lastSelectableRoot;
     }
   }
 
-  if (state.mode === "source") return visibleById<HTMLTextAreaElement>("markdown");
-  if (state.mode === "edit") return visibleById("inline-editor");
+  if (state.mode === "edit") return visibleById<HTMLTextAreaElement>("markdown");
   return visibleById("reader");
 }
 
@@ -130,7 +124,7 @@ function selectRoot(root: HTMLElement | HTMLTextAreaElement | null): boolean {
 }
 
 function renderedSurfaceRoot(target: HTMLElement | null): HTMLElement | null {
-  return target?.closest<HTMLElement>("#reader, #inline-editor, #preview") || null;
+  return target?.closest<HTMLElement>("#reader, #preview") || null;
 }
 
 function selectableBlock(target: HTMLElement | null, root: HTMLElement): HTMLElement | null {
@@ -273,7 +267,7 @@ export function bindSelectionBoundary(context: SelectAllContext = "main") {
   document.addEventListener("pointerdown", (event) => {
     const target = elementFromTarget(event.target);
     lastSelectableRoot = target?.closest<HTMLElement>(
-      "#reader, #inline-editor, #git-diff-scroll, #preview, #format-preview-text, #health-list, .debug-list",
+      "#reader, #git-diff-scroll, #preview, #format-preview-text, #health-list, .debug-list",
     ) || null;
   }, { capture: true });
 }

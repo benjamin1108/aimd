@@ -1,6 +1,5 @@
 import { state } from "../core/state";
 import {
-  inlineEditorEl,
   markdownEl,
   previewEl,
   readerEl,
@@ -9,8 +8,7 @@ import type { Mode } from "../core/types";
 import { activeTab } from "./open-document-state";
 
 function paneFor(mode: Mode): HTMLElement {
-  if (mode === "edit") return inlineEditorEl();
-  if (mode === "source") return previewEl();
+  if (mode === "edit") return previewEl();
   return readerEl();
 }
 
@@ -19,8 +17,7 @@ export function captureActiveViewState() {
   if (!tab) return;
   tab.mode = state.mode;
   tab.scroll.read = readerEl().scrollTop;
-  tab.scroll.edit = inlineEditorEl().scrollTop;
-  tab.scroll.source = previewEl().scrollTop;
+  tab.scroll.edit = previewEl().scrollTop;
   tab.sourceSelection = {
     start: markdownEl().selectionStart ?? 0,
     end: markdownEl().selectionEnd ?? 0,
@@ -39,7 +36,7 @@ export function restoreActiveViewState(mode = state.mode) {
     if (!current || current.id !== tabId) return;
     paneFor(mode).scrollTop = scroll[mode] || 0;
     current.scroll[mode] = scroll[mode] || 0;
-    if (mode === "source") {
+    if (mode === "edit") {
       markdownEl().setSelectionRange(selection.start, selection.end, selection.direction);
       current.sourceSelection = selection;
     }

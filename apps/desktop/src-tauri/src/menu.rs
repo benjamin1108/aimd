@@ -19,10 +19,6 @@ pub const MENU_EVENT_IDS: &[&str] = &[
     "close-document",
     "mode-read",
     "mode-edit",
-    "mode-source",
-    "width-normal",
-    "width-wide",
-    "width-ultra",
 ];
 
 pub fn build_app_menu<M: Manager<tauri::Wry>>(
@@ -80,11 +76,6 @@ pub fn build_app_menu<M: Manager<tauri::Wry>>(
     let view_menu = SubmenuBuilder::new(manager, "视图")
         .text("mode-read", "阅读")
         .text("mode-edit", "编辑")
-        .text("mode-source", "源码")
-        .separator()
-        .text("width-normal", "常规宽度")
-        .text("width-wide", "加宽")
-        .text("width-ultra", "超宽")
         .build()?;
     MenuBuilder::new(manager)
         .items(&[&app_menu, &file_menu, &edit_menu, &view_menu])

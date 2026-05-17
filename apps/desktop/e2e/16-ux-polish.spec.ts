@@ -253,7 +253,7 @@ test.describe("3. Context menu is prevented (production mode)", () => {
     await installTauriMockWithContextmenuForce(page);
     await page.goto("/");
     await page.locator("#empty-open").click();
-    await page.locator("#mode-source").click();
+    await page.locator("#mode-edit").click();
 
     const result = await page.evaluate(() => {
       function fire(target: Element) {
@@ -328,6 +328,7 @@ test.describe("4. Text selectability", () => {
 
     // Switch to edit mode to make the format toolbar visible
     await page.locator("#mode-edit").click();
+    await page.locator("#markdown").focus();
     await expect(page.locator("#format-toolbar")).toBeVisible();
 
     const userSelectValue = await page.evaluate(() => {
@@ -490,7 +491,7 @@ test.describe("5. Image lightbox in read mode", () => {
     await page.locator("#empty-open").click();
     await page.locator("#mode-edit").click();
 
-    // Simulate a click on an img inside hidden #reader; the active visual-editor
+    // Simulate a click on an img inside hidden #reader; the active preview
     // surface has its own lightbox behavior, but hidden surfaces must stay inert.
     await page.evaluate(() => {
       const img = document.createElement("img");

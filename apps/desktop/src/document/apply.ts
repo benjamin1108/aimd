@@ -6,7 +6,6 @@ import { setMode } from "../ui/mode";
 import { updateChrome } from "../ui/chrome";
 import { renderDocPanelTabs } from "../ui/doc-panel";
 import { refreshSourceHighlight } from "../editor/source-highlight";
-import { flushInline } from "../editor/inline";
 import {
   activeTab,
   addTabAndBind,
@@ -31,7 +30,7 @@ export function paintActiveDocument(mode: Mode) {
     ? { scroll: { ...tab.scroll }, sourceSelection: { ...tab.sourceSelection } }
     : null;
   markdownEl().value = state.doc.markdown;
-  if (mode === "source") refreshSourceHighlight();
+  if (mode === "edit") refreshSourceHighlight();
   if (tab) {
     tab.outline = tab.outline.length ? tab.outline : extractOutlineFromHTML(state.doc.html);
     state.outline = tab.outline;
@@ -80,10 +79,6 @@ export async function activateDocumentTab(tabId: string): Promise<boolean> {
     syncActiveTabFromFacade();
     updateChrome();
     return true;
-  }
-  if (state.mode === "edit" && state.inlineDirty) {
-    const flushed = flushInline();
-    if (!flushed.ok) return false;
   }
   captureActiveViewState();
   syncActiveTabFromFacade();

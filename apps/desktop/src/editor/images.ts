@@ -1,14 +1,11 @@
 import { invoke } from "@tauri-apps/api/core";
 import { state } from "../core/state";
-import { inlineEditorEl } from "../core/dom";
 import type { AddedAsset } from "../core/types";
 import { setStatus } from "../ui/chrome";
 import { updateChrome } from "../ui/chrome";
-import { applyHTML, scheduleRender } from "../ui/outline";
 import { normalizeAssets } from "../document/apply";
 import { ensureDraftPackage } from "../document/drafts";
-import { commitMarkdownChange } from "../document/markdown-mutation";
-import { insertAtCursor } from "./inline";
+import { insertMarkdownAtSelection } from "./textarea";
 
 export const IMG_COMPRESS_MAX_SIDE = 2560;
 export const IMG_COMPRESS_THRESHOLD = 300 * 1024;
@@ -76,56 +73,6 @@ export function normalizeAddedAsset(added: AddedAsset): AddedAsset {
   };
 }
 
-export function buildAssetImage(added: AddedAsset): HTMLImageElement {
-  const img = document.createElement("img");
-  img.src = added.asset.url || "";
-  img.alt = added.asset.id;
-  img.dataset.assetId = added.asset.id;
-  return img;
-}
-
-export function insertImageInline(added: AddedAsset, emitInput = true) {
-  inlineEditorEl().focus();
-  const sel = document.getSelection();
-  if (!sel || sel.rangeCount === 0) {
-    inlineEditorEl().appendChild(buildAssetImage(added));
-    return;
-  }
-  const range = sel.getRangeAt(0);
-  range.deleteContents();
-  const figure = buildAssetImage(added);
-  range.insertNode(figure);
-  // Move caret after the inserted image
-  range.setStartAfter(figure);
-  range.collapse(true);
-  sel.removeAllRanges();
-  sel.addRange(range);
-  if (emitInput) inlineEditorEl().dispatchEvent(new Event("input"));
-}
-
-function markdownWithInsertedImage(markdown: string, imageMarkdown: string): string {
-  const model = state.sourceModel?.markdown === markdown ? state.sourceModel : null;
-  const anchor = window.getSelection()?.anchorNode;
-  const anchorElement = anchor instanceof HTMLElement ? anchor : anchor?.parentElement;
-  const sourceRef = anchorElement?.closest<HTMLElement>("[data-md-source-ref]")?.dataset.mdSourceRef || "";
-  const blockId = sourceRef.split(":")[0];
-  const block = model?.blocks.find((candidate) => candidate.id === blockId);
-  const insertAt = block?.end ?? markdown.length;
-  const before = markdown.slice(0, insertAt).replace(/\s*$/, "");
-  const after = markdown.slice(insertAt).replace(/^\s*/, "");
-  return after
-    ? `${before}\n\n${imageMarkdown.trim()}\n\n${after}`
-    : `${before}\n\n${imageMarkdown.trim()}\n`;
-}
-
-export function applyVisualEditorHTMLAsCurrent() {
-  if (!state.doc) return;
-  const template = document.createElement("template");
-  template.innerHTML = state.doc.html || "";
-  const frontmatter = template.content.querySelector<HTMLElement>(".aimd-frontmatter")?.outerHTML || "";
-  applyHTML(`${frontmatter}${inlineEditorEl().innerHTML}`);
-}
-
 export async function insertImage() {
   if (!state.doc) return;
   const imagePath = await invoke<string | null>("choose_image_file");
@@ -149,35 +96,14 @@ export async function insertImage() {
       filename: compressed.filename,
       data: Array.from(compressed.data),
     }));
-    if (state.mode === "edit") {
-      state.doc.assets = [...state.doc.assets, added.asset];
-      commitMarkdownChange({
-        markdown: markdownWithInsertedImage(state.doc.markdown, added.markdown),
-        origin: "insert-image",
-        updateSourceTextarea: true,
-        scheduleRender: false,
-      });
-      insertImageInline(added, false);
-      state.inlineDirty = false;
-      applyVisualEditorHTMLAsCurrent();
-    } else if (state.mode === "source") {
-      insertAtCursor(`${added.markdown}\n`);
-    } else {
-      state.doc.assets = [...state.doc.assets, added.asset];
-      commitMarkdownChange({
-        markdown: `${state.doc.markdown}\n${added.markdown}\n`,
-        origin: "insert-image",
-        updateSourceTextarea: true,
-      });
-    }
-    if (state.mode === "source") state.doc.assets = [...state.doc.assets, added.asset];
+    state.doc.assets = [...state.doc.assets, added.asset];
+    insertMarkdownAtSelection(`${added.markdown}\n`);
     state.doc.dirty = true;
     if (state.doc.format === "markdown") {
       state.doc.requiresAimdSave = true;
       state.doc.needsAimdSave = true;
     }
     updateChrome();
-    if (state.mode === "source") scheduleRender();
     setStatus(
       state.doc.format === "markdown"
         ? "图片已加入，保存时需转换为 AIMD"

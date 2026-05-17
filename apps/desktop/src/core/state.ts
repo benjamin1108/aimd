@@ -3,8 +3,8 @@ import type {
   GitFileDiff,
   GitDiffTab,
   GitRepoStatus,
+  EditPaneOrder,
   MainView,
-  MarkdownSourceModel,
   Mode,
   OpenDocumentsState,
   OutlineNode,
@@ -40,7 +40,9 @@ export const ICONS = {
   read: `<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12.5V4a1 1 0 0 1 1.2-1l4.3 1 4.3-1A1 1 0 0 1 13 4v8.5"/><path d="M7.5 4v9"/></svg>`,
   edit: `<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"><path d="M11.2 2.5 13.5 4.8 5.4 12.9l-3 .7.7-3z"/><path d="m10.2 3.5 2.3 2.3"/></svg>`,
   source: `<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"><path d="m5.5 4-3 4 3 4M10.5 4l3 4-3 4"/></svg>`,
+  swapPanes: `<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.45" stroke-linecap="round" stroke-linejoin="round"><path d="M3 5.5h8.8M9.5 3.2l2.3 2.3-2.3 2.3M13 10.5H4.2M6.5 8.2l-2.3 2.3 2.3 2.3"/></svg>`,
   search: `<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.45" stroke-linecap="round" stroke-linejoin="round"><circle cx="7.1" cy="7.1" r="3.75"/><path d="m10 10 3.05 3.05"/></svg>`,
+  viewportWidth: `<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.45" stroke-linecap="round" stroke-linejoin="round"><rect x="2.6" y="3.2" width="10.8" height="9.6" rx="1.5"/><path d="M5.4 6.1h5.2M4.4 8h7.2M5.4 9.9h5.2"/></svg>`,
   save: `<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3.5v9a1 1 0 0 0 1 1h8a1 1 0 0 0 1-1V5.5L11 3H4a1 1 0 0 0-1 .5z"/><path d="M5 3.5V7h6V3.5M5 13.5V10h6v3.5"/></svg>`,
   close: `<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><path d="m4 4 8 8M12 4 4 12"/></svg>`,
   play: `<svg viewBox="0 0 16 16" fill="none"><path d="M5 3.7v8.6a.8.8 0 0 0 1.2.7l6.5-4.3a.8.8 0 0 0 0-1.4L6.2 3A.8.8 0 0 0 5 3.7Z" fill="currentColor"/></svg>`,
@@ -70,7 +72,6 @@ export const state: {
   openDocuments: OpenDocumentsState;
   mainView: MainView;
   mode: Mode;
-  flushTimer: number | null;
   statusTimer: number | null;
   statusOverride: {
     text: string;
@@ -84,6 +85,7 @@ export const state: {
   pendingRenderVersion: number | null;
   renderErrorVersion: number | null;
   paintedVersion: Record<Mode, number>;
+  editPaneOrder: EditPaneOrder;
   recentPaths: string[];
   workspace: WorkspaceRoot | null;
   workspaceExpanded: Set<string>;
@@ -109,10 +111,6 @@ export const state: {
     selectedPath: string;
   };
   uiSettings: UiSettings;
-  inlineDirty: boolean;
-  sourceModel: MarkdownSourceModel | null;
-  sourceDirtyRefs: Set<string>;
-  sourceStructuralDirty: boolean;
   isBootstrappingSession: boolean;
 } = {
   doc: null,
@@ -122,11 +120,10 @@ export const state: {
   },
   mainView: "document",
   mode: "read",
-  flushTimer: null,
   statusTimer: null,
   statusOverride: null,
   outline: [],
-  // Bumped every time state.doc.html changes (applyHTML, flushInline-with-md-change).
+  // Bumped every time state.doc.html changes.
   // paintedVersion tracks which version each pane's DOM currently shows; setMode
   // only re-paints a pane when its painted version trails htmlVersion. Without
   // this, mode hops on a long doc rebuild innerHTML for the destination pane
@@ -136,7 +133,8 @@ export const state: {
   htmlMarkdownVersion: 0,
   pendingRenderVersion: null,
   renderErrorVersion: null,
-  paintedVersion: { read: -1, edit: -1, source: -1 },
+  paintedVersion: { read: -1, edit: -1 },
+  editPaneOrder: "source-first",
   recentPaths: [],
   workspace: null,
   workspaceExpanded: new Set(),
@@ -162,12 +160,5 @@ export const state: {
     selectedPath: "",
   },
   uiSettings: { debugMode: false, theme: "system" },
-  // Tracks whether the inline editor's DOM has been mutated by user input since
-  // the last flush / paint. flushInline skips source patching when false — this
-  // is what keeps mode hops snappy on long documents.
-  inlineDirty: false,
-  sourceModel: null,
-  sourceDirtyRefs: new Set(),
-  sourceStructuralDirty: false,
   isBootstrappingSession: false,
 };

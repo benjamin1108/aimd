@@ -108,14 +108,13 @@ test.describe("Narrow viewport (< 760px) layout", () => {
     expect(stripHeight).toBeLessThan(120);
   });
 
-  test("source-mode preview pane only collapses below 760px", async ({ page }) => {
-    // ux-product-audit P2-3：原来 900px 就直接隐藏预览，桌面窄窗口编辑 markdown
-    // 时没有渲染反馈。新规则只在 mobile 760 以下折叠，900 仍保留双栏。
+  test("edit-mode preview pane stays visible at 880px", async ({ page }) => {
+    // Markdown 编辑面板在窄桌面仍保留源码和预览，避免编辑时失去渲染反馈。
     await page.setViewportSize({ width: 880, height: 800 });
     await installTauriMock(page);
     await page.goto("/");
     await page.locator("#empty-open").click();
-    await page.locator("#mode-source").click();
+    await page.locator("#mode-edit").click();
     await expect(page.locator("#editor-wrap")).toBeVisible();
 
     const previewVisible = await page.locator(".preview-pane").evaluate(
@@ -124,17 +123,22 @@ test.describe("Narrow viewport (< 760px) layout", () => {
     expect(previewVisible).toBe(true);
   });
 
-  test("at 700px the preview pane finally collapses", async ({ page }) => {
+  test("at 700px the edit panel stacks source and preview vertically", async ({ page }) => {
     await page.setViewportSize({ width: 700, height: 800 });
     await installTauriMock(page);
     await page.goto("/");
     await page.locator("#empty-open").click();
-    await page.locator("#mode-source").click();
+    await page.locator("#mode-edit").click();
     await expect(page.locator("#editor-wrap")).toBeVisible();
 
     const previewDisplay = await page.locator(".preview-pane").evaluate(
       (el) => window.getComputedStyle(el).display,
     );
-    expect(previewDisplay).toBe("none");
+    expect(previewDisplay).toBe("flex");
+
+    const splitColumns = await page.locator("#editor-wrap").evaluate(
+      (el) => window.getComputedStyle(el).gridTemplateColumns.trim().split(/\s+/),
+    );
+    expect(splitColumns).toHaveLength(1);
   });
 });

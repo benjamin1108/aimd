@@ -1,7 +1,6 @@
 import { state } from "../core/state";
 import { markdownEl } from "../core/dom";
 import type { OpenDocumentTab } from "../core/types";
-import { createSourceModel } from "../editor/source-preserve";
 import { updateChrome } from "../ui/chrome";
 import { scheduleRender } from "../ui/outline";
 import { hasAimdImageReferences, hasExternalImageReferences } from "./assets";
@@ -15,12 +14,11 @@ import {
 
 export type MarkdownMutationOrigin =
   | "source-input"
-  | "visual-flush"
   | "task-toggle"
   | "image-alt"
   | "format-toolbar"
   | "paste-image"
-  | "visual-paste"
+  | "paste-markdown"
   | "insert-image"
   | "format-apply"
   | "save-canonical"
@@ -33,8 +31,6 @@ export type CommitMarkdownChangeOptions = {
   origin: MarkdownMutationOrigin;
   dirty?: boolean;
   updateSourceTextarea?: boolean;
-  rebuildSourceModel?: boolean;
-  clearSourceDirty?: boolean;
   scheduleRender?: boolean;
   renderImmediately?: boolean;
 };
@@ -61,14 +57,6 @@ export function commitMarkdownChange(options: CommitMarkdownChangeOptions): Open
     tab.pendingRenderVersion = null;
     tab.renderErrorVersion = null;
   }
-  if (options.rebuildSourceModel !== false) {
-    tab.sourceModel = createSourceModel(next);
-  }
-  if (options.clearSourceDirty !== false) {
-    tab.sourceDirtyRefs.clear();
-    tab.sourceStructuralDirty = false;
-  }
-
   const isActive = state.openDocuments.activeTabId === tab.id;
   if (isActive) {
     bindFacadeFromTab(tab);

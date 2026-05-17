@@ -31,7 +31,6 @@ svg {
 }
 
 #reader,
-#inline-editor,
 #markdown,
 #markdown-highlight,
 #preview,
@@ -48,7 +47,6 @@ svg {
 input,
 textarea,
 select,
-[contenteditable="true"],
 [data-select-all-scope],
 [data-selectable],
 code,
@@ -59,8 +57,7 @@ pre {
 
 input,
 textarea,
-select,
-[contenteditable="true"] {
+select {
   -webkit-user-select: text;
   user-select: text;
 }

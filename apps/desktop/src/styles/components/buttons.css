@@ -191,7 +191,9 @@
 .recent-item:focus-visible,
 .outline-item:focus-visible,
 .ft-btn:focus-visible,
-.icon-btn:focus-visible {
+.icon-btn:focus-visible,
+.viewport-width-toggle:focus-visible,
+.viewport-width-option:focus-visible {
   outline: 2px solid var(--hairline-focus);
   outline-offset: 2px;
 }

@@ -112,12 +112,14 @@ function resolveMarkdownImageFilePath(basePath: string, src: string): string {
 }
 
 function imageMimeByPath(path: string): string {
-  const lower = path.toLowerCase().split(/[?#]/, 1)[0];
-  if (lower.endsWith(".jpg") || lower.endsWith(".jpeg")) return "image/jpeg";
-  if (lower.endsWith(".gif")) return "image/gif";
-  if (lower.endsWith(".webp")) return "image/webp";
-  if (lower.endsWith(".svg")) return "image/svg+xml";
-  if (lower.endsWith(".avif")) return "image/avif";
+  const lower = path.toLowerCase();
+  const filename = lower.split(/[\\/]/).pop() || lower;
+  const candidates = [filename, filename.split(/[?#]/, 1)[0]];
+  if (candidates.some((name) => name.endsWith(".jpg") || name.endsWith(".jpeg"))) return "image/jpeg";
+  if (candidates.some((name) => name.endsWith(".gif"))) return "image/gif";
+  if (candidates.some((name) => name.endsWith(".webp"))) return "image/webp";
+  if (candidates.some((name) => name.endsWith(".svg"))) return "image/svg+xml";
+  if (candidates.some((name) => name.endsWith(".avif"))) return "image/avif";
   return "image/png";
 }
 
@@ -161,8 +163,12 @@ export function rewriteMarkdownLocalImageURLs(html: string, markdownPath: string
     ) return;
     const { suffix } = splitURLSuffix(src);
     const localPath = resolveMarkdownImagePath(markdownPath, src);
+    const literalLocalPath = suffix ? resolveMarkdownImageFilePath(markdownPath, src) : "";
     img.dataset.aimdMarkdownSrc = src;
     img.dataset.aimdLocalImagePath = localPath;
+    if (literalLocalPath && literalLocalPath !== localPath) {
+      img.dataset.aimdLocalImageLiteralPath = literalLocalPath;
+    }
     img.dataset.aimdLocalImageSuffix = suffix;
     img.src = filePathToAssetURL(localPath) + suffix;
   });
@@ -206,9 +212,16 @@ export async function hydrateMarkdownLocalImages(container: HTMLElement) {
   await Promise.all(images.map(async (img) => {
     const imagePath = img.dataset.aimdLocalImagePath || "";
     if (!imagePath) return;
-    const objectURL = await loadLocalImageObjectURL(imagePath);
+    let objectURL = await loadLocalImageObjectURL(imagePath);
+    let suffix = img.dataset.aimdLocalImageSuffix || "";
+    const literalPath = img.dataset.aimdLocalImageLiteralPath || "";
+    if (!objectURL && literalPath) {
+      objectURL = await loadLocalImageObjectURL(literalPath);
+      suffix = "";
+      if (objectURL) img.dataset.aimdLocalImagePath = literalPath;
+    }
     if (objectURL) {
-      img.src = objectURL + (img.dataset.aimdLocalImageSuffix || "");
+      img.src = objectURL + suffix;
     }
   }));
 }

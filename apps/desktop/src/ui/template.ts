@@ -71,54 +71,71 @@ ${APP_TOPBAR_HTML}
           <div class="doc-toolbar" id="doc-toolbar">
             <div class="format-toolbar" id="format-toolbar" hidden>
               <div class="ft-group">
-                <button class="ft-btn" data-cmd="bold" type="button" title="粗体 (⌘B)">${ICONS.bold}</button>
-                <button class="ft-btn" data-cmd="italic" type="button" title="斜体 (⌘I)">${ICONS.italic}</button>
-                <button class="ft-btn" data-cmd="strike" type="button" title="删除线">${ICONS.strike}</button>
+                <button class="ft-btn" data-cmd="bold" data-tooltip="粗体 (⌘B)" type="button" aria-label="粗体">${ICONS.bold}</button>
+                <button class="ft-btn" data-cmd="italic" data-tooltip="斜体 (⌘I)" type="button" aria-label="斜体">${ICONS.italic}</button>
+                <button class="ft-btn" data-cmd="strike" data-tooltip="删除线" type="button" aria-label="删除线">${ICONS.strike}</button>
               </div>
-              <span class="ft-sep" role="separator" aria-orientation="vertical" title="拖动浏览工具"></span>
+              <span class="ft-sep" role="separator" aria-orientation="vertical"></span>
               <div class="ft-group">
-                <button class="ft-btn" data-cmd="h1" type="button" title="标题 1">${ICONS.h1}</button>
-                <button class="ft-btn" data-cmd="h2" type="button" title="标题 2">${ICONS.h2}</button>
-                <button class="ft-btn" data-cmd="h3" type="button" title="标题 3">${ICONS.h3}</button>
-                <button class="ft-btn ft-btn--text" data-cmd="paragraph" type="button" title="正文">正文</button>
+                <button class="ft-btn" data-cmd="h1" data-tooltip="标题 1" type="button" aria-label="标题 1">${ICONS.h1}</button>
+                <button class="ft-btn" data-cmd="h2" data-tooltip="标题 2" type="button" aria-label="标题 2">${ICONS.h2}</button>
+                <button class="ft-btn" data-cmd="h3" data-tooltip="标题 3" type="button" aria-label="标题 3">${ICONS.h3}</button>
+                <button class="ft-btn ft-btn--text" data-cmd="paragraph" type="button">正文</button>
               </div>
-              <span class="ft-sep" role="separator" aria-orientation="vertical" title="拖动浏览工具"></span>
+              <span class="ft-sep" role="separator" aria-orientation="vertical"></span>
               <div class="ft-group">
-                <button class="ft-btn" data-cmd="ul" type="button" title="无序列表">${ICONS.ul}</button>
-                <button class="ft-btn" data-cmd="ol" type="button" title="有序列表">${ICONS.ol}</button>
-                <button class="ft-btn" data-cmd="quote" type="button" title="引用">${ICONS.quote}</button>
+                <button class="ft-btn" data-cmd="ul" data-tooltip="无序列表" type="button" aria-label="无序列表">${ICONS.ul}</button>
+                <button class="ft-btn" data-cmd="ol" data-tooltip="有序列表" type="button" aria-label="有序列表">${ICONS.ol}</button>
+                <button class="ft-btn" data-cmd="quote" data-tooltip="引用" type="button" aria-label="引用">${ICONS.quote}</button>
               </div>
-              <span class="ft-sep" role="separator" aria-orientation="vertical" title="拖动浏览工具"></span>
+              <span class="ft-sep" role="separator" aria-orientation="vertical"></span>
               <div class="ft-group">
-                <button class="ft-btn" data-cmd="code" type="button" title="行内代码">${ICONS.code}</button>
-                <button class="ft-btn" data-cmd="codeblock" type="button" title="代码块">${ICONS.source}</button>
-                <button class="ft-btn" data-cmd="table" type="button" title="插入表格">${ICONS.table}</button>
-                <button class="ft-btn" data-cmd="task" type="button" title="任务列表">${ICONS.check}</button>
-                <button class="ft-btn" data-cmd="link" type="button" title="链接">${ICONS.link}</button>
-                <button class="ft-btn" data-cmd="image" type="button" title="插入图片">${ICONS.image}</button>
-                <button class="ft-btn ft-btn--text" data-cmd="image-alt" type="button" title="图片 alt">Alt</button>
+                <button class="ft-btn" data-cmd="code" data-tooltip="行内代码" type="button" aria-label="行内代码">${ICONS.code}</button>
+                <button class="ft-btn" data-cmd="codeblock" data-tooltip="代码块" type="button" aria-label="代码块">${ICONS.source}</button>
+                <button class="ft-btn" data-cmd="table" data-tooltip="插入表格" type="button" aria-label="插入表格">${ICONS.table}</button>
+                <button class="ft-btn" data-cmd="task" data-tooltip="任务列表" type="button" aria-label="任务列表">${ICONS.check}</button>
+                <button class="ft-btn" data-cmd="link" data-tooltip="链接" type="button" aria-label="链接">${ICONS.link}</button>
+                <button class="ft-btn" data-cmd="image" data-tooltip="插入图片" type="button" aria-label="插入图片">${ICONS.image}</button>
+                <button class="ft-btn ft-btn--text" data-cmd="image-alt" data-tooltip="编辑图片描述" type="button" aria-label="编辑图片描述">描述</button>
               </div>
             </div>
 
-            <div class="find-cluster">
-              <button id="find-toggle" class="ghost-btn icon-only command-find-btn" type="button" aria-label="查找" title="查找" aria-controls="find-bar" aria-expanded="false" disabled>
-                <span class="secondary-btn-icon">${ICONS.search}</span>
-              </button>
+            <div class="command-icon-cluster" aria-label="文档视图工具">
+              <div id="mode-tool-slot" class="mode-tool-slot">
+                <button id="edit-pane-swap" class="ghost-btn icon-only edit-pane-swap-btn" type="button" aria-label="对调源码与预览" aria-hidden="true" data-visible="false" hidden disabled>${ICONS.swapPanes}</button>
 
-              <div id="find-bar" class="find-bar" role="search" hidden>
-                <div class="find-row">
-                  <span class="find-bar-icon" aria-hidden="true">${ICONS.search}</span>
-                  <input id="find-input" class="find-input" type="search" placeholder="查找" autocomplete="off" />
-                  <span id="find-count" class="find-count">0/0</span>
-                  <span class="find-nav" aria-hidden="true"></span>
-                  <button id="find-prev" class="find-icon-btn" type="button" title="上一个" aria-label="上一个">${ICONS.chevronUp}</button>
-                  <button id="find-next" class="find-icon-btn" type="button" title="下一个" aria-label="下一个">${ICONS.chevronDown}</button>
-                  <button id="find-close" class="find-icon-btn find-close-btn" type="button" title="关闭" aria-label="关闭">${ICONS.close}</button>
+                <div id="viewport-width-cluster" class="viewport-width-cluster" hidden>
+                  <button id="viewport-width-toggle" class="ghost-btn icon-only viewport-width-toggle" type="button" title="视口宽度" aria-label="视口宽度" aria-controls="viewport-width-popover" aria-expanded="false" disabled>
+                    <span class="secondary-btn-icon">${ICONS.viewportWidth}</span>
+                  </button>
+                  <div id="viewport-width-popover" class="viewport-width-popover" role="radiogroup" aria-label="选择文档视口宽度" hidden>
+                    <button id="width-normal" class="viewport-width-option" data-width-option="normal" type="button" role="radio" aria-checked="true">窄</button>
+                    <button id="width-wide" class="viewport-width-option" data-width-option="wide" type="button" role="radio" aria-checked="false">中</button>
+                    <button id="width-ultra" class="viewport-width-option" data-width-option="ultra" type="button" role="radio" aria-checked="false">宽</button>
+                  </div>
                 </div>
-                <div class="find-replace-group" hidden>
-                  <input id="replace-input" class="find-input replace-input" type="text" placeholder="替换" autocomplete="off" />
-                  <button id="replace-one" class="find-text-btn" type="button">替换</button>
-                  <button id="replace-all" class="find-text-btn" type="button">全部</button>
+              </div>
+
+              <div class="find-cluster">
+                <button id="find-toggle" class="ghost-btn icon-only command-find-btn" type="button" aria-label="查找" title="查找" aria-controls="find-bar" aria-expanded="false" disabled>
+                  <span class="secondary-btn-icon">${ICONS.search}</span>
+                </button>
+
+                <div id="find-bar" class="find-bar" role="search" hidden>
+                  <div class="find-row">
+                    <span class="find-bar-icon" aria-hidden="true">${ICONS.search}</span>
+                    <input id="find-input" class="find-input" type="search" placeholder="查找" autocomplete="off" />
+                    <span id="find-count" class="find-count">0/0</span>
+                    <span class="find-nav" aria-hidden="true"></span>
+                    <button id="find-prev" class="find-icon-btn" type="button" title="上一个" aria-label="上一个">${ICONS.chevronUp}</button>
+                    <button id="find-next" class="find-icon-btn" type="button" title="下一个" aria-label="下一个">${ICONS.chevronDown}</button>
+                    <button id="find-close" class="find-icon-btn find-close-btn" type="button" title="关闭" aria-label="关闭">${ICONS.close}</button>
+                  </div>
+                  <div class="find-replace-group" hidden>
+                    <input id="replace-input" class="find-input replace-input" type="text" placeholder="替换" autocomplete="off" />
+                    <button id="replace-one" class="find-text-btn" type="button">替换</button>
+                    <button id="replace-all" class="find-text-btn" type="button">全部</button>
+                  </div>
                 </div>
               </div>
             </div>
@@ -126,13 +143,10 @@ ${APP_TOPBAR_HTML}
             <div class="toolbar-group toolbar-group--mode">
               <div class="mode-switch" role="tablist">
                 <button id="mode-read" class="mode-btn" role="tab" aria-selected="true" type="button" disabled>
-                  <span>预览</span>
+                  <span>阅读</span>
                 </button>
-                <button id="mode-edit" class="mode-btn" role="tab" aria-selected="false" type="button" title="可视编辑" aria-label="可视编辑" disabled>
+                <button id="mode-edit" class="mode-btn" role="tab" aria-selected="false" type="button" disabled>
                   <span>编辑</span>
-                </button>
-                <button id="mode-source" class="mode-btn" role="tab" aria-selected="false" type="button" title="Markdown" aria-label="Markdown" disabled>
-                  <span>MD</span>
                 </button>
               </div>
             </div>
@@ -208,13 +222,15 @@ ${APP_TOPBAR_HTML}
         </div>
 
         <div id="image-alt-popover" class="link-popover" hidden>
-          <label class="link-popover-label" for="image-alt-input">图片 alt 文本</label>
-          <input id="image-alt-input" class="link-popover-input" type="text" />
+          <label class="link-popover-label" for="image-alt-input">图片描述</label>
+          <input id="image-alt-input" class="link-popover-input" type="text" placeholder="可留空" />
           <div class="link-popover-actions">
             <button id="image-alt-cancel" class="secondary-btn sm" type="button">取消</button>
             <button id="image-alt-confirm" class="primary-btn sm" type="button">确定</button>
           </div>
         </div>
+
+        <div id="ui-tooltip" class="ui-tooltip" role="tooltip" hidden></div>
 
         <div id="web-clip-panel" class="web-clip-panel" hidden>
           <div class="web-clip-panel-head">
@@ -382,19 +398,13 @@ ${APP_TOPBAR_HTML}
 
           <article id="reader" class="reader aimd" hidden></article>
 
-          <article id="inline-editor"
-                   class="reader aimd inline-editor"
-                   contenteditable="true"
-                   spellcheck="false"
-                   hidden></article>
-
-          <div id="editor-wrap" class="editor-split" hidden>
+          <div id="editor-wrap" class="editor-split" data-edit-pane-order="source-first" hidden>
             <div class="editor-pane">
               <div id="source-banner" class="source-banner" hidden>
                 <span class="source-banner-icon">${ICONS.info}</span>
                 <span class="source-banner-text" id="source-banner-text"></span>
               </div>
-              <div class="pane-tag">Markdown</div>
+              <div class="pane-tag">源码</div>
               <div class="source-editor-shell">
                 <pre id="markdown-highlight" class="markdown-highlight" aria-hidden="true"></pre>
                 <textarea id="markdown" spellcheck="false" wrap="soft"></textarea>

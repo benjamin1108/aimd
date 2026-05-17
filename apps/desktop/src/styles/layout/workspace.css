@@ -113,7 +113,7 @@
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto auto auto;
   align-items: center;
-  gap: 8px;
+  gap: 4px;
   min-width: 0;
   width: 100%;
   max-width: 100%;
@@ -154,9 +154,16 @@
   background: currentColor;
 }
 
-.find-cluster {
+.command-icon-cluster {
   grid-column: 2;
   justify-self: end;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  min-width: 0;
+}
+
+.find-cluster {
   display: inline-flex;
   align-items: center;
   flex: 0 1 auto;
@@ -169,6 +176,43 @@
   justify-self: end;
 }
 
+.mode-tool-slot {
+  position: relative;
+  display: inline-grid;
+  place-items: center;
+  width: var(--size-control);
+  height: var(--size-control);
+}
+
+.mode-tool-slot[hidden] { display: none; }
+
+.mode-tool-slot[data-tool-mode="read"] .edit-pane-swap-btn,
+.mode-tool-slot[data-tool-mode="edit"] .viewport-width-cluster,
+.mode-tool-slot[data-tool-mode="none"] .edit-pane-swap-btn,
+.mode-tool-slot[data-tool-mode="none"] .viewport-width-cluster {
+  display: none;
+}
+
+.edit-pane-swap-btn {
+  width: var(--size-control);
+  height: var(--size-control);
+  border-radius: var(--radius-control-sm);
+}
+
+.viewport-width-cluster {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+}
+
+.viewport-width-cluster[hidden],
+.edit-pane-swap-btn[hidden] { display: none !important; }
+
+.edit-pane-swap-btn svg {
+  width: 15px;
+  height: 15px;
+}
+
 .panel[data-main-view="git-diff"] .doc-toolbar {
   grid-template-columns: minmax(0, 1fr) auto;
 }
@@ -176,6 +220,16 @@
 .panel[data-main-view="git-diff"] .doc-toolbar > .format-toolbar,
 .panel[data-main-view="git-diff"] .toolbar-group--mode,
 .panel[data-main-view="git-diff"] #doc-actions {
+  display: none;
+}
+
+.panel[data-main-view="git-diff"] .command-icon-cluster {
+  grid-column: 2;
+}
+
+.panel[data-main-view="git-diff"] .mode-tool-slot,
+.panel[data-main-view="git-diff"] .edit-pane-swap-btn,
+.panel[data-main-view="git-diff"] .viewport-width-cluster {
   display: none;
 }
 

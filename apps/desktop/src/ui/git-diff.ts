@@ -5,7 +5,6 @@ import {
   formatToolbarEl,
   gitDiffContentEl,
   gitDiffViewEl,
-  inlineEditorEl,
   readerEl,
 } from "../core/dom";
 import { state } from "../core/state";
@@ -15,7 +14,6 @@ import { updateChrome } from "./chrome";
 import { setMode } from "./mode";
 import { renderDocPanelTabs } from "./doc-panel";
 import { activateDocumentTab } from "../document/apply";
-import { flushInline } from "../editor/inline";
 import { captureActiveViewState } from "../document/view-state";
 import { gitPathDirectoryLabel, splitGitPath } from "./git-path";
 import {
@@ -113,10 +111,6 @@ async function prepareLeavingDocumentView(): Promise<boolean> {
     captureActiveGitDiffScroll();
     return true;
   }
-  if (state.mode === "edit" && state.inlineDirty) {
-    const flushed = flushInline();
-    if (!flushed.ok) return false;
-  }
   captureActiveViewState();
   syncActiveTabFromFacade();
   return true;
@@ -209,7 +203,6 @@ export async function activateGitDiffTab(tabId: string, options: { refresh?: boo
   state.mainView = "git-diff";
   syncActiveGitDiffView(tab);
   readerEl().hidden = true;
-  inlineEditorEl().hidden = true;
   editorWrapEl().hidden = true;
   emptyEl().hidden = true;
   formatToolbarEl().hidden = true;

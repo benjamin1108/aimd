@@ -37,7 +37,8 @@ export function loadSessionSnapshot(): SessionSnapshot | null {
       hasExternalImageReferences: Boolean(parsed.hasExternalImageReferences),
       requiresAimdSave: Boolean(parsed.requiresAimdSave),
       format: parsed.format === "markdown" ? "markdown" : "aimd",
-      mode: parsed.mode === "edit" || parsed.mode === "source" ? parsed.mode : "read",
+      mode: parsed.mode === "edit" || parsed.mode === "source" ? "edit" : "read",
+      editPaneOrder: parsed.editPaneOrder === "preview-first" ? "preview-first" : "source-first",
     };
   } catch {
     return null;

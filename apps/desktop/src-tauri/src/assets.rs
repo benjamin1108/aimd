@@ -4,11 +4,11 @@
 use crate::dto::{asset_dto, image_alt, materialize_assets, AddedAssetDTO};
 use aimd_core::manifest::{mime_by_ext, ROLE_CONTENT_IMAGE};
 use aimd_core::reader::Reader;
+use aimd_core::resolve_image_path;
 use aimd_core::rewrite::{
     find_asset_by_hash, is_image_filename, rewrite_file, sha256_hex, unique_asset_name, NewAsset,
     RewriteOptions,
 };
-use aimd_core::{is_path_like_image_url, resolve_image_path};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use std::fs;
@@ -25,38 +25,27 @@ fn ext_to_mime(name: &str) -> String {
     mime_by_ext(name).to_string()
 }
 
-fn sanitize_filename(name: &str) -> String {
-    let cleaned: String = name
-        .chars()
-        .map(|c| {
-            if c.is_ascii_alphanumeric() || c == '.' || c == '-' || c == '_' {
-                c
-            } else {
-                '-'
-            }
-        })
-        .collect();
-    let trimmed = cleaned.trim_matches(|c: char| c == '.' || c == '-' || c.is_whitespace());
-    let base = if trimmed.is_empty() {
-        "image".to_string()
-    } else {
-        trimmed.to_string()
-    };
-    if base.contains('.') {
-        base
-    } else {
-        format!("{base}.png")
-    }
-}
-
 #[tauri::command]
 pub fn add_image(path: String, image_path: String) -> Result<Value, String> {
-    if !is_image_filename(&image_path) {
-        return Err(format!("not an image file: {}", image_path));
+    let fs_path = image_path_to_fs_path(&image_path);
+    let preferred_name = fs_path
+        .file_name()
+        .and_then(|name| name.to_str())
+        .unwrap_or(&image_path)
+        .to_string();
+    if !is_image_filename(&preferred_name) {
+        return Err(format!("not an image file: {}", preferred_name));
     }
-    let data = fs::read(&image_path).map_err(|e| e.to_string())?;
+    let data = fs::read(&fs_path).map_err(|e| e.to_string())?;
+    add_image_data(path, preferred_name, data)
+}
+
+fn add_image_data(path: String, preferred_name: String, data: Vec<u8>) -> Result<Value, String> {
+    if !is_image_filename(&preferred_name) {
+        return Err(format!("not an image file: {}", preferred_name));
+    }
     if data.is_empty() {
-        return Err(format!("empty image: {}", image_path));
+        return Err(format!("empty image: {}", preferred_name));
     }
     let incoming_hash = sha256_hex(&data);
 
@@ -80,7 +69,7 @@ pub fn add_image(path: String, image_path: String) -> Result<Value, String> {
         return serde_json::to_value(result).map_err(|e| e.to_string());
     }
 
-    let (id, filename) = unique_asset_name(Some(&reader.manifest), &image_path);
+    let (id, filename) = unique_asset_name(Some(&reader.manifest), &preferred_name);
     let md_bytes = reader.main_markdown().map_err(|e| e.to_string())?;
 
     rewrite_file(
@@ -127,7 +116,11 @@ pub fn read_image_bytes(image_path: String) -> Result<Vec<u8>, String> {
 }
 
 fn image_path_to_fs_path(value: &str) -> PathBuf {
-    if is_path_like_image_url(value) {
+    if value
+        .trim_start()
+        .to_ascii_lowercase()
+        .starts_with("file://")
+    {
         resolve_image_path(Path::new("."), value)
     } else {
         PathBuf::from(value)
@@ -139,23 +132,37 @@ pub fn add_image_bytes(path: String, filename: String, data: Vec<u8>) -> Result<
     if data.is_empty() {
         return Err("empty image data".to_string());
     }
-    let safe_name = sanitize_filename(&filename);
-    let ext = std::path::Path::new(&safe_name)
-        .extension()
-        .and_then(|e| e.to_str())
-        .map(|e| format!(".{e}"))
-        .unwrap_or_default();
-    let mut tmp = tempfile::Builder::new()
-        .prefix("aimd-paste-")
-        .suffix(&ext)
-        .tempfile()
-        .map_err(|e| format!("create temp image: {e}"))?;
-    use std::io::Write as _;
-    tmp.write_all(&data)
-        .map_err(|e| format!("write temp image: {e}"))?;
-    tmp.flush().map_err(|e| format!("flush temp image: {e}"))?;
-    let tmp_path = tmp.path().to_string_lossy().to_string();
-    add_image(path, tmp_path)
+    let preferred_name = preferred_image_filename(&filename, &data);
+    add_image_data(path, preferred_name, data)
+}
+
+fn preferred_image_filename(filename: &str, data: &[u8]) -> String {
+    let trimmed = filename.trim();
+    let base = if trimmed.is_empty() { "image" } else { trimmed };
+    if is_image_filename(base) {
+        return base.to_string();
+    }
+    format!("{base}.{}", image_ext_from_bytes(data))
+}
+
+fn image_ext_from_bytes(data: &[u8]) -> &'static str {
+    if data.starts_with(&[0x89, b'P', b'N', b'G', 0x0d, 0x0a, 0x1a, 0x0a]) {
+        return "png";
+    }
+    if data.starts_with(&[0xff, 0xd8, 0xff]) {
+        return "jpg";
+    }
+    if data.starts_with(b"GIF87a") || data.starts_with(b"GIF89a") {
+        return "gif";
+    }
+    if data.len() >= 12 && data.starts_with(b"RIFF") && &data[8..12] == b"WEBP" {
+        return "webp";
+    }
+    let prefix = String::from_utf8_lossy(&data[..data.len().min(128)]).to_ascii_lowercase();
+    if prefix.contains("<svg") {
+        return "svg";
+    }
+    "png"
 }
 
 #[tauri::command]
@@ -256,6 +263,45 @@ mod tests {
         assert_eq!(
             path.to_string_lossy().replace('\\', "/"),
             "C:/Users/benjamin/Pictures/pic one.png"
+        );
+    }
+
+    #[test]
+    fn image_path_preserves_question_mark_in_plain_native_path() {
+        let path = image_path_to_fs_path("/Users/benjamin/Pictures/cover?draft.png");
+        assert_eq!(
+            path.to_string_lossy(),
+            "/Users/benjamin/Pictures/cover?draft.png"
+        );
+    }
+
+    #[test]
+    fn image_path_decodes_question_mark_when_it_is_part_of_a_file_url_path() {
+        let path = image_path_to_fs_path("file:///Users/benjamin/Pictures/cover%3Fdraft.png");
+        assert_eq!(
+            path.to_string_lossy(),
+            "/Users/benjamin/Pictures/cover?draft.png"
+        );
+    }
+
+    #[test]
+    fn image_path_strips_file_url_query_suffix() {
+        let path = image_path_to_fs_path("file:///Users/benjamin/Pictures/cover.png?raw=1");
+        assert_eq!(path.to_string_lossy(), "/Users/benjamin/Pictures/cover.png");
+    }
+
+    #[test]
+    fn preferred_image_filename_keeps_legal_image_name_and_adds_fallback_ext() {
+        assert_eq!(
+            preferred_image_filename("报告?draft.png", b"not-enough"),
+            "报告?draft.png"
+        );
+        assert_eq!(
+            preferred_image_filename(
+                "clipboard",
+                &[0x89, b'P', b'N', b'G', 0x0d, 0x0a, 0x1a, 0x0a]
+            ),
+            "clipboard.png"
         );
     }
 }

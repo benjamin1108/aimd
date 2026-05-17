@@ -30,8 +30,9 @@ export function bindFormatToolbarDragHandles() {
 
   toolbar.addEventListener("pointerdown", (event) => {
     const handle = (event.target as HTMLElement | null)?.closest<HTMLElement>(".ft-sep");
-    if (!handle || event.button !== 0 || !hasScrollableOverflow(toolbar)) return;
+    if (!handle || event.button !== 0) return;
     event.preventDefault();
+    if (!hasScrollableOverflow(toolbar)) return;
     drag = {
       handle,
       pointerId: event.pointerId,

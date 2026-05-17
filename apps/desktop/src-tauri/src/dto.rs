@@ -166,7 +166,20 @@ pub fn image_alt(filename: &str) -> String {
         .file_stem()
         .and_then(|s| s.to_str())
         .unwrap_or(filename);
+    if is_generated_image_alt_source(name) {
+        return String::new();
+    }
     name.replace('-', " ")
+}
+
+fn is_generated_image_alt_source(stem: &str) -> bool {
+    let stem = stem.trim().to_ascii_lowercase();
+    stem == "image"
+        || stem == "clipboard"
+        || stem == "pasted"
+        || stem.starts_with("pasted-")
+        || stem == "aimd-paste"
+        || stem.starts_with("aimd-paste-")
 }
 
 pub fn document_dto_from_reader(
@@ -193,4 +206,23 @@ pub fn document_dto_from_reader(
         assets,
         dirty: false,
     })
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn image_alt_keeps_meaningful_file_names() {
+        assert_eq!(image_alt("cover-photo.png"), "cover photo");
+        assert_eq!(image_alt("产品图.png"), "产品图");
+    }
+
+    #[test]
+    fn image_alt_hides_generated_internal_names() {
+        assert_eq!(image_alt("aimd-paste-1777432866771939000-image.png"), "");
+        assert_eq!(image_alt("pasted-1777432866771.png"), "");
+        assert_eq!(image_alt("clipboard.png"), "");
+        assert_eq!(image_alt("image.png"), "");
+    }
 }

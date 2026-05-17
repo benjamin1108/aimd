@@ -8,7 +8,7 @@ document.querySelector<HTMLDivElement>("#app")!.innerHTML = APP_HTML;
 import { state } from "./core/state";
 import type { AimdDocument } from "./core/types";
 import {
-  markdownEl, inlineEditorEl, modeReadEl, modeEditEl, modeSourceEl,
+  markdownEl, modeReadEl, modeEditEl,
   openTabsEl,
   saveEl, saveAsEl, closeEl,
   moreMenuToggleEl, moreMenuEl, webImportEl, formatDocumentEl,
@@ -21,15 +21,14 @@ import {
 import { setMode, refreshSourceBanner } from "./ui/mode";
 import { setStatus, updateChrome } from "./ui/chrome";
 import { bindFormatToolbar } from "./editor/format-toolbar";
+import { bindFormatToolbarVisibility } from "./editor/toolbar-visibility";
 import { bindSearch, openFindBar } from "./editor/search";
 import { bindSourceHighlight } from "./editor/source-highlight";
 import { bindFormatToolbarDragHandles } from "./ui/toolbar-drag";
-import { bindWidthSwitch, setWidth } from "./ui/width";
+import { bindWidthSwitch } from "./ui/width";
 import { bindSidebarResizers, bindSidebarHrResizer, bindInspectorHrResizer } from "./ui/resizers";
 import { showFileContextMenu } from "./ui/context-menu";
-import { onInlineInput, onInlineBeforeInput, flushInline } from "./editor/inline";
-import { bindImageDeleteGuard } from "./editor/image-delete";
-import { onInlinePaste, onInlineKeydown, collectClipboardImages, pasteImageFiles } from "./editor/paste";
+import { onMarkdownKeydown, onMarkdownPaste, collectClipboardImages, pasteImageFiles } from "./editor/paste";
 import { clearRecentDocuments, loadRecentPaths } from "./ui/recents";
 import {
   chooseAndOpen, newDocument, closeCurrentTab,
@@ -63,6 +62,7 @@ import {
   isGitDiffTabId,
 } from "./ui/git-diff";
 import { bindSelectionBoundary } from "./ui/selection";
+import { bindTooltips } from "./ui/tooltips";
 import { loadAppSettings, type AppSettings } from "./core/settings";
 import { applyThemePreference, bindSystemThemePreference } from "./ui/theme";
 import { bindUpdater, checkForUpdates, scheduleStartupUpdateCheck, showAboutAimd } from "./updater/client";
@@ -70,6 +70,7 @@ import { syncActiveTabFromFacade } from "./document/open-document-state";
 document.body.dataset.aimdEntry = "desktop";
 installDebugConsole();
 bindSelectionBoundary("main");
+bindTooltips();
 bindUpdater();
 bindProjectRailCollapse();
 bindSystemThemePreference(() => state.uiSettings.theme);
@@ -166,7 +167,6 @@ $("#empty-import-web").addEventListener("click", () => { void importWebClip(); }
 $("#clear-recent").addEventListener("click", clearRecentDocuments);
 modeReadEl().addEventListener("click", () => setMode("read"));
 modeEditEl().addEventListener("click", () => setMode("edit"));
-modeSourceEl().addEventListener("click", () => setMode("source"));
 saveEl().addEventListener("click", () => { closeActionMenus(); void saveDocument(); });
 saveAsEl().addEventListener("click", () => { closeActionMenus(); void saveDocumentAs(); });
 formatDocumentEl().addEventListener("click", () => { closeActionMenus(); void formatCurrentDocument(); });
@@ -222,23 +222,18 @@ markdownEl().addEventListener("input", () => {
 markdownEl().addEventListener("paste", (event) => {
   if (!event.clipboardData || !state.doc) return;
   const imageFiles = collectClipboardImages(event.clipboardData);
-  if (imageFiles.length === 0) return;
-  event.preventDefault();
-  void pasteImageFiles(imageFiles, "source");
+  if (imageFiles.length > 0) {
+    event.preventDefault();
+    void pasteImageFiles(imageFiles);
+    return;
+  }
+  onMarkdownPaste(event);
 });
 
-inlineEditorEl().addEventListener("beforeinput", onInlineBeforeInput);
-inlineEditorEl().addEventListener("input", onInlineInput);
-inlineEditorEl().addEventListener("paste", onInlinePaste);
-inlineEditorEl().addEventListener("keydown", onInlineKeydown);
-
-inlineEditorEl().addEventListener("focus", () => {
-  try {
-    document.execCommand("defaultParagraphSeparator", false, "p");
-  } catch {}
-}, { once: true });
+markdownEl().addEventListener("keydown", onMarkdownKeydown);
 
 bindFormatToolbar();
+bindFormatToolbarVisibility();
 bindFormatToolbarDragHandles();
 bindSearch();
 bindSourceHighlight();
@@ -250,7 +245,6 @@ bindOpenTabsNavigationControls();
 bindGitPanel();
 bindGitDiffView();
 bindWidthSwitch();
-bindImageDeleteGuard(inlineEditorEl());
 bindSidebarResizers();
 bindSidebarHrResizer();
 bindInspectorHrResizer();
@@ -307,7 +301,7 @@ document.addEventListener("keydown", (event) => {
 //
 // 例外（让原生菜单透出）：
 //   - [data-file-item] 自己处理 contextmenu。
-//   - input / textarea / contenteditable / 源码 #markdown：用户需要"剪切/复制/粘贴"
+//   - input / textarea / 源码 #markdown：用户需要"剪切/复制/粘贴"
 //     原生菜单。一刀切阻断会让 API key 等密码字段也丢失粘贴入口（用户会以为
 //     "禁用了 copy paste"）。
 if (!(import.meta as any).env?.DEV || (window as any).__aimd_force_contextmenu_block) {
@@ -315,15 +309,12 @@ if (!(import.meta as any).env?.DEV || (window as any).__aimd_force_contextmenu_b
     const target = e.target as HTMLElement | null;
     if (!target) return;
     if (target.closest("[data-file-item]")) return;
-    if (target.closest("input, textarea, [contenteditable='true'], #markdown")) return;
+    if (target.closest("input, textarea, #markdown")) return;
     e.preventDefault();
   }, { capture: true });
 }
 
 window.addEventListener("beforeunload", () => {
-  if (state.mode === "edit" && state.inlineDirty) {
-    flushInline();
-  }
   syncActiveTabFromFacade();
   persistSessionSnapshot();
 });
@@ -372,7 +363,6 @@ async function bindWindowCloseGuard() {
       closeApprovalInFlight = true;
       void (async () => {
         try {
-          if (state.mode === "edit" && state.inlineDirty && !flushInline().ok) return;
           syncActiveTabFromFacade();
           if (await confirmAllDirtyTabsForWindowClose()) {
             await destroyCurrentWindowAfterCloseApproval();
@@ -419,10 +409,6 @@ window.addEventListener("DOMContentLoaded", async () => {
       "close-document":    () => { void closeCurrentTab(); },
       "mode-read":         () => { setMode("read"); },
       "mode-edit":         () => { setMode("edit"); },
-      "mode-source":       () => { setMode("source"); },
-      "width-normal":      () => { setWidth("normal"); },
-      "width-wide":        () => { setWidth("wide"); },
-      "width-ultra":       () => { setWidth("ultra"); },
     };
     await listen<string>("aimd-menu", (event) => {
       menuHandlers[event.payload]?.();
@@ -479,10 +465,9 @@ void bindWindowCloseGuard();
   buf: ArrayBuffer,
   mime: string,
   name: string,
-  target: "edit" | "source",
 ) => {
   const f = new File([buf], name, { type: mime });
-  await pasteImageFiles([f], target);
+  await pasteImageFiles([f]);
 };
 
 (window as any).__aimd_testOptimizeAssets = (path: string) =>

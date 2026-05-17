@@ -1,9 +1,8 @@
-import type { AimdAsset, MarkdownSourceModel, Mode } from "../core/types";
+import type { AimdAsset, Mode } from "../core/types";
 
 export type RenderedSurfaceKind =
   | "reader"
-  | "preview"
-  | "visual-editor"
+  | "edit-preview"
   | "git-diff";
 
 export type LinkOpenMode = "none" | "plain" | "modifier";
@@ -11,9 +10,7 @@ export type LinkOpenMode = "none" | "plain" | "modifier";
 export type RenderedSurfaceProfile = {
   kind: RenderedSurfaceKind;
   root: HTMLElement;
-  contentEditable: boolean;
   stripFrontmatter: boolean;
-  sourceAnnotations: boolean;
   hydrateMarkdownImages: boolean;
   taskToggle: boolean;
   codeCopy: boolean;
@@ -37,7 +34,6 @@ export type PaintRenderedSurfaceContext = {
   callbacks: RenderedSurfaceCallbacks;
   htmlVersion?: number;
   markdownPath?: string;
-  sourceModel?: MarkdownSourceModel | null;
   tabId?: string | null;
   onHydrated?: (profile: RenderedSurfaceProfile) => void;
   onPainted?: (profile: RenderedSurfaceProfile) => void;

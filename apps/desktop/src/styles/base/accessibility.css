@@ -15,8 +15,7 @@ button:focus-visible {
 
 input:focus-visible,
 select:focus-visible,
-textarea:focus-visible,
-[contenteditable="true"]:focus-visible {
+textarea:focus-visible {
   outline: 1px solid var(--hairline-focus-soft);
   outline-offset: 1px;
 }

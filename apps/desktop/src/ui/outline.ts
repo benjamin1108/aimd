@@ -1,7 +1,7 @@
 import { invoke } from "@tauri-apps/api/core";
 import { state } from "../core/state";
 import {
-  readerEl, inlineEditorEl, previewEl, markdownEl,
+  readerEl, previewEl,
   outlineSectionEl, outlineListEl,
 } from "../core/dom";
 import type { Mode, OpenDocumentTab, OutlineNode, RenderResult } from "../core/types";
@@ -9,7 +9,6 @@ import { escapeAttr, escapeHTML } from "../util/escape";
 import { clearStatusOverride, setStatus, setStatusOverride, updateChrome } from "./chrome";
 import { persistSessionSnapshot } from "../session/snapshot";
 import { renderDocPanelTabs } from "./doc-panel";
-import { createSourceModel } from "../editor/source-preserve";
 import {
   activeTab,
   bindFacadeFromTab,
@@ -23,13 +22,12 @@ import { paintRenderedSurface, normalizeRenderedHTML } from "../rendered-surface
 import {
   previewSurfaceProfile,
   readerSurfaceProfile,
-  visualEditorSurfaceProfile,
 } from "../rendered-surface/profiles";
 import type { PaintRenderedSurfaceContext, RenderedSurfaceCallbacks, RenderedSurfaceProfile } from "../rendered-surface/types";
 import { commitMarkdownChange } from "../document/markdown-mutation";
 
 const LINK_HINT_STATUS_ACTION = "link-hover-hint";
-const paintedSurfaceTabIds: Record<Mode, string | null> = { read: null, edit: null, source: null };
+const paintedSurfaceTabIds: Record<Mode, string | null> = { read: null, edit: null };
 
 type RenderTask = {
   tabId: string;
@@ -136,11 +134,6 @@ export function applyHTML(html: string, markdownVersion = activeTab()?.markdownV
 }
 
 function applyHTMLToTab(tab: OpenDocumentTab, html: string, markdownVersion: number) {
-  if (!tab.sourceModel || tab.sourceModel.markdown !== tab.doc.markdown) {
-    tab.sourceModel = createSourceModel(tab.doc.markdown);
-    tab.sourceDirtyRefs.clear();
-    tab.sourceStructuralDirty = false;
-  }
   const rendered = rewriteRenderedSurfaceAssets(html, {
     assets: tab.doc.assets,
     markdownPath: markdownPathForTab(tab),
@@ -203,24 +196,16 @@ function setActiveOutlineItem(activeButton: HTMLButtonElement) {
 }
 
 export function currentScrollPane(): HTMLElement {
-  if (state.mode === "edit") return inlineEditorEl();
-  if (state.mode === "source") return previewEl();
+  if (state.mode === "edit") return previewEl();
   return readerEl();
 }
 
 function profileForMode(mode: Mode): RenderedSurfaceProfile {
-  if (mode === "edit") return visualEditorSurfaceProfile();
-  if (mode === "source") return previewSurfaceProfile();
+  if (mode === "edit") return previewSurfaceProfile();
   return readerSurfaceProfile();
 }
 
 function paintCurrentModeSurface(version: number) {
-  if (state.mode === "edit" && state.inlineDirty) return;
-  if (state.mode === "source") {
-    paintDocumentSurface(previewSurfaceProfile(), version);
-    paintDocumentSurface(readerSurfaceProfile(), version);
-    return;
-  }
   paintDocumentSurface(profileForMode(state.mode), version);
 }
 
@@ -231,7 +216,6 @@ export function paintPaneIfStale(mode: Mode) {
     scheduleRender(state.openDocuments.activeTabId || "", { immediate: true });
     return;
   }
-  if (mode === "edit" && state.inlineDirty) return;
   if (
     state.paintedVersion[mode] === state.htmlVersion
     && paintedSurfaceTabIds[mode] === state.openDocuments.activeTabId
@@ -242,11 +226,8 @@ export function paintPaneIfStale(mode: Mode) {
 function paintSyncPlaceholder(mode: Mode) {
   state.paintedVersion[mode] = -1;
   paintedSurfaceTabIds[mode] = null;
-  const root = mode === "edit"
-    ? inlineEditorEl()
-    : (mode === "source" ? previewEl() : readerEl());
-  root.contentEditable = "false";
-  root.dataset.renderedSurface = mode === "edit" ? "visual-editor" : (mode === "source" ? "preview" : "reader");
+  const root = mode === "edit" ? previewEl() : readerEl();
+  root.dataset.renderedSurface = mode === "edit" ? "edit-preview" : "reader";
   root.setAttribute("aria-busy", "true");
   root.innerHTML = `<div class="surface-sync-placeholder">正在同步最新内容…</div>`;
 }
@@ -263,12 +244,10 @@ function renderedSurfaceContext(version: number): PaintRenderedSurfaceContext {
     callbacks: documentSurfaceCallbacks(),
     htmlVersion: version,
     markdownPath: activeMarkdownPath(),
-    sourceModel: state.sourceModel,
     tabId,
     onPainted: (profile) => {
       if (profile.paintVersionKey) state.paintedVersion[profile.paintVersionKey] = version;
       if (profile.paintVersionKey) paintedSurfaceTabIds[profile.paintVersionKey] = tabId;
-      if (profile.kind === "visual-editor" && !state.inlineDirty) state.inlineDirty = false;
       profile.root.removeAttribute("aria-busy");
     },
     onHydrated: () => {
@@ -333,6 +312,5 @@ function toggleTaskMarkdown(index: number) {
     origin: "task-toggle",
     updateSourceTextarea: true,
   });
-  markdownEl().value = next;
   updateChrome();
 }

@@ -1,3 +1,4 @@
+mod asset_names;
 pub mod canonical;
 pub mod export;
 pub mod git_diff;

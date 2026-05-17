@@ -232,7 +232,7 @@ test.describe("Document inspector ownership", () => {
     await openWorkspaceAndDocs(page);
 
     await page.locator(".open-tab", { hasText: "Alpha" }).locator(".open-tab-main").click();
-    await page.locator("#mode-source").click();
+    await page.locator("#mode-edit").click();
     await page.locator("#markdown").fill("# Alpha stale\n\n## slow-alpha");
     await page.evaluate(async () => {
       const { renderPreview } = await import("/src/ui/outline.ts");

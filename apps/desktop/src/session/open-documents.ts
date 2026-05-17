@@ -1,6 +1,6 @@
 import { invoke } from "@tauri-apps/api/core";
 import { state, STORAGE_SESSION } from "../core/state";
-import type { AimdDocument, OpenDocumentTab, SessionSnapshot } from "../core/types";
+import type { AimdDocument, EditPaneOrder, Mode, OpenDocumentTab, SessionSnapshot } from "../core/types";
 import { paintActiveDocument } from "../document/apply";
 import { readFileFingerprint } from "../document/fingerprint";
 import {
@@ -15,8 +15,6 @@ import { setStatus } from "../ui/chrome";
 import { rememberOpenedPath } from "../ui/recents";
 import { renderSnapshotHTML } from "./render";
 
-type PersistedMode = "read" | "edit" | "source";
-
 type PersistedOpenTabV2 = {
   kind: "path" | "draft";
   id: string;
@@ -24,7 +22,8 @@ type PersistedOpenTabV2 = {
   draftId?: string;
   title: string;
   format: "aimd" | "markdown";
-  mode: PersistedMode;
+  mode: Mode;
+  editPaneOrder?: EditPaneOrder;
   scroll?: { read?: number; edit?: number; source?: number };
   sourceSelection?: { start?: number; end?: number; direction?: "forward" | "backward" | "none" };
   dirtyWorkingCopy?: {
@@ -78,6 +77,7 @@ export function buildOpenDocumentsSessionSnapshot(): {
           title: tab.title || tab.doc.title,
           format: tab.doc.format,
           mode: tab.mode,
+          editPaneOrder: tab.editPaneOrder,
           scroll,
           sourceSelection,
           dirtyWorkingCopy: tab.doc.dirty
@@ -107,6 +107,7 @@ export function buildOpenDocumentsSessionSnapshot(): {
         title: tab.title || tab.doc.title,
         format: tab.doc.format,
         mode: tab.mode,
+        editPaneOrder: tab.editPaneOrder,
         scroll,
         sourceSelection,
       };
@@ -135,6 +136,7 @@ export function loadOpenDocumentsSessionV2(): PersistedOpenDocumentsSessionV2 | 
         title: typeof tab.title === "string" ? tab.title : "",
         format: asFormat(tab.format),
         mode: asMode(tab.mode),
+        editPaneOrder: asEditPaneOrder(tab.editPaneOrder),
         scroll: tab.scroll && typeof tab.scroll === "object" ? tab.scroll : {},
         sourceSelection: tab.sourceSelection && typeof tab.sourceSelection === "object" ? tab.sourceSelection : undefined,
         dirtyWorkingCopy: tab.dirtyWorkingCopy && typeof tab.dirtyWorkingCopy.markdown === "string"
@@ -185,6 +187,7 @@ export async function restoreOpenDocumentsSession(session: PersistedOpenDocument
         continue;
       }
       const tab = createOpenDocumentTab(restored.doc, item.mode, { id: item.id });
+      tab.editPaneOrder = item.editPaneOrder || "source-first";
       applyPersistedViewState(tab, item);
       tab.baseFileFingerprint = restored.fingerprint;
       tab.recoveryState = restored.recoveryState;
@@ -210,6 +213,7 @@ export async function restoreOpenDocumentsSession(session: PersistedOpenDocument
       hasExternalImageReferences: draft.hasExternalImageReferences,
       format: draft.format,
       mode: item.mode,
+      editPaneOrder: item.editPaneOrder,
     });
     const doc: AimdDocument = {
       path: "",
@@ -226,6 +230,7 @@ export async function restoreOpenDocumentsSession(session: PersistedOpenDocument
       format: draft.format,
     };
     const tab = createOpenDocumentTab(doc, item.mode, { id: item.id, forceDraft: true });
+    tab.editPaneOrder = item.editPaneOrder || "source-first";
     applyPersistedViewState(tab, item);
     state.openDocuments.tabs.push(tab);
   }
@@ -254,8 +259,12 @@ export async function registerRestoredPath(path: string) {
   }
 }
 
-function asMode(value: unknown): PersistedMode {
-  return value === "edit" || value === "source" ? value : "read";
+function asMode(value: unknown): Mode {
+  return value === "edit" || value === "source" ? "edit" : "read";
+}
+
+function asEditPaneOrder(value: unknown): EditPaneOrder {
+  return value === "preview-first" ? "preview-first" : "source-first";
 }
 
 function asFormat(value: unknown): "aimd" | "markdown" {
@@ -265,9 +274,9 @@ function asFormat(value: unknown): "aimd" | "markdown" {
 function applyPersistedViewState(tab: OpenDocumentTab, data: PersistedOpenTabV2) {
   tab.scroll = {
     read: Number(data.scroll?.read || 0),
-    edit: Number(data.scroll?.edit || 0),
-    source: Number(data.scroll?.source || 0),
+    edit: Number(data.scroll?.edit ?? data.scroll?.source ?? 0),
   };
+  tab.editPaneOrder = data.editPaneOrder || "source-first";
   tab.sourceSelection = {
     start: Number(data.sourceSelection?.start || 0),
     end: Number(data.sourceSelection?.end || 0),
@@ -324,6 +333,7 @@ async function restorePathTab(item: PersistedOpenTabV2): Promise<{
     hasExternalImageReferences: dirty.hasExternalImageReferences,
     format: item.format,
     mode: item.mode,
+    editPaneOrder: item.editPaneOrder,
   });
   return {
     doc: {

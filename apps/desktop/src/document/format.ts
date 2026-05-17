@@ -1,7 +1,6 @@
 import { invoke } from "@tauri-apps/api/core";
 import { state } from "../core/state";
 import { setStatus, updateChrome } from "../ui/chrome";
-import { flushInline } from "../editor/inline";
 import { formatPreviewPanelEl, formatPreviewTextEl, formatApplyEl, formatCancelEl, formatPreviewCancelXEl } from "../core/dom";
 import { renderPreview } from "../ui/outline";
 import { loadAppSettings } from "../core/settings";
@@ -109,7 +108,6 @@ export async function formatCurrentDocument() {
     setStatus("文档包含 Git 冲突，请解决后再格式化", "warn");
     return;
   }
-  if (state.mode === "edit" && !flushInline().ok) return;
   const target = beginTabOperation();
   if (!target) return;
   formatting = true;

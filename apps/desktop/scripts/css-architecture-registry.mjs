@@ -49,6 +49,16 @@ export const runtimeVars = {
     reason: "tree depth indentation",
     cleanup: "row is re-rendered",
   },
+  "--ui-tooltip-x": {
+    owner: "ui/tooltips.ts",
+    reason: "measured tooltip portal x coordinate",
+    cleanup: "tooltip hides between targets",
+  },
+  "--ui-tooltip-y": {
+    owner: "ui/tooltips.ts",
+    reason: "measured tooltip portal y coordinate",
+    cleanup: "tooltip hides between targets",
+  },
 };
 
 export const runtimeStyleWrites = [
@@ -77,6 +87,7 @@ export const runtimeStyleWrites = [
   { file: "apps/desktop/src/updater/view.ts", pattern: "refs.progressFill.style.removeProperty", owner: "updater progress CSS variable cleanup" },
   { file: "apps/desktop/src/ui/doc-panel.ts", pattern: "outlineSectionEl().style.setProperty", owner: "inspector tab count CSS variable" },
   { file: "apps/desktop/src/ui/workspace.ts", pattern: "style=\"${workspaceIndentStyle(depth)}\"", owner: "workspace tree depth CSS variable" },
+  { file: "apps/desktop/src/ui/tooltips.ts", pattern: "tooltip.style.setProperty", owner: "tooltip portal measured position" },
 ];
 
 export const pointerEventsNone = [
@@ -87,6 +98,7 @@ export const pointerEventsNone = [
   { file: "apps/desktop/src/styles/overlays/debug-console.css", selector: ".debug-modal", reason: "transparent overlay with interactive panel child" },
   { file: "apps/desktop/src/styles/overlays/tree-overflow-portal.css", selector: ".workspace-row-overflow-measure", reason: "hidden measurement probe" },
   { file: "apps/desktop/src/styles/overlays/tree-overflow-portal.css", selector: ".workspace-row.workspace-row-overflow-overlay", reason: "visual clone; original row keeps interaction" },
+  { file: "apps/desktop/src/styles/overlays/tooltips.css", selector: ".ui-tooltip", reason: "passive tooltip surface" },
   { file: "apps/desktop/src/styles/components/settings.css", selector: ".api-key-mask", reason: "masked text overlay passes clicks to input" },
   { file: "apps/desktop/src/styles/components/sidebar-tooltips.css", selector: ".workspace-actions .icon-btn[title]::after", reason: "passive tooltip surface" },
 ];

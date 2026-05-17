@@ -29,28 +29,7 @@ export type RenderResult = {
   html: string;
 };
 
-export type MarkdownSourceCell = {
-  id: string;
-  start: number;
-  end: number;
-  contentStart: number;
-  contentEnd: number;
-};
-
-export type MarkdownSourceBlock = {
-  id: string;
-  kind: "heading" | "paragraph" | "list_item" | "blockquote" | "table" | "code" | "thematic_break" | "other";
-  start: number;
-  end: number;
-  contentStart: number;
-  contentEnd: number;
-  cells?: MarkdownSourceCell[];
-};
-
-export type MarkdownSourceModel = {
-  markdown: string;
-  blocks: MarkdownSourceBlock[];
-};
+export type EditPaneOrder = "source-first" | "preview-first";
 
 export type SessionSnapshot = {
   path: string;
@@ -67,6 +46,7 @@ export type SessionSnapshot = {
   hasGitConflicts?: boolean;
   format: "aimd" | "markdown";
   mode: Mode;
+  editPaneOrder?: EditPaneOrder;
 };
 
 export type OpenDocumentId = string;
@@ -76,10 +56,6 @@ export type OpenDocumentTab = {
   pathKey: string | null;
   title: string;
   doc: AimdDocument;
-  sourceModel: MarkdownSourceModel | null;
-  sourceDirtyRefs: Set<string>;
-  sourceStructuralDirty: boolean;
-  inlineDirty: boolean;
   outline: OutlineNode[];
   markdownVersion: number;
   htmlVersion: number;
@@ -90,10 +66,10 @@ export type OpenDocumentTab = {
   paintedVersion: Record<Mode, number>;
   operationVersion: number;
   mode: Mode;
+  editPaneOrder: EditPaneOrder;
   scroll: {
     read: number;
     edit: number;
-    source: number;
   };
   sourceSelection: {
     start: number;
@@ -125,7 +101,7 @@ export type OutlineNode = {
   level: number;
 };
 
-export type Mode = "read" | "edit" | "source";
+export type Mode = "read" | "edit";
 export type MainView = "document" | "git-diff";
 
 export type MarkdownDraft = { markdown: string; title: string; html: string };

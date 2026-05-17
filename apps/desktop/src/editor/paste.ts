@@ -1,55 +1,14 @@
 import { invoke } from "@tauri-apps/api/core";
 import { state } from "../core/state";
-import { inlineEditorEl } from "../core/dom";
 import type { AddedAsset } from "../core/types";
 import { setStatus, updateChrome } from "../ui/chrome";
-import { scheduleRender } from "../ui/outline";
 import { ensureDraftPackage } from "../document/drafts";
 import {
   compressImageBytes, normalizeAddedAsset,
-  applyVisualEditorHTMLAsCurrent,
-  insertImageInline,
 } from "./images";
-import {
-  sanitizePastedHTML,
-  MAX_TITLE_LENGTH,
-} from "./inline";
 import { htmlToMarkdown } from "./markdown";
-import { insertAtCursor } from "./inline";
-import { closestBlock, runFormatCommand } from "./format-toolbar";
-import { commitMarkdownChange } from "../document/markdown-mutation";
-import { renderPreview } from "../ui/outline";
-import { sourceOffsetFromSelection } from "./source-preserve";
-
-function isHeading(el: Element | null): boolean {
-  return !!el && /^H[1-6]$/.test(el.tagName);
-}
-
-/** True when `range` is collapsed at the very first caret position of `block`,
- *  i.e. there is no text content between block-start and the caret. Walking
- *  the DOM is fragile (mixed text nodes, inline wrappers); using a probe
- *  range and asking for its toString length is robust to nested inlines. */
-function isAtBlockStart(range: Range, block: Element): boolean {
-  if (!range.collapsed) return false;
-  const probe = document.createRange();
-  try {
-    probe.setStart(block, 0);
-    probe.setEnd(range.startContainer, range.startOffset);
-    return probe.toString().length === 0;
-  } catch {
-    return false;
-  }
-}
-
-/** Lightweight printable-key check: a single-char `event.key` with no
- *  modifier and no IME composition. Used to gate the H1 length cap so that
- *  shortcuts (Ctrl+S etc.), arrows, and IME candidate selection still work. */
-function isPrintableKey(event: KeyboardEvent): boolean {
-  if (event.isComposing) return false;
-  if (event.metaKey || event.ctrlKey || event.altKey) return false;
-  if (event.key.length !== 1) return false;
-  return true;
-}
+import { insertMarkdownAtSelection } from "./textarea";
+import { runFormatCommand } from "./format-toolbar";
 
 export function collectClipboardImages(data: DataTransfer): File[] {
   const out: File[] = [];
@@ -85,7 +44,7 @@ export function guessImageExt(mime: string): string {
   }
 }
 
-export async function pasteImageFiles(files: File[], target: "edit" | "source") {
+export async function pasteImageFiles(files: File[]) {
   if (!state.doc) return;
   setStatus("正在加入粘贴的图片", "loading");
   try {
@@ -102,21 +61,8 @@ export async function pasteImageFiles(files: File[], target: "edit" | "source") 
         filename: compressed.filename,
         data: Array.from(compressed.data),
       }));
-      if (target === "edit") {
-        state.doc.assets = [...state.doc.assets, added.asset];
-        commitMarkdownChange({
-          markdown: `${state.doc.markdown.replace(/\s*$/, "")}\n\n${added.markdown.trim()}\n`,
-          origin: "paste-image",
-          updateSourceTextarea: true,
-          scheduleRender: false,
-        });
-        insertImageInline(added, false);
-        state.inlineDirty = false;
-        applyVisualEditorHTMLAsCurrent();
-      } else {
-        insertAtCursor(`${added.markdown}\n`);
-        state.doc.assets = [...state.doc.assets, added.asset];
-      }
+      state.doc.assets = [...state.doc.assets, added.asset];
+      insertMarkdownAtSelection(`${added.markdown}\n`);
       state.doc.dirty = true;
       if (state.doc.format === "markdown") {
         state.doc.requiresAimdSave = true;
@@ -124,7 +70,6 @@ export async function pasteImageFiles(files: File[], target: "edit" | "source") 
       }
     }
     updateChrome();
-    if (target === "source") scheduleRender();
     setStatus(
       state.doc.format === "markdown"
         ? "图片已粘贴，保存时需转换为 AIMD"
@@ -137,13 +82,13 @@ export async function pasteImageFiles(files: File[], target: "edit" | "source") 
   }
 }
 
-export function onInlinePaste(event: ClipboardEvent) {
+export function onMarkdownPaste(event: ClipboardEvent) {
   if (!event.clipboardData) return;
 
   const imageFiles = collectClipboardImages(event.clipboardData);
   if (imageFiles.length > 0) {
     event.preventDefault();
-    void pasteImageFiles(imageFiles, "edit");
+    void pasteImageFiles(imageFiles);
     return;
   }
 
@@ -151,123 +96,41 @@ export function onInlinePaste(event: ClipboardEvent) {
   const html = event.clipboardData.getData("text/html");
   const text = event.clipboardData.getData("text/plain");
   if (!html && !text) return;
+  if (!html) return;
   event.preventDefault();
   const markdown = pastedMarkdown(html, text);
   if (!markdown.trim()) return;
-  insertMarkdownAtVisualSelection(markdown);
+  insertMarkdownAtSelection(markdown);
 }
 
 function pastedMarkdown(html: string, text: string) {
   if (!html) return text;
-  const fragment = sanitizePastedHTML(html);
   const template = document.createElement("template");
-  template.content.appendChild(fragment);
+  template.innerHTML = html;
+  template.content.querySelectorAll("style, script, link, meta, iframe, object, embed, frame, frameset").forEach((node) => node.remove());
+  template.content.querySelectorAll<HTMLElement>("*").forEach((el) => {
+    el.removeAttribute("style");
+    el.removeAttribute("class");
+    Array.from(el.attributes).forEach((attr) => {
+      if (attr.name.startsWith("on")) el.removeAttribute(attr.name);
+    });
+  });
   return htmlToMarkdown(template.innerHTML).trim();
 }
 
-function insertMarkdownAtVisualSelection(markdown: string) {
-  if (!state.doc) return;
-  const model = state.sourceModel?.markdown === state.doc.markdown ? state.sourceModel : null;
-  const offset = model ? sourceOffsetFromSelection(inlineEditorEl(), model) : state.doc.markdown.length;
-  const next = spliceMarkdown(state.doc.markdown, offset ?? state.doc.markdown.length, markdown);
-  state.inlineDirty = false;
-  commitMarkdownChange({
-    markdown: next,
-    origin: "visual-paste",
-    updateSourceTextarea: true,
-    renderImmediately: true,
-  });
-  void renderPreview().then(() => {
-    if (state.mode === "edit") inlineEditorEl().focus();
-  });
-}
-
-function spliceMarkdown(markdown: string, offset: number, insertion: string) {
-  const at = Math.max(0, Math.min(offset, markdown.length));
-  const before = markdown.slice(0, at);
-  const after = markdown.slice(at);
-  const block = insertion.trim();
-  if (!block) return markdown;
-  if (isBlockMarkdown(block)) {
-    const prefix = before.trimEnd();
-    const suffix = after.trimStart();
-    if (!prefix) return suffix ? `${block}\n\n${suffix}` : `${block}\n`;
-    return suffix ? `${prefix}\n\n${block}\n\n${suffix}` : `${prefix}\n\n${block}\n`;
+export function onMarkdownKeydown(event: KeyboardEvent) {
+  if (!(event.metaKey || event.ctrlKey) || event.shiftKey) return;
+  const key = event.key.toLowerCase();
+  if (key === "b") {
+    event.preventDefault();
+    runFormatCommand("bold");
   }
-  return `${before}${insertion}${after}`;
-}
-
-function isBlockMarkdown(markdown: string) {
-  return markdown.includes("\n")
-    || /^(#{1,6}\s|[-*+]\s|\d+[.)]\s|>\s|```|~~~|\|.*\||(?:\*\s*){3,}$|(?:-\s*){3,}$|(?:_\s*){3,}$)/.test(markdown.trim());
-}
-
-export function onInlineKeydown(event: KeyboardEvent) {
-  // Backspace at the very start of a block must not merge it into an H1-H6
-  // sibling above. The default contenteditable Backspace would absorb the
-  // body paragraph into the heading, growing the title without bound — the
-  // active tab title and the H1 in the editor then push every other
-  // header control off-screen, and the user has no good way to recover.
-  if (
-    event.key === "Backspace" &&
-    !event.shiftKey && !event.metaKey && !event.ctrlKey && !event.altKey
-  ) {
-    const sel = document.getSelection();
-    if (sel && sel.rangeCount > 0) {
-      const range = sel.getRangeAt(0);
-      const block = closestBlock(range.startContainer);
-      if (block && isAtBlockStart(range, block) && isHeading(block.previousElementSibling)) {
-        event.preventDefault();
-        return;
-      }
-    }
+  if (key === "i") {
+    event.preventDefault();
+    runFormatCommand("italic");
   }
-
-  // Hard cap on H1 (the document title) length. Block printable input once
-  // the limit is hit. inline.ts#enforceTitleLength is the safety net for
-  // paste / IME commit / dictation paths that bypass keydown.
-  if (isPrintableKey(event)) {
-    const sel = document.getSelection();
-    if (sel && sel.rangeCount > 0) {
-      const block = closestBlock(sel.getRangeAt(0).startContainer);
-      if (block && block.tagName === "H1" && (block.textContent?.length ?? 0) >= MAX_TITLE_LENGTH) {
-        event.preventDefault();
-        return;
-      }
-    }
-  }
-
-  if (event.key === "Enter" && !event.shiftKey) {
-    const sel = document.getSelection();
-    if (sel && sel.rangeCount > 0) {
-      const range = sel.getRangeAt(0);
-      const block = closestBlock(range.startContainer);
-      if (block && /^H[1-6]$/.test(block.tagName)) {
-        event.preventDefault();
-        // Extract content from cursor to end of heading into the new paragraph.
-        const afterRange = range.cloneRange();
-        afterRange.setEnd(block, block.childNodes.length);
-        const fragment = afterRange.extractContents();
-        const p = document.createElement("p");
-        if (fragment.textContent && fragment.textContent.length > 0) {
-          p.appendChild(fragment);
-        } else {
-          p.appendChild(document.createElement("br"));
-        }
-        block.after(p);
-        const r = document.createRange();
-        r.setStart(p, 0);
-        r.collapse(true);
-        sel.removeAllRanges();
-        sel.addRange(r);
-        inlineEditorEl().dispatchEvent(new Event("input"));
-      }
-    }
-  }
-  if ((event.metaKey || event.ctrlKey) && !event.shiftKey) {
-    const key = event.key.toLowerCase();
-    if (key === "b") { event.preventDefault(); runFormatCommand("bold"); }
-    if (key === "i") { event.preventDefault(); runFormatCommand("italic"); }
-    if (key === "k") { event.preventDefault(); runFormatCommand("link"); }
+  if (key === "k") {
+    event.preventDefault();
+    runFormatCommand("link");
   }
 }

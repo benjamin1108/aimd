@@ -22,7 +22,21 @@ pub fn is_path_like_image_url(value: &str) -> bool {
 
 pub fn resolve_image_path(base_dir: &Path, value: &str) -> PathBuf {
     let path_part = split_url_suffix(value).0;
-    let local = file_url_to_path(path_part).unwrap_or_else(|| percent_decode(path_part));
+    let stripped = local_path_from_part(base_dir, path_part);
+    if value.to_ascii_lowercase().starts_with("file://") {
+        return stripped;
+    }
+    if path_part.len() != value.len() {
+        let literal = local_path_from_part(base_dir, value);
+        if literal.exists() && !stripped.exists() {
+            return literal;
+        }
+    }
+    stripped
+}
+
+fn local_path_from_part(base_dir: &Path, value: &str) -> PathBuf {
+    let local = file_url_to_path(value).unwrap_or_else(|| percent_decode(value));
     let normalized = local.replace('\\', "/");
     if Path::new(&normalized).is_absolute() || is_windows_drive_path(&normalized) {
         PathBuf::from(normalized)
@@ -123,6 +137,17 @@ mod tests {
             path.to_string_lossy().replace('\\', "/"),
             "/tmp/docs/images/pic one.png"
         );
+    }
+
+    #[test]
+    fn relative_path_can_use_literal_question_mark_when_file_exists() {
+        let tmp = tempfile::tempdir().unwrap();
+        let literal = tmp.path().join("pic?draft.png");
+        if std::fs::write(&literal, b"img").is_err() {
+            return;
+        }
+        let path = resolve_image_path(tmp.path(), "pic?draft.png");
+        assert_eq!(path, literal);
     }
 
     #[test]

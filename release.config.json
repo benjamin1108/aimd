@@ -1,5 +1,5 @@
 {
-  "version": "1.0.11",
+  "version": "0.9.0",
   "channel": "stable",
   "releaseUrl": "https://github.com/benjamin1108/aimd/releases",
   "updaterManifestUrl": "https://github.com/benjamin1108/aimd/releases/latest/download/latest.json",

@@ -7,6 +7,7 @@ use std::io;
 use std::path::Path;
 use std::sync::OnceLock;
 
+use crate::asset_names::portable_asset_filename_from_path;
 use crate::manifest::{Manifest, ROLE_CONTENT_IMAGE};
 use crate::manifest::{FILE_MAIN_MD, FILE_MANIFEST};
 use crate::reader::Reader;
@@ -188,11 +189,7 @@ pub fn set_title_file<P: AsRef<Path>>(path: P, title: String) -> io::Result<()> 
 /// Returns a collision-free id and filename for a new asset.
 /// Matches Go's UniqueAssetName behaviour.
 pub fn unique_asset_name(manifest: Option<&Manifest>, original: &str) -> (String, String) {
-    let raw_base = std::path::Path::new(original)
-        .file_name()
-        .and_then(|n| n.to_str())
-        .unwrap_or("image");
-    let filename = sanitize_filename(raw_base);
+    let filename = portable_asset_filename_from_path(original, "image.bin");
     let (filename, ext) = if filename.is_empty() {
         ("image.bin".to_string(), ".bin".to_string())
     } else {
@@ -244,13 +241,6 @@ pub fn unique_asset_name(manifest: Option<&Manifest>, original: &str) -> (String
         }
     }
     unreachable!()
-}
-
-fn sanitize_filename(s: &str) -> String {
-    let s = s.replace(' ', "-");
-    s.chars()
-        .filter(|&c| c.is_ascii_alphanumeric() || c == '-' || c == '_' || c == '.')
-        .collect()
 }
 
 fn sanitize_id(s: &str) -> String {

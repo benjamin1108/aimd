@@ -2,7 +2,6 @@ import { state } from "../core/state";
 import type {
   AimdAsset,
   AimdDocument,
-  MarkdownSourceModel,
   Mode,
   OpenDocumentId,
   OpenDocumentTab,
@@ -16,7 +15,6 @@ import {
   resolveLocalAssetPath,
   sanitizeDisplayURL,
 } from "./assets";
-import { createSourceModel } from "../editor/source-preserve";
 import { normalizeRenderedHTML } from "../rendered-surface/pipeline";
 import { rewriteRenderedSurfaceAssets } from "../rendered-surface/assets";
 
@@ -118,10 +116,6 @@ export function createOpenDocumentTab(
     pathKey,
     title: displayTabTitle(normalizedDoc),
     doc: normalizedDoc,
-    sourceModel: createSourceModel(normalizedDoc.markdown),
-    sourceDirtyRefs: new Set(),
-    sourceStructuralDirty: false,
-    inlineDirty: false,
     outline: canonical.outline,
     markdownVersion: 0,
     htmlVersion: 0,
@@ -129,10 +123,11 @@ export function createOpenDocumentTab(
     pendingRenderVersion: null,
     renderErrorVersion: null,
     renderTimer: null,
-    paintedVersion: { read: -1, edit: -1, source: -1 },
+    paintedVersion: { read: -1, edit: -1 },
     operationVersion: 0,
     mode,
-    scroll: { read: 0, edit: 0, source: 0 },
+    editPaneOrder: "source-first",
+    scroll: { read: 0, edit: 0 },
     sourceSelection: { start: 0, end: 0, direction: "none" },
     baseFileFingerprint: null,
     recoveryState: null,
@@ -144,10 +139,7 @@ export function bindFacadeFromTab(tab: OpenDocumentTab) {
   state.openDocuments.activeTabId = tab.id;
   state.doc = tab.doc;
   state.mode = tab.mode;
-  state.sourceModel = tab.sourceModel;
-  state.sourceDirtyRefs = tab.sourceDirtyRefs;
-  state.sourceStructuralDirty = tab.sourceStructuralDirty;
-  state.inlineDirty = tab.inlineDirty;
+  state.editPaneOrder = tab.editPaneOrder;
   state.outline = tab.outline;
   state.markdownVersion = tab.markdownVersion;
   state.htmlVersion = tab.htmlVersion;
@@ -164,10 +156,7 @@ export function syncActiveTabFromFacade() {
   tab.doc = state.doc;
   tab.title = displayTabTitle(state.doc);
   tab.pathKey = state.doc.isDraft ? null : normalizePathKey(state.doc.path);
-  tab.sourceModel = state.sourceModel as MarkdownSourceModel | null;
-  tab.sourceDirtyRefs = state.sourceDirtyRefs;
-  tab.sourceStructuralDirty = state.sourceStructuralDirty;
-  tab.inlineDirty = state.inlineDirty;
+  tab.editPaneOrder = state.editPaneOrder;
   tab.outline = state.outline;
   tab.markdownVersion = state.markdownVersion;
   tab.htmlVersion = state.htmlVersion;
@@ -196,10 +185,6 @@ export function replaceActiveTabDocument(doc: AimdDocument, mode: Mode): OpenDoc
     tab.doc = normalizedDoc;
     tab.title = displayTabTitle(normalizedDoc);
     tab.pathKey = normalizedDoc.isDraft ? null : normalizePathKey(normalizedDoc.path);
-    tab.sourceModel = createSourceModel(normalizedDoc.markdown);
-    tab.sourceDirtyRefs = new Set();
-    tab.sourceStructuralDirty = false;
-    tab.inlineDirty = false;
     if (tab.renderTimer) window.clearTimeout(tab.renderTimer);
     tab.outline = canonical.outline;
     tab.markdownVersion = 0;
@@ -208,10 +193,11 @@ export function replaceActiveTabDocument(doc: AimdDocument, mode: Mode): OpenDoc
     tab.pendingRenderVersion = null;
     tab.renderErrorVersion = null;
     tab.renderTimer = null;
-    tab.paintedVersion = { read: -1, edit: -1, source: -1 };
+    tab.paintedVersion = { read: -1, edit: -1 };
     tab.operationVersion += 1;
     tab.mode = mode;
-    tab.scroll = { read: 0, edit: 0, source: 0 };
+    tab.editPaneOrder = "source-first";
+    tab.scroll = { read: 0, edit: 0 };
     tab.sourceSelection = { start: 0, end: 0, direction: "none" };
     tab.recoveryState = null;
     tab.healthReport = null;
@@ -229,10 +215,6 @@ export function replaceTabDocument(tabId: string, doc: AimdDocument, mode?: Mode
   tab.doc = normalizedDoc;
   tab.title = displayTabTitle(normalizedDoc);
   tab.pathKey = normalizedDoc.isDraft ? null : normalizePathKey(normalizedDoc.path);
-  tab.sourceModel = createSourceModel(normalizedDoc.markdown);
-  tab.sourceDirtyRefs = new Set();
-  tab.sourceStructuralDirty = false;
-  tab.inlineDirty = false;
   if (tab.renderTimer) window.clearTimeout(tab.renderTimer);
   tab.outline = canonical.outline;
   tab.markdownVersion = 0;
@@ -241,7 +223,7 @@ export function replaceTabDocument(tabId: string, doc: AimdDocument, mode?: Mode
   tab.pendingRenderVersion = null;
   tab.renderErrorVersion = null;
   tab.renderTimer = null;
-  tab.paintedVersion = { read: -1, edit: -1, source: -1 };
+  tab.paintedVersion = { read: -1, edit: -1 };
   if (mode) tab.mode = mode;
   tab.recoveryState = null;
   tab.healthReport = null;

@@ -147,7 +147,7 @@ async function openWorkspaceAndDocs(page: Page) {
 
 async function replaceSourceMarkdown(page: Page, markdown: string) {
   const source = page.locator("#markdown");
-  await page.locator("#mode-source").click();
+  await page.locator("#mode-edit").click();
   await expect(source).toHaveValue("# Alpha\n\nA body");
   await source.evaluate((element, value) => {
     const textarea = element as HTMLTextAreaElement;

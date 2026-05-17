@@ -237,6 +237,7 @@ test.describe("D. 阅读模式文本选择", () => {
 
     // 切到编辑模式，让工具栏出现
     await page.locator("#mode-edit").click();
+    await page.locator("#markdown").focus();
     await expect(page.locator("#format-toolbar")).toBeVisible();
 
     // 验证工具栏按钮可以被点击（pointer-events 未被 user-select:none 影响）

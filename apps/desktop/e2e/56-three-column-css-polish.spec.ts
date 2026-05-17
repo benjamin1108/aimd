@@ -259,6 +259,7 @@ async function expectCommandStripAndTabsStable(page: Page) {
     const intersects = (a?: DOMRect, b?: DOMRect) => Boolean(a && b
       && a.left < b.right && a.right > b.left && a.top < b.bottom && a.bottom > b.top);
     const find = box("#find-toggle");
+    const width = box("#viewport-width-toggle");
     const mode = box(".toolbar-group--mode");
     const more = box("#more-menu-toggle");
     const tab = box(".open-tab");
@@ -267,6 +268,8 @@ async function expectCommandStripAndTabsStable(page: Page) {
     const strip = box("#document-command-strip");
     return {
       findModeOverlap: intersects(find, mode),
+      findWidthOverlap: intersects(find, width),
+      widthModeOverlap: intersects(width, mode),
       modeMoreOverlap: intersects(mode, more),
       tabCommandOverlap: intersects(tab, strip),
       tabStripBottom: tabStrip?.bottom || 0,
@@ -275,9 +278,12 @@ async function expectCommandStripAndTabsStable(page: Page) {
       closeWidth: close?.width || 0,
       closeHeight: close?.height || 0,
       stripHeight: strip?.height || 0,
+      widthToggleWidth: width?.width || 0,
     };
   });
   expect(metrics.findModeOverlap).toBe(false);
+  expect(metrics.findWidthOverlap).toBe(false);
+  expect(metrics.widthModeOverlap).toBe(false);
   expect(metrics.modeMoreOverlap).toBe(false);
   expect(metrics.tabCommandOverlap).toBe(false);
   expect(metrics.commandStripTop).toBeGreaterThanOrEqual(metrics.tabStripBottom - 1);
@@ -286,6 +292,8 @@ async function expectCommandStripAndTabsStable(page: Page) {
   expect(metrics.closeWidth).toBeGreaterThanOrEqual(24);
   expect(metrics.closeHeight).toBeGreaterThanOrEqual(24);
   expect(metrics.stripHeight).toBeLessThanOrEqual(62);
+  expect(metrics.widthToggleWidth).toBeGreaterThanOrEqual(28);
+  expect(metrics.widthToggleWidth).toBeLessThanOrEqual(34);
 }
 
 type VisualState =
@@ -311,7 +319,7 @@ async function setupVisualState(page: Page, stateName: VisualState) {
   }
   if (stateName === "dirty-markdown-requires-aimd") {
     await openDoc(page, "Daily with an intentionally long project filename");
-    await page.locator("#mode-source").click();
+    await page.locator("#mode-edit").click();
     await page.locator("#markdown").fill("# Daily with an intentionally long project filename for ellipsis checks\n\n![local](asset://img-001)");
     await expect(page.locator("#doc-state-badges")).toBeHidden();
     await expect(page.locator("#status")).toContainText("保存时需选择格式");
@@ -328,7 +336,7 @@ async function setupVisualState(page: Page, stateName: VisualState) {
     await expect(page.locator("#git-panel")).toBeVisible();
     return;
   }
-  await page.locator("#mode-source").click();
+  await page.locator("#mode-edit").click();
   await expect(page.locator("#editor-wrap")).toBeVisible();
 }
 

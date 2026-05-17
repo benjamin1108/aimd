@@ -33,6 +33,7 @@
 @import "../surfaces/editor.css";
 @import "../overlays/lightbox.css";
 @import "../overlays/debug-console.css";
+@import "../overlays/tooltips.css";
 @import "../overlays/overlays.css";
 @import "../utilities/state.css";
 @import "../utilities/print.css";

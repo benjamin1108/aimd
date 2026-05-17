@@ -9,7 +9,6 @@ import { setStatus, displayDocTitle, updateChrome } from "../ui/chrome";
 import { rememberOpenedPath } from "../ui/recents";
 import { fileStem, suggestAimdFilename } from "../util/path";
 import { applyDocument, applyDocumentToTab } from "./apply";
-import { flushInline } from "../editor/inline";
 import { deleteDraftFile } from "./drafts";
 import { hasAimdImageReferences } from "./assets";
 import { ensureCanonicalHTMLForTab, renderPreview } from "../ui/outline";
@@ -34,7 +33,6 @@ function messageFromError(err: unknown, fallback: string): string {
 
 export async function saveDocument() {
   if (!state.doc) return;
-  if (state.mode === "edit" && !flushInline().ok) return;
   syncActiveTabFromFacade();
   const target = beginTabOperation();
   const tab = target ? findTab(target.tabId) : activeTab();
@@ -225,7 +223,6 @@ async function saveDocumentAsAimd(sourcePath: string | null, wasDraft: boolean, 
 
 export async function saveDocumentAs() {
   if (!state.doc) return;
-  if (state.mode === "edit" && !flushInline().ok) return;
   if (state.doc.hasGitConflicts && !window.confirm("文档仍包含 Git 冲突标记。确认另存？")) {
     setStatus("已取消保存，请先解决 Git 冲突", "warn");
     return;

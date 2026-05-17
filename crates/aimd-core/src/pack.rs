@@ -5,6 +5,7 @@ use std::path::{Path, PathBuf};
 
 use aimd_mdx::{extract_title, is_asset_uri, is_remote, rewrite, scan, ASSET_URI_PREFIX};
 
+use crate::asset_names::portable_asset_filename;
 use crate::manifest::{Manifest, ROLE_CONTENT_IMAGE};
 use crate::rewrite::NewAsset;
 use crate::writer::Writer;
@@ -269,16 +270,7 @@ fn unique_filename(taken: &mut HashSet<String>, name: &str) -> String {
 }
 
 fn sanitize_filename(s: &str) -> String {
-    let out: String = s
-        .replace(' ', "-")
-        .chars()
-        .filter(|&c| c.is_ascii_alphanumeric() || c == '-' || c == '_' || c == '.')
-        .collect();
-    if out.is_empty() {
-        "image.bin".to_string()
-    } else {
-        out
-    }
+    portable_asset_filename(s, "image.bin")
 }
 
 fn sha256_hex(data: &[u8]) -> String {

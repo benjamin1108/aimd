@@ -1,7 +1,7 @@
 import { invoke } from "@tauri-apps/api/core";
 import { state } from "../core/state";
 import {
-  markdownEl, inlineEditorEl, previewEl, readerEl,
+  markdownEl, previewEl, readerEl,
 } from "../core/dom";
 import type { AimdDocument, MarkdownDraft, RenderResult } from "../core/types";
 import { setStatus, updateChrome } from "../ui/chrome";
@@ -10,7 +10,6 @@ import { applyHTML } from "../ui/outline";
 import { rememberOpenedPath } from "../ui/recents";
 import { fileStem } from "../util/path";
 import { activateDocumentTab, applyDocumentAsNewTab, applyDocumentToTab } from "./apply";
-import { flushInline } from "../editor/inline";
 import { hasExternalImageReferences } from "./assets";
 import { triggerOptimizeOnOpen } from "./optimize";
 import { saveDocument } from "./persist";
@@ -152,19 +151,8 @@ export async function newDocument() {
   setMode("edit");
   updateChrome();
   setStatus("已创建草稿，先保存为 .aimd 文件", "info");
-  // BUG-008: 显式将焦点和光标设到编辑区第一个可编辑节点开头
-  inlineEditorEl().focus();
-  const firstBlock = inlineEditorEl().firstElementChild;
-  if (firstBlock) {
-    const r = document.createRange();
-    r.setStart(firstBlock, 0);
-    r.collapse(true);
-    const sel = window.getSelection();
-    if (sel) {
-      sel.removeAllRanges();
-      sel.addRange(r);
-    }
-  }
+  markdownEl().focus();
+  markdownEl().setSelectionRange(markdown.length, markdown.length);
 }
 
 export async function openDocument(path: string, options: { skipConfirm?: boolean } = {}): Promise<OpenRouteResult> {
@@ -213,17 +201,12 @@ function clearDocumentSurface() {
   state.doc = null;
   state.openDocuments.activeTabId = null;
   state.outline = [];
-  state.inlineDirty = false;
-  state.sourceModel = null;
-  state.sourceDirtyRefs.clear();
-  state.sourceStructuralDirty = false;
   state.markdownVersion = 0;
   state.htmlVersion = 0;
   state.htmlMarkdownVersion = 0;
   state.pendingRenderVersion = null;
   state.renderErrorVersion = null;
   markdownEl().value = "";
-  inlineEditorEl().innerHTML = "";
   previewEl().innerHTML = "";
   readerEl().innerHTML = "";
   clearSessionSnapshot();
@@ -304,14 +287,6 @@ async function saveTabBeforeLeaving(tabId: string): Promise<boolean> {
 export async function ensureCanCloseTab(tabId: string, action: string): Promise<boolean> {
   const tab = findTab(tabId);
   if (!tab?.doc.dirty) return true;
-  if (state.openDocuments.activeTabId === tab.id && state.mode === "edit" && state.inlineDirty) {
-    const flushed = flushInline();
-    if (!flushed.ok) return false;
-    syncActiveTabFromFacade();
-  } else if (tab.inlineDirty) {
-    setStatus("可视化编辑仍有未同步修改，请先切回该文档处理", "warn");
-    return false;
-  }
   const label = displayTabTitle(tab.doc);
   let choice: "save" | "discard" | "cancel";
   try {

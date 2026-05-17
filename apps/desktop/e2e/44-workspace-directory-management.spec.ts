@@ -239,7 +239,7 @@ test.describe("Workspace directory management", () => {
     await page.locator(".link-popover [data-action='confirm']").click();
     await expect(page.locator("#doc-title")).toHaveText("Daily Renamed");
 
-    await page.locator("#mode-source").click();
+    await page.locator("#mode-edit").click();
     await page.locator("#markdown").fill("# Daily Renamed\n\nSaved after rename");
     await page.locator("#more-menu-toggle").click();
     await page.locator("#save").click();

@@ -2,12 +2,10 @@ import { invoke } from "@tauri-apps/api/core";
 import { state } from "../core/state";
 import type { DocumentHealthReport, ExportMarkdownResult } from "../core/types";
 import { setStatus, displayDocTitle } from "../ui/chrome";
-import { flushInline } from "../editor/inline";
 import { fileStem } from "../util/path";
 import { showHealthReport } from "./health";
 
 function currentMarkdown(): string | null {
-  if (state.mode === "edit" && !flushInline().ok) return null;
   return state.doc?.markdown ?? "";
 }
 

@@ -6,7 +6,6 @@ import {
   healthCleanUnusedEl, healthPackageLocalEl,
 } from "../core/dom";
 import { setStatus, updateChrome } from "../ui/chrome";
-import { flushInline } from "../editor/inline";
 import { applyDocumentToTab } from "./apply";
 import { saveDocumentAs } from "./persist";
 import { escapeHTML } from "../util/escape";
@@ -20,7 +19,6 @@ import {
 } from "./open-document-state";
 
 function currentMarkdown(): string | null {
-  if (state.mode === "edit" && !flushInline().ok) return null;
   return state.doc?.markdown ?? "";
 }
 

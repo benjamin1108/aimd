@@ -13,7 +13,7 @@
 }
 
 @media (max-width: 1320px) and (min-width: 901px) {
-  .panel[data-mode="source"]:not([data-shell="launch"]) .editor-split {
+  .panel[data-mode="edit"]:not([data-shell="launch"]) .editor-split {
     grid-template-columns: minmax(0, 1.15fr) minmax(0, 0.85fr);
   }
 }
@@ -97,11 +97,19 @@
   .reader { padding: 28px 28px 56px; }
 }
 
-/* 桌面窄窗口下保留源码 / 预览双栏：让作者还能即时看到渲染结果。
-   只在 mobile/non-pointer 设备上把预览折叠掉。 */
 @media (max-width: 760px) {
-  .editor-split { grid-template-columns: minmax(0, 1fr); }
-  .preview-pane { display: none; }
+  .editor-split {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: minmax(0, 1fr) minmax(0, 1fr);
+  }
+  .reader.preview {
+    border-left: 0;
+    border-top: 1px solid var(--hairline);
+  }
+  .editor-split[data-edit-pane-order="preview-first"] .reader.preview {
+    border-right: 0;
+    border-bottom: 1px solid var(--hairline);
+  }
 }
 
 @media (max-width: 760px) {
@@ -159,14 +167,14 @@
     align-items: center;
     justify-content: flex-start;
     grid-template-columns: minmax(0, 1fr) auto auto auto;
-    gap: 6px;
+    gap: 4px;
     padding: 0;
   }
   .doc-toolbar > .format-toolbar {
     flex: 1 1 auto;
     min-width: 0;
   }
-  .find-cluster,
+  .command-icon-cluster,
   .toolbar-group--mode,
   .command-actions {
     flex: 0 0 auto;

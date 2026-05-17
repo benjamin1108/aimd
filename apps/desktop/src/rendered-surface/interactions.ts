@@ -127,7 +127,6 @@ function addCodeCopyButtons(
     const btn = document.createElement("button");
     btn.type = "button";
     btn.className = "code-copy";
-    btn.contentEditable = "false";
     btn.textContent = "复制";
     btn.dataset.surfaceKind = profile.kind;
     btn.addEventListener("click", async (event) => {
