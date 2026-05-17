@@ -413,7 +413,7 @@ ${APP_TOPBAR_HTML}
             </div>
             <div class="preview-pane">
               <div class="pane-tag">预览</div>
-              <div id="preview" class="reader aimd preview"></div>
+              <div id="preview" class="reader aimd preview preview-content"></div>
             </div>
           </div>
         </section>

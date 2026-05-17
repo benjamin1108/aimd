@@ -70,6 +70,7 @@ export type OpenDocumentTab = {
   scroll: {
     read: number;
     edit: number;
+    source: number;
   };
   sourceSelection: {
     start: number;

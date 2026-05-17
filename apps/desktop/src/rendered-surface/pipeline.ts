@@ -25,6 +25,7 @@ export function paintRenderedSurface(
   root.innerHTML = profile.stripFrontmatter
     ? stripRenderedFrontmatter(renderedHtml)
     : renderedHtml;
+  normalizeRenderedSurfaceDOM(root);
 
   tagAssetImages(root, context.assets);
   prepareRenderedSurfaceInteractions(root, profile, context.callbacks);
@@ -55,4 +56,25 @@ export function normalizeRenderedHTML(html: string): { html: string; outline: Ou
     outline.push({ id, text, level });
   });
   return { html: template.innerHTML, outline };
+}
+
+function normalizeRenderedSurfaceDOM(root: HTMLElement) {
+  stripInterBlockWhitespaceText(root);
+}
+
+function stripInterBlockWhitespaceText(root: HTMLElement) {
+  const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT);
+  const removable: Text[] = [];
+  while (walker.nextNode()) {
+    const node = walker.currentNode;
+    if (!(node instanceof Text) || node.data.trim()) continue;
+    const parent = node.parentElement;
+    if (!parent || !shouldStripWhitespaceText(parent)) continue;
+    removable.push(node);
+  }
+  removable.forEach((node) => node.remove());
+}
+
+function shouldStripWhitespaceText(parent: HTMLElement): boolean {
+  return !parent.closest("p,li,h1,h2,h3,h4,h5,h6,td,th,pre,code,kbd,samp");
 }

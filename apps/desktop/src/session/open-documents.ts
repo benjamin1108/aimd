@@ -275,6 +275,7 @@ function applyPersistedViewState(tab: OpenDocumentTab, data: PersistedOpenTabV2)
   tab.scroll = {
     read: Number(data.scroll?.read || 0),
     edit: Number(data.scroll?.edit ?? data.scroll?.source ?? 0),
+    source: Number(data.scroll?.source ?? data.scroll?.edit ?? 0),
   };
   tab.editPaneOrder = data.editPaneOrder || "source-first";
   tab.sourceSelection = {

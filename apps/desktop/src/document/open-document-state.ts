@@ -127,7 +127,7 @@ export function createOpenDocumentTab(
     operationVersion: 0,
     mode,
     editPaneOrder: "source-first",
-    scroll: { read: 0, edit: 0 },
+    scroll: { read: 0, edit: 0, source: 0 },
     sourceSelection: { start: 0, end: 0, direction: "none" },
     baseFileFingerprint: null,
     recoveryState: null,
@@ -197,7 +197,7 @@ export function replaceActiveTabDocument(doc: AimdDocument, mode: Mode): OpenDoc
     tab.operationVersion += 1;
     tab.mode = mode;
     tab.editPaneOrder = "source-first";
-    tab.scroll = { read: 0, edit: 0 };
+    tab.scroll = { read: 0, edit: 0, source: 0 };
     tab.sourceSelection = { start: 0, end: 0, direction: "none" };
     tab.recoveryState = null;
     tab.healthReport = null;

@@ -3,13 +3,10 @@ import { state } from "../core/state";
 type SelectAllContext = "main" | "settings";
 
 let lastSelectableRoot: HTMLElement | null = null;
-let doubleClickAnchor: {
-  block: HTMLElement;
-  node: Text | null;
-  offset: number;
-  root: HTMLElement;
-  until: number;
-} | null = null;
+let renderedSurfacePointerDown = false;
+let renderedSurfaceSelectionHotUntil = 0;
+let selectionTrimFrame = 0;
+let isTrimmingRenderedSelection = false;
 
 function elementFromTarget(target: EventTarget | null): HTMLElement | null {
   return target instanceof HTMLElement ? target : null;
@@ -41,14 +38,6 @@ export function selectElementContents(element: HTMLElement): boolean {
   selection.removeAllRanges();
   selection.addRange(range);
   return true;
-}
-
-export function selectionInside(root: HTMLElement): boolean {
-  const selection = window.getSelection();
-  if (!selection || selection.rangeCount === 0) return false;
-  const anchor = selection.anchorNode;
-  const focus = selection.focusNode;
-  return Boolean(anchor && focus && root.contains(anchor) && root.contains(focus));
 }
 
 function selectTextarea(textarea: HTMLTextAreaElement): boolean {
@@ -123,112 +112,137 @@ function selectRoot(root: HTMLElement | HTMLTextAreaElement | null): boolean {
   return selectElementContents(root);
 }
 
-function renderedSurfaceRoot(target: HTMLElement | null): HTMLElement | null {
-  return target?.closest<HTMLElement>("#reader, #preview") || null;
-}
-
-function selectableBlock(target: HTMLElement | null, root: HTMLElement): HTMLElement | null {
-  const block = target?.closest<HTMLElement>("h1,h2,h3,h4,h5,h6,p,li,blockquote,pre,td,th");
-  return block && root.contains(block) ? block : null;
-}
-
-function caretRangeFromPoint(x: number, y: number): Range | null {
-  if (document.caretRangeFromPoint) return document.caretRangeFromPoint(x, y);
-  const pos = document.caretPositionFromPoint?.(x, y);
-  if (!pos) return null;
-  const range = document.createRange();
-  range.setStart(pos.offsetNode, pos.offset);
-  range.collapse(true);
-  return range;
-}
-
-function textAnchorFromPoint(event: MouseEvent, block: HTMLElement): { node: Text | null; offset: number } {
-  const caret = caretRangeFromPoint(event.clientX, event.clientY);
-  const node = caret?.startContainer;
-  if (node instanceof Text && block.contains(node)) {
-    return { node, offset: caret?.startOffset ?? 0 };
-  }
-  const walker = document.createTreeWalker(block, NodeFilter.SHOW_TEXT);
-  const fallback = walker.nextNode();
-  return { node: fallback instanceof Text ? fallback : null, offset: 0 };
-}
-
-function rememberDoubleClickAnchor(event: MouseEvent) {
-  if (event.detail < 2) return;
-  const target = elementFromTarget(event.target);
-  const root = renderedSurfaceRoot(target);
-  if (!root) {
-    doubleClickAnchor = null;
-    return;
-  }
-  const block = selectableBlock(target, root);
-  if (!block) {
-    doubleClickAnchor = null;
-    return;
-  }
-  const anchor = textAnchorFromPoint(event, block);
-  doubleClickAnchor = {
-    block,
-    node: anchor.node,
-    offset: anchor.offset,
-    root,
-    until: performance.now() + 900,
-  };
-}
-
-function normalizeDoubleClickSelection() {
-  const anchor = doubleClickAnchor;
-  if (!anchor || performance.now() > anchor.until || !isVisible(anchor.root) || !isVisible(anchor.block)) return;
-  const selection = window.getSelection();
-  if (!selection || selection.rangeCount === 0 || selection.isCollapsed) return;
-  const range = selection.getRangeAt(0);
-  if (!anchor.root.contains(range.commonAncestorContainer) && range.commonAncestorContainer !== anchor.root) return;
-  if (selectionInside(anchor.block)) return;
-  selectWordAtAnchor(anchor);
-}
-
-function selectWordAtAnchor(anchor: NonNullable<typeof doubleClickAnchor>) {
-  const node = anchor.node && anchor.block.contains(anchor.node) ? anchor.node : firstTextNode(anchor.block);
-  if (!node || !node.data.length) return;
-  const index = nearestWordIndex(node.data, anchor.offset);
-  if (index === null) return;
-  const [start, end] = wordBounds(node.data, index);
-  if (start === end) return;
-  const range = document.createRange();
-  range.setStart(node, start);
-  range.setEnd(node, end);
-  const selection = window.getSelection();
-  selection?.removeAllRanges();
-  selection?.addRange(range);
-}
-
-function firstTextNode(root: HTMLElement): Text | null {
-  const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT);
-  const node = walker.nextNode();
-  return node instanceof Text ? node : null;
-}
-
-function nearestWordIndex(text: string, offset: number): number | null {
-  const start = Math.max(0, Math.min(offset, text.length - 1));
-  for (let distance = 0; distance < text.length; distance += 1) {
-    const left = start - distance;
-    const right = start + distance;
-    if (left >= 0 && isWordChar(text[left])) return left;
-    if (right < text.length && isWordChar(text[right])) return right;
-  }
+function renderedSurfaceRoot(target: EventTarget | Node | null): HTMLElement | null {
+  if (target instanceof HTMLElement) return target.closest<HTMLElement>("#reader, #preview");
+  if (target instanceof Node) return target.parentElement?.closest<HTMLElement>("#reader, #preview") || null;
   return null;
 }
 
-function wordBounds(text: string, index: number): [number, number] {
-  let start = index;
-  let end = index + 1;
-  while (start > 0 && isWordChar(text[start - 1])) start -= 1;
-  while (end < text.length && isWordChar(text[end])) end += 1;
-  return [start, end];
+function activeRenderedSelectionRoot(): HTMLElement | null {
+  const selection = window.getSelection();
+  if (!selection || selection.rangeCount === 0 || selection.isCollapsed) return null;
+  const anchorRoot = renderedSurfaceRoot(selection.anchorNode);
+  const focusRoot = renderedSurfaceRoot(selection.focusNode);
+  return anchorRoot && anchorRoot === focusRoot ? anchorRoot : null;
 }
 
-function isWordChar(char: string | undefined): boolean {
-  return Boolean(char && /[\p{L}\p{N}_$.-]/u.test(char));
+function scheduleTrimRenderedSelection() {
+  if (selectionTrimFrame) window.cancelAnimationFrame(selectionTrimFrame);
+  selectionTrimFrame = window.requestAnimationFrame(() => {
+    selectionTrimFrame = 0;
+    trimRenderedSelection();
+  });
+}
+
+function trimRenderedSelection() {
+  if (isTrimmingRenderedSelection) return;
+  const root = activeRenderedSelectionRoot();
+  if (!root || !isVisible(root)) return;
+  const selection = window.getSelection();
+  if (!selection || selection.rangeCount === 0 || selection.isCollapsed) return;
+  const range = selection.getRangeAt(0);
+  const bounds = selectedTextBounds(root, range);
+  if (!bounds) return;
+
+  const next = document.createRange();
+  next.setStart(bounds.startNode, bounds.startOffset);
+  next.setEnd(bounds.endNode, bounds.endOffset);
+  if (sameRangeBoundary(range, next)) return;
+  const backward = isBackwardSelection(selection);
+  isTrimmingRenderedSelection = true;
+  try {
+    applySelectionBounds(selection, bounds, backward, next);
+  } finally {
+    isTrimmingRenderedSelection = false;
+  }
+}
+
+function applySelectionBounds(
+  selection: Selection,
+  bounds: { startNode: Text; startOffset: number; endNode: Text; endOffset: number },
+  backward: boolean,
+  fallbackRange: Range,
+) {
+  if (selection.setBaseAndExtent) {
+    if (backward) {
+      selection.setBaseAndExtent(bounds.endNode, bounds.endOffset, bounds.startNode, bounds.startOffset);
+    } else {
+      selection.setBaseAndExtent(bounds.startNode, bounds.startOffset, bounds.endNode, bounds.endOffset);
+    }
+    return;
+  }
+  selection.removeAllRanges();
+  selection.addRange(fallbackRange);
+}
+
+function isBackwardSelection(selection: Selection): boolean {
+  const anchorNode = selection.anchorNode;
+  const focusNode = selection.focusNode;
+  if (!anchorNode || !focusNode) return false;
+  if (anchorNode === focusNode) return selection.anchorOffset > selection.focusOffset;
+  const range = document.createRange();
+  try {
+    range.setStart(anchorNode, selection.anchorOffset);
+    range.setEnd(focusNode, selection.focusOffset);
+    return range.collapsed;
+  } catch {
+    return false;
+  }
+}
+
+function selectedTextBounds(
+  root: HTMLElement,
+  range: Range,
+): { startNode: Text; startOffset: number; endNode: Text; endOffset: number } | null {
+  const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT);
+  let startNode: Text | null = null;
+  let startOffset = 0;
+  let endNode: Text | null = null;
+  let endOffset = 0;
+
+  while (walker.nextNode()) {
+    const node = walker.currentNode;
+    if (!(node instanceof Text) || !node.data.trim()) continue;
+    if (!range.intersectsNode(node)) continue;
+    let start = node === range.startContainer ? range.startOffset : 0;
+    let end = node === range.endContainer ? range.endOffset : node.data.length;
+    if (isCodeTextNode(node)) {
+      start = trimCodeLeadingBoundary(node.data, start, end);
+      end = trimCodeTrailingBoundary(node.data, start, end);
+    }
+    if (end <= start || !node.data.slice(start, end).trim()) continue;
+    if (!startNode) {
+      startNode = node;
+      startOffset = start;
+    }
+    endNode = node;
+    endOffset = end;
+  }
+
+  return startNode && endNode ? { startNode, startOffset, endNode, endOffset } : null;
+}
+
+function isCodeTextNode(node: Text): boolean {
+  return Boolean(node.parentElement?.closest("pre,code"));
+}
+
+function trimCodeLeadingBoundary(text: string, start: number, end: number): number {
+  let nextStart = start;
+  while (nextStart < end && /[\r\n]/.test(text[nextStart])) nextStart += 1;
+  return nextStart;
+}
+
+function trimCodeTrailingBoundary(text: string, start: number, end: number): number {
+  let nextEnd = end;
+  while (nextEnd > start && /[\s]/.test(text[nextEnd - 1])) nextEnd -= 1;
+  return nextEnd;
+}
+
+function sameRangeBoundary(a: Range, b: Range): boolean {
+  return a.startContainer === b.startContainer
+    && a.startOffset === b.startOffset
+    && a.endContainer === b.endContainer
+    && a.endOffset === b.endOffset;
 }
 
 export function handleSelectAllShortcut(event: KeyboardEvent, context: SelectAllContext = "main"): boolean {
@@ -259,15 +273,27 @@ export function bindSelectionBoundary(context: SelectAllContext = "main") {
   }, { capture: true });
 
   if (context !== "main") return;
-  document.addEventListener("mousedown", rememberDoubleClickAnchor, { capture: true });
-  document.addEventListener("dblclick", () => {
-    window.requestAnimationFrame(normalizeDoubleClickSelection);
-    window.setTimeout(normalizeDoubleClickSelection, 0);
-  }, { capture: true });
   document.addEventListener("pointerdown", (event) => {
     const target = elementFromTarget(event.target);
     lastSelectableRoot = target?.closest<HTMLElement>(
       "#reader, #git-diff-scroll, #preview, #format-preview-text, #health-list, .debug-list",
     ) || null;
+    renderedSurfacePointerDown = Boolean(target?.closest("#reader, #preview"));
+    renderedSurfaceSelectionHotUntil = renderedSurfacePointerDown ? performance.now() + 1_500 : 0;
+  }, { capture: true });
+  document.addEventListener("pointerup", () => {
+    if (!renderedSurfacePointerDown) return;
+    renderedSurfacePointerDown = false;
+    renderedSurfaceSelectionHotUntil = 0;
+  }, { capture: true });
+  document.addEventListener("selectionchange", () => {
+    if (!renderedSurfacePointerDown && performance.now() > renderedSurfaceSelectionHotUntil) return;
+    trimRenderedSelection();
+  });
+  document.addEventListener("dblclick", (event) => {
+    if (!renderedSurfaceRoot(event.target)) return;
+    renderedSurfaceSelectionHotUntil = performance.now() + 250;
+    trimRenderedSelection();
+    scheduleTrimRenderedSelection();
   }, { capture: true });
 }

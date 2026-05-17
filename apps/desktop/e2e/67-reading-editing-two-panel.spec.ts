@@ -19,15 +19,115 @@ async function installTwoPanelMock(page: Page) {
       saveCalls: [] as Array<Record<string, unknown>>,
       addedAssets: [] as Array<Record<string, unknown>>,
     };
+    const escapeHTML = (value: string) => value
+      .replace(/&/g, "&amp;")
+      .replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;")
+      .replace(/"/g, "&quot;");
     const render = (markdown: string) => ({
-      html: markdown
-        .replace(/^# (.*)$/gm, "<h1>$1</h1>")
-        .replace(/Alpha paragraph/g, "<p>Alpha paragraph</p>")
-        .replace(/Beta preview/g, "<p>Beta preview</p>")
-        .replace(/- \[ \] task/g, '<ul><li><input type="checkbox" disabled> task</li></ul>')
-        .replace(/- \[x\] task/g, '<ul><li><input type="checkbox" disabled checked> task</li></ul>')
-        .replace(/!\[([^\]]*)\]\(asset:\/\/img-001\)/g, '<p><img src="asset://img-001" alt="$1"></p>'),
+      html: markdownToHTML(markdown),
     });
+    const markdownToHTML = (markdown: string) => {
+      const html: string[] = [];
+      let paragraph: string[] = [];
+      let listItems: string[] = [];
+      let codeLines: string[] | null = null;
+      let tableLines: string[] = [];
+      const flushParagraph = () => {
+        if (!paragraph.length) return;
+        html.push(`<p>${paragraph.map(escapeHTML).join("<br>")}</p>`);
+        paragraph = [];
+      };
+      const flushList = () => {
+        if (!listItems.length) return;
+        html.push(`<ul>${listItems.join("")}</ul>`);
+        listItems = [];
+      };
+      const flushCode = () => {
+        if (!codeLines) return;
+        html.push(`<pre><code>${escapeHTML(codeLines.join("\n"))}</code></pre>`);
+        codeLines = null;
+      };
+      const flushTable = () => {
+        if (tableLines.length < 2) {
+          tableLines.forEach((line) => paragraph.push(line));
+          tableLines = [];
+          return;
+        }
+        const rows = tableLines
+          .filter((line) => !/^\s*\|?\s*:?-{3,}:?\s*(\|\s*:?-{3,}:?\s*)+\|?\s*$/.test(line))
+          .map((line) => line.trim().replace(/^\|/, "").replace(/\|$/, "").split("|").map((cell) => escapeHTML(cell.trim())));
+        const header = rows.shift() || [];
+        html.push([
+          "<table><thead><tr>",
+          header.map((cell) => `<th>${cell}</th>`).join(""),
+          "</tr></thead><tbody>",
+          rows.map((row) => `<tr>${row.map((cell) => `<td>${cell}</td>`).join("")}</tr>`).join(""),
+          "</tbody></table>",
+        ].join(""));
+        tableLines = [];
+      };
+      for (const line of markdown.split("\n")) {
+        if (codeLines) {
+          if (/^\s*(```|~~~)/.test(line)) {
+            flushCode();
+          } else {
+            codeLines.push(line);
+          }
+          continue;
+        }
+        const heading = line.match(/^(#{1,6})\s+(.+)$/);
+        if (heading) {
+          flushParagraph();
+          flushList();
+          flushTable();
+          html.push(`<h${heading[1].length}>${escapeHTML(heading[2])}</h${heading[1].length}>`);
+          continue;
+        }
+        if (/^\s*(```|~~~)/.test(line)) {
+          flushParagraph();
+          flushList();
+          flushTable();
+          codeLines = [];
+          continue;
+        }
+        const task = line.match(/^\s*-\s+\[( |x|X)]\s+(.+)$/);
+        if (task) {
+          flushParagraph();
+          flushTable();
+          listItems.push(`<li><input type="checkbox" disabled${task[1].toLowerCase() === "x" ? " checked" : ""}> ${escapeHTML(task[2])}</li>`);
+          continue;
+        }
+        const image = line.match(/!\[([^\]]*)]\(asset:\/\/img-001\)/);
+        if (image) {
+          flushParagraph();
+          flushList();
+          flushTable();
+          html.push(`<p><img src="asset://img-001" alt="${escapeHTML(image[1])}"></p>`);
+          continue;
+        }
+        if (!line.trim()) {
+          flushParagraph();
+          flushList();
+          flushTable();
+          continue;
+        }
+        if (line.includes("|")) {
+          flushParagraph();
+          flushList();
+          tableLines.push(line);
+          continue;
+        }
+        flushTable();
+        flushList();
+        paragraph.push(line);
+      }
+      flushParagraph();
+      flushList();
+      flushCode();
+      flushTable();
+      return html.join("\n\n");
+    };
     const handlers: Record<string, (a: Args) => unknown> = {
       initial_open_path: () => null,
       choose_doc_file: () => s.doc.path,
@@ -78,6 +178,75 @@ async function openDoc(page: Page) {
   await page.locator("#empty-open").click();
 }
 
+function longMarkdown() {
+  return [
+    "# Scroll Sync",
+    "",
+    ...Array.from({ length: 36 }, (_, index) => {
+      const section = index + 1;
+      return [
+        `## Section ${section}`,
+        "",
+        `Paragraph ${section} keeps the rendered preview aligned with the source editor.`,
+      ].join("\n");
+    }),
+  ].join("\n\n");
+}
+
+async function fillLongMarkdown(page: Page) {
+  await page.locator("#mode-edit").click();
+  await page.locator("#markdown").fill(longMarkdown());
+  await expect(page.locator("#preview h2")).toHaveCount(36);
+  await expect.poll(() => page.locator("#markdown").evaluate((el: HTMLTextAreaElement) => (
+    el.scrollHeight - el.clientHeight
+  ))).toBeGreaterThan(0);
+  await expect.poll(() => page.locator("#preview").evaluate((el: HTMLElement) => (
+    el.scrollHeight - el.clientHeight
+  ))).toBeGreaterThan(0);
+}
+
+async function sourceScrollToHeading(page: Page, heading: string) {
+  await page.locator("#markdown").evaluate((textarea: HTMLTextAreaElement, targetHeading) => {
+    const lines = textarea.value.split("\n");
+    const line = lines.findIndex((item) => item.trim() === `## ${targetHeading}`);
+    const style = window.getComputedStyle(textarea);
+    const lineHeight = Number.parseFloat(style.lineHeight) || Number.parseFloat(style.fontSize) * 1.45 || 22;
+    textarea.scrollTop = Math.max(0, line) * lineHeight;
+    textarea.dispatchEvent(new Event("scroll", { bubbles: true }));
+  }, heading);
+}
+
+async function previewScrollToHeading(page: Page, heading: string) {
+  await page.locator("#preview").evaluate((preview: HTMLElement, targetHeading) => {
+    const target = Array.from(preview.querySelectorAll<HTMLElement>("h2"))
+      .find((element) => element.textContent?.trim() === targetHeading);
+    if (!target) throw new Error(`missing preview heading ${targetHeading}`);
+    const rootRect = preview.getBoundingClientRect();
+    const targetRect = target.getBoundingClientRect();
+    preview.scrollTop = targetRect.top - rootRect.top + preview.scrollTop;
+    preview.dispatchEvent(new Event("scroll", { bubbles: true }));
+  }, heading);
+}
+
+async function expectPreviewHeadingNearTop(page: Page, heading: string) {
+  await expect.poll(() => page.locator("#preview").evaluate((preview: HTMLElement, targetHeading) => {
+    const target = Array.from(preview.querySelectorAll<HTMLElement>("h2"))
+      .find((element) => element.textContent?.trim() === targetHeading);
+    if (!target) return Number.POSITIVE_INFINITY;
+    return Math.abs(target.getBoundingClientRect().top - preview.getBoundingClientRect().top);
+  }, heading)).toBeLessThan(140);
+}
+
+async function expectSourceHeadingNearTop(page: Page, heading: string) {
+  await expect.poll(() => page.locator("#markdown").evaluate((textarea: HTMLTextAreaElement, targetHeading) => {
+    const lines = textarea.value.split("\n");
+    const line = lines.findIndex((item) => item.trim() === `## ${targetHeading}`);
+    const style = window.getComputedStyle(textarea);
+    const lineHeight = Number.parseFloat(style.lineHeight) || Number.parseFloat(style.fontSize) * 1.45 || 22;
+    return Math.abs(textarea.scrollTop - Math.max(0, line) * lineHeight);
+  }, heading)).toBeLessThan(140);
+}
+
 test.describe("reading/editing two-panel contract", () => {
   test("only reading and editing modes are exposed", async ({ page }) => {
     await openDoc(page);
@@ -121,6 +290,31 @@ test.describe("reading/editing two-panel contract", () => {
     await page.locator("#mode-read").click();
     await page.locator("#mode-edit").click();
     await expect(page.locator("#editor-wrap")).toHaveAttribute("data-edit-pane-order", "preview-first");
+  });
+
+  test("source and preview keep semantic scroll position in sync", async ({ page }) => {
+    await openDoc(page);
+    await fillLongMarkdown(page);
+
+    await sourceScrollToHeading(page, "Section 24");
+    await expectPreviewHeadingNearTop(page, "Section 24");
+
+    await previewScrollToHeading(page, "Section 31");
+    await expectSourceHeadingNearTop(page, "Section 31");
+  });
+
+  test("scroll sync survives pane swap and stacked edit layout", async ({ page }) => {
+    await page.setViewportSize({ width: 700, height: 720 });
+    await openDoc(page);
+    await fillLongMarkdown(page);
+
+    await page.locator("#edit-pane-swap").click();
+    await expect(page.locator("#editor-wrap")).toHaveAttribute("data-edit-pane-order", "preview-first");
+    await sourceScrollToHeading(page, "Section 18");
+    await expectPreviewHeadingNearTop(page, "Section 18");
+
+    await previewScrollToHeading(page, "Section 28");
+    await expectSourceHeadingNearTop(page, "Section 28");
   });
 
   test("format toolbar follows source focus and pane swap keeps the icon row stable", async ({ page }) => {

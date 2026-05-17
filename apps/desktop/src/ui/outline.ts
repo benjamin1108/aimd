@@ -25,6 +25,7 @@ import {
 } from "../rendered-surface/profiles";
 import type { PaintRenderedSurfaceContext, RenderedSurfaceCallbacks, RenderedSurfaceProfile } from "../rendered-surface/types";
 import { commitMarkdownChange } from "../document/markdown-mutation";
+import { refreshEditScrollSync } from "../editor/scroll-sync";
 
 const LINK_HINT_STATUS_ACTION = "link-hover-hint";
 const paintedSurfaceTabIds: Record<Mode, string | null> = { read: null, edit: null };
@@ -249,10 +250,12 @@ function renderedSurfaceContext(version: number): PaintRenderedSurfaceContext {
       if (profile.paintVersionKey) state.paintedVersion[profile.paintVersionKey] = version;
       if (profile.paintVersionKey) paintedSurfaceTabIds[profile.paintVersionKey] = tabId;
       profile.root.removeAttribute("aria-busy");
+      if (profile.paintVersionKey === "edit") refreshEditScrollSync();
     },
     onHydrated: () => {
       if (state.doc && state.openDocuments.activeTabId === tabId && state.htmlVersion === version) {
         syncActiveTabFromFacade();
+        refreshEditScrollSync();
       }
     },
     isHydrationCurrent: () => Boolean(
