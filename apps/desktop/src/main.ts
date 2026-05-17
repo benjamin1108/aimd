@@ -27,7 +27,7 @@ import { bindFormatToolbarDragHandles } from "./ui/toolbar-drag";
 import { bindWidthSwitch, setWidth } from "./ui/width";
 import { bindSidebarResizers, bindSidebarHrResizer, bindInspectorHrResizer } from "./ui/resizers";
 import { showFileContextMenu } from "./ui/context-menu";
-import { onInlineInput, flushInline } from "./editor/inline";
+import { onInlineInput, onInlineBeforeInput, flushInline } from "./editor/inline";
 import { bindImageDeleteGuard } from "./editor/image-delete";
 import { onInlinePaste, onInlineKeydown, collectClipboardImages, pasteImageFiles } from "./editor/paste";
 import { clearRecentDocuments, loadRecentPaths } from "./ui/recents";
@@ -227,6 +227,7 @@ markdownEl().addEventListener("paste", (event) => {
   void pasteImageFiles(imageFiles, "source");
 });
 
+inlineEditorEl().addEventListener("beforeinput", onInlineBeforeInput);
 inlineEditorEl().addEventListener("input", onInlineInput);
 inlineEditorEl().addEventListener("paste", onInlinePaste);
 inlineEditorEl().addEventListener("keydown", onInlineKeydown);

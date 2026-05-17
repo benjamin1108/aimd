@@ -350,17 +350,15 @@ test.describe("source-preserving visual editor stress suite", () => {
     expect(saveCalls).toBe(0);
   });
 
-  test("unsupported source block edits are blocked instead of silently dropped", async ({ page }) => {
+  test("fenced code block edits patch only the code body", async ({ page }) => {
     await installStressMock(page);
     await openVisualEditor(page);
     await appendText(page.locator("#inline-editor pre code").first(), " X");
-    await page.keyboard.press("Meta+s");
-
-    await expect(page.locator("#status")).toContainText("暂不支持直接保存此结构: code");
-    const saveCalls = await page.evaluate(() => {
-      const calls = (window as any).__aimd_calls as Array<{ cmd: string; args?: any }>;
-      return calls.filter((call) => call.cmd === "save_aimd").length;
-    });
-    expect(saveCalls).toBe(0);
+    const saved = await savedMarkdown(page);
+    expect(saved).toBe(STRESS_MARKDOWN.replace(
+      'const untouched = "code";',
+      'const untouched = "code"; X',
+    ));
+    expectNoSerializerChurn(saved);
   });
 });

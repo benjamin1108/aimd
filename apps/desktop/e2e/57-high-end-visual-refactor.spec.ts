@@ -335,18 +335,21 @@ test.describe("high-end visual refactor contract", () => {
     expect(sizes.projectIcon.width).toBeGreaterThanOrEqual(30);
   });
 
-  test("medium-width source mode collapses inspector pressure before split panes become unusable", async ({ page }) => {
+  test("medium-width source mode keeps inspector state interactive and honest", async ({ page }) => {
     await installHighEndMock(page);
     await page.setViewportSize({ width: 1280, height: 800 });
     await openProjectAndDoc(page);
     await page.locator("#mode-source").click();
     await expect(page.locator("#editor-wrap")).toBeVisible();
+    await expect(page.locator("#outline-panel")).toBeVisible();
 
     const metrics = await page.evaluate(() => {
       const box = (selector: string) => document.querySelector(selector)!.getBoundingClientRect();
       return {
         mode: document.querySelector("#panel")!.getAttribute("data-mode"),
         sourcePressure: document.querySelector("#panel")!.getAttribute("data-source-pressure"),
+        inspectorState: document.querySelector("#panel")!.getAttribute("data-inspector"),
+        inspectorCollapsed: document.querySelector("#inspector")!.classList.contains("is-collapsed"),
         workspace: box(".workspace").width,
         inspector: box("#inspector").width,
         editor: box("#editor-wrap").width,
@@ -354,10 +357,23 @@ test.describe("high-end visual refactor contract", () => {
       };
     });
     expect(metrics.mode).toBe("source");
-    expect(metrics.sourcePressure).toBe("true");
-    expect(metrics.inspector).toBeLessThanOrEqual(52);
-    expect(metrics.workspace).toBeGreaterThanOrEqual(900);
+    expect(metrics.sourcePressure).toBeNull();
+    expect(metrics.inspectorState).toBe("expanded");
+    expect(metrics.inspectorCollapsed).toBe(false);
+    expect(metrics.inspector).toBeGreaterThanOrEqual(220);
+    expect(metrics.workspace).toBeGreaterThanOrEqual(720);
     expect(metrics.sourcePane).toBeGreaterThanOrEqual(430);
+    await expect(page.locator("#doc-panel-collapse")).toHaveAttribute("title", "折叠检查器");
+    await expect(page.locator("#doc-panel-collapse svg")).toHaveCount(1);
+
+    await page.locator("#doc-panel-collapse").click();
+    await expect(page.locator("#inspector")).toHaveClass(/is-collapsed/);
+    await expect(page.locator("#doc-panel-collapse")).toHaveAttribute("title", "展开检查器");
+
+    const collapsedRail = await page.locator("#inspector").boundingBox();
+    await page.mouse.click(collapsedRail!.x + collapsedRail!.width / 2, collapsedRail!.y + collapsedRail!.height / 2);
+    await expect(page.locator("#inspector")).not.toHaveClass(/is-collapsed/);
+    await expect(page.locator("#outline-panel")).toBeVisible();
     await expectNoHorizontalOverflow(page);
   });
 

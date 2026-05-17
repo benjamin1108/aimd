@@ -8,6 +8,8 @@
 .app-frame[data-width="ultra"]  { --reader-max: 100%; }
 
 .reader {
+  isolation: isolate;
+  contain: paint;
   min-width: 0;
   min-height: 0;
   /* Without `width: 100%`, an auto-sized grid item with `margin: 0 auto`
@@ -72,6 +74,8 @@
 
 .source-editor-shell {
   position: relative;
+  isolation: isolate;
+  contain: paint;
   display: flex;
   flex: 1 1 auto;
   min-height: 0;
@@ -84,6 +88,8 @@
 }
 
 #markdown {
+  isolation: isolate;
+  contain: paint;
   display: block;
   flex: 1 1 auto;
   width: 100%;
@@ -118,6 +124,8 @@
 }
 
 .preview-pane #preview {
+  isolation: isolate;
+  contain: paint;
   flex: 1 1 auto;
   min-height: 0;
 }
@@ -221,6 +229,9 @@
 .aimd em { font-style: italic; }
 
 .aimd blockquote {
+  position: relative;
+  isolation: isolate;
+  contain: paint;
   margin: 18px 0;
   padding: 4px 16px;
   border-left: 2px solid var(--hairline-strong);
@@ -229,12 +240,16 @@
 }
 
 .aimd hr {
+  isolation: isolate;
+  contain: paint;
   margin: 28px 0;
   border: 0;
   border-top: 1px solid var(--hairline);
 }
 
 .aimd img {
+  isolation: isolate;
+  contain: paint;
   display: block;
   max-width: 100%;
   height: auto;
@@ -254,6 +269,8 @@
 
 .aimd pre {
   position: relative;
+  isolation: isolate;
+  contain: paint;
   margin: 16px 0;
   padding: 14px 16px;
   border-radius: var(--radius-control);
@@ -308,6 +325,8 @@
      down to arbitrary character breaks. Tables may scroll horizontally when
      their real minimum width is wider than the reader. */
   display: block;
+  isolation: isolate;
+  contain: paint;
   width: 100%;
   max-width: 100%;
   margin: 18px 0;

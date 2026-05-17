@@ -3,6 +3,13 @@ import { state } from "../core/state";
 type SelectAllContext = "main" | "settings";
 
 let lastSelectableRoot: HTMLElement | null = null;
+let doubleClickAnchor: {
+  block: HTMLElement;
+  node: Text | null;
+  offset: number;
+  root: HTMLElement;
+  until: number;
+} | null = null;
 
 function elementFromTarget(target: EventTarget | null): HTMLElement | null {
   return target instanceof HTMLElement ? target : null;
@@ -26,6 +33,7 @@ export function isEditableTarget(target: EventTarget | null): boolean {
 
 export function selectElementContents(element: HTMLElement): boolean {
   if (!isVisible(element) || !element.textContent?.length) return false;
+  element.focus({ preventScroll: true });
   const range = document.createRange();
   range.selectNodeContents(element);
   const selection = window.getSelection();
@@ -121,6 +129,114 @@ function selectRoot(root: HTMLElement | HTMLTextAreaElement | null): boolean {
   return selectElementContents(root);
 }
 
+function renderedSurfaceRoot(target: HTMLElement | null): HTMLElement | null {
+  return target?.closest<HTMLElement>("#reader, #inline-editor, #preview") || null;
+}
+
+function selectableBlock(target: HTMLElement | null, root: HTMLElement): HTMLElement | null {
+  const block = target?.closest<HTMLElement>("h1,h2,h3,h4,h5,h6,p,li,blockquote,pre,td,th");
+  return block && root.contains(block) ? block : null;
+}
+
+function caretRangeFromPoint(x: number, y: number): Range | null {
+  if (document.caretRangeFromPoint) return document.caretRangeFromPoint(x, y);
+  const pos = document.caretPositionFromPoint?.(x, y);
+  if (!pos) return null;
+  const range = document.createRange();
+  range.setStart(pos.offsetNode, pos.offset);
+  range.collapse(true);
+  return range;
+}
+
+function textAnchorFromPoint(event: MouseEvent, block: HTMLElement): { node: Text | null; offset: number } {
+  const caret = caretRangeFromPoint(event.clientX, event.clientY);
+  const node = caret?.startContainer;
+  if (node instanceof Text && block.contains(node)) {
+    return { node, offset: caret?.startOffset ?? 0 };
+  }
+  const walker = document.createTreeWalker(block, NodeFilter.SHOW_TEXT);
+  const fallback = walker.nextNode();
+  return { node: fallback instanceof Text ? fallback : null, offset: 0 };
+}
+
+function rememberDoubleClickAnchor(event: MouseEvent) {
+  if (event.detail < 2) return;
+  const target = elementFromTarget(event.target);
+  const root = renderedSurfaceRoot(target);
+  if (!root) {
+    doubleClickAnchor = null;
+    return;
+  }
+  const block = selectableBlock(target, root);
+  if (!block) {
+    doubleClickAnchor = null;
+    return;
+  }
+  const anchor = textAnchorFromPoint(event, block);
+  doubleClickAnchor = {
+    block,
+    node: anchor.node,
+    offset: anchor.offset,
+    root,
+    until: performance.now() + 900,
+  };
+}
+
+function normalizeDoubleClickSelection() {
+  const anchor = doubleClickAnchor;
+  if (!anchor || performance.now() > anchor.until || !isVisible(anchor.root) || !isVisible(anchor.block)) return;
+  const selection = window.getSelection();
+  if (!selection || selection.rangeCount === 0 || selection.isCollapsed) return;
+  const range = selection.getRangeAt(0);
+  if (!anchor.root.contains(range.commonAncestorContainer) && range.commonAncestorContainer !== anchor.root) return;
+  if (selectionInside(anchor.block)) return;
+  selectWordAtAnchor(anchor);
+}
+
+function selectWordAtAnchor(anchor: NonNullable<typeof doubleClickAnchor>) {
+  const node = anchor.node && anchor.block.contains(anchor.node) ? anchor.node : firstTextNode(anchor.block);
+  if (!node || !node.data.length) return;
+  const index = nearestWordIndex(node.data, anchor.offset);
+  if (index === null) return;
+  const [start, end] = wordBounds(node.data, index);
+  if (start === end) return;
+  const range = document.createRange();
+  range.setStart(node, start);
+  range.setEnd(node, end);
+  const selection = window.getSelection();
+  selection?.removeAllRanges();
+  selection?.addRange(range);
+}
+
+function firstTextNode(root: HTMLElement): Text | null {
+  const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT);
+  const node = walker.nextNode();
+  return node instanceof Text ? node : null;
+}
+
+function nearestWordIndex(text: string, offset: number): number | null {
+  const start = Math.max(0, Math.min(offset, text.length - 1));
+  for (let distance = 0; distance < text.length; distance += 1) {
+    const left = start - distance;
+    const right = start + distance;
+    if (left >= 0 && isWordChar(text[left])) return left;
+    if (right < text.length && isWordChar(text[right])) return right;
+  }
+  return null;
+}
+
+function wordBounds(text: string, index: number): [number, number] {
+  let start = index;
+  let end = index + 1;
+  while (start > 0 && isWordChar(text[start - 1])) start -= 1;
+  while (end < text.length && isWordChar(text[end])) end += 1;
+  return [start, end];
+}
+
+function isWordChar(char: string | undefined): boolean {
+  return Boolean(char && /[\p{L}\p{N}_$.-]/u.test(char));
+}
+
 export function handleSelectAllShortcut(event: KeyboardEvent, context: SelectAllContext = "main"): boolean {
   if (!(event.metaKey || event.ctrlKey) || event.altKey || event.shiftKey || event.key.toLowerCase() !== "a") {
     return false;
@@ -149,6 +265,11 @@ export function bindSelectionBoundary(context: SelectAllContext = "main") {
   }, { capture: true });
 
   if (context !== "main") return;
+  document.addEventListener("mousedown", rememberDoubleClickAnchor, { capture: true });
+  document.addEventListener("dblclick", () => {
+    window.requestAnimationFrame(normalizeDoubleClickSelection);
+    window.setTimeout(normalizeDoubleClickSelection, 0);
+  }, { capture: true });
   document.addEventListener("pointerdown", (event) => {
     const target = elementFromTarget(event.target);
     lastSelectableRoot = target?.closest<HTMLElement>(

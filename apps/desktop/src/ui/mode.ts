@@ -8,7 +8,7 @@ import {
 import type { Mode } from "../core/types";
 import { paintPaneIfStale } from "./outline";
 import { updateChrome } from "./chrome";
-import { flushInline } from "../editor/inline";
+import { abandonUnsafeInlineDraft, flushInline } from "../editor/inline";
 import { captureActiveViewState, restoreActiveViewState } from "../document/view-state";
 import { clearRenderedSurfaceInteractionStatus } from "../rendered-surface/interactions";
 import { refreshSourceHighlight } from "../editor/source-highlight";
@@ -34,7 +34,10 @@ export function setMode(mode: Mode, options: { skipCapture?: boolean } = {}): bo
   // Flush from the mode we are leaving.
   if (state.mode === "edit" && mode !== "edit") {
     const flushed = flushInline();
-    if (!flushed.ok) return false;
+    if (!flushed.ok) {
+      if (mode !== "source") return false;
+      abandonUnsafeInlineDraft(flushed.reason);
+    }
   }
 
   state.mode = mode;

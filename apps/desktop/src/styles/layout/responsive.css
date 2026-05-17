@@ -1,9 +1,8 @@
 @layer responsive {
 /* Responsive collapse — explicit rail behavior.
-   Wide desktop keeps three columns. Medium keeps the project rail and turns
-   the inspector into a stable narrow affordance before the editor surface starts
-   squeezing. Narrow tablet keeps the project rail as the same narrow affordance; mobile hides both rails
-   and keeps document commands in the workspace header. */
+   Wide desktop keeps three columns. Medium and narrow tablet widths respect the
+   inspector state owned by JavaScript; mobile hides both rails and keeps document
+   commands in the workspace header. */
 
 @media (max-width: 1180px) {
   .panel {
@@ -14,18 +13,8 @@
 }
 
 @media (max-width: 1320px) and (min-width: 901px) {
-  .panel[data-mode="source"][data-source-pressure="true"]:not([data-shell="launch"]) {
-    grid-template-columns:
-      var(--project-rail-width)
-      minmax(0, 1fr)
-      var(--rail-collapsed-width);
-  }
-
-  .panel[data-mode="source"][data-source-pressure="true"][data-project-rail="collapsed"]:not([data-shell="launch"]) {
-    grid-template-columns:
-      var(--rail-collapsed-width)
-      minmax(0, 1fr)
-      var(--rail-collapsed-width);
+  .panel[data-mode="source"]:not([data-shell="launch"]) .editor-split {
+    grid-template-columns: minmax(0, 1.15fr) minmax(0, 0.85fr);
   }
 }
 

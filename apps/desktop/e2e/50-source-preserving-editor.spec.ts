@@ -124,6 +124,81 @@ async function installInlineImageMock(page: Page, initialMarkdown: string) {
   }, initialMarkdown);
 }
 
+const codeBoundaryMarkdown = [
+  "# Code Boundary",
+  "",
+  "Paragraph before code.",
+  "",
+  "```ts",
+  "const value = 1;",
+  "```",
+  "",
+  "Paragraph after code.",
+  "",
+].join("\n");
+
+async function installCodeBoundaryMock(page: Page) {
+  await page.addInitScript((initialMarkdown: string) => {
+    type Args = Record<string, any> | undefined;
+    const calls: Array<{ cmd: string; args?: Args }> = [];
+    const escapeHTML = (value: string) => value
+      .replace(/&/g, "&amp;")
+      .replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;");
+    const render = (md: string) => {
+      const blocks: string[] = [];
+      const lines = md.split(/\n/);
+      for (let i = 0; i < lines.length; i += 1) {
+        const line = lines[i];
+        if (line.startsWith("# ")) {
+          blocks.push(`<h1>${escapeHTML(line.slice(2))}</h1>`);
+        } else if (line.startsWith("```")) {
+          const code: string[] = [];
+          i += 1;
+          while (i < lines.length && !lines[i].startsWith("```")) {
+            code.push(lines[i]);
+            i += 1;
+          }
+          blocks.push(`<pre><code>${escapeHTML(code.join("\n"))}</code></pre>`);
+        } else if (line.trim()) {
+          blocks.push(`<p>${escapeHTML(line)}</p>`);
+        }
+      }
+      return { html: blocks.join("") };
+    };
+    const doc = {
+      path: "/mock/code-boundary.aimd",
+      title: "Code Boundary",
+      markdown: initialMarkdown,
+      html: render(initialMarkdown).html,
+      assets: [],
+      dirty: false,
+      format: "aimd",
+    };
+    const handlers: Record<string, (a?: Args) => unknown> = {
+      initial_open_path: () => null,
+      choose_doc_file: () => doc.path,
+      open_aimd: () => doc,
+      save_aimd: (a) => ({ ...doc, markdown: String(a?.markdown ?? ""), dirty: false }),
+      render_markdown: (a) => render(String(a?.markdown ?? "")),
+      render_markdown_standalone: (a) => render(String(a?.markdown ?? "")),
+      list_aimd_assets: () => [],
+      cleanup_old_drafts: () => undefined,
+    };
+    (window as any).__aimd_calls = calls;
+    (window as any).__TAURI_INTERNALS__ = {
+      invoke: async (cmd: string, args?: Args) => {
+        calls.push({ cmd, args });
+        const handler = handlers[cmd];
+        if (!handler) throw new Error(`mock invoke: unknown command ${cmd}`);
+        return handler(args);
+      },
+      transformCallback: (callback: Function) => callback,
+    };
+    (window as any).__TAURI_EVENT_PLUGIN_INTERNALS__ = { unregisterListener: () => {} };
+  }, codeBoundaryMarkdown);
+}
+
 function readHeadExampleMarkdown() {
   const dir = mkdtempSync(join(tmpdir(), "aimd-example-"));
   const aimdPath = join(dir, "ai-daily-head.aimd");
@@ -258,6 +333,76 @@ test.describe("source-preserving visual editor", () => {
       return calls.filter((call) => call.cmd === "save_aimd").length;
     });
     expect(saveCalls).toBe(0);
+
+    await page.locator("#mode-source").click();
+    await expect(page.locator("#editor-wrap")).toBeVisible();
+    await expect(page.locator("#markdown")).toHaveValue(markdown);
+  });
+
+  test("visual editor blocks cross-block replacements that touch fenced code blocks", async ({ page }) => {
+    await installCodeBoundaryMock(page);
+    await page.goto("/");
+    await page.locator("#empty-open").click();
+    await page.locator("#mode-edit").click();
+
+    const canceled = await page.locator("#inline-editor").evaluate((editor: HTMLElement) => {
+      const paragraph = editor.querySelector("p")?.firstChild;
+      const code = editor.querySelector("pre code")?.firstChild;
+      if (!paragraph || !code) throw new Error("test content missing");
+      const range = document.createRange();
+      range.setStart(paragraph, 0);
+      range.setEnd(code, Math.min(5, code.textContent?.length ?? 0));
+      const selection = window.getSelection();
+      selection?.removeAllRanges();
+      selection?.addRange(range);
+      editor.focus();
+      const event = new InputEvent("beforeinput", {
+        bubbles: true,
+        cancelable: true,
+        inputType: "insertText",
+        data: "X",
+      });
+      return !editor.dispatchEvent(event);
+    });
+
+    expect(canceled).toBe(true);
+    await expect(page.locator("#status")).toContainText("跨块直接替换");
+    await expect(page.locator("#inline-editor p").first()).toHaveText("Paragraph before code.");
+    await expect(page.locator("#inline-editor pre code")).toHaveText("const value = 1;");
+  });
+
+  test("visual code block edits save through source-preserving patch", async ({ page }) => {
+    await installCodeBoundaryMock(page);
+    await page.goto("/");
+    await page.locator("#empty-open").click();
+    await page.locator("#mode-edit").click();
+
+    await page.locator("#inline-editor pre code").evaluate((code: HTMLElement) => {
+      code.textContent = `${code.textContent}BROKEN`;
+      const text = code.firstChild;
+      if (!text) throw new Error("code text missing");
+      const range = document.createRange();
+      range.setStart(text, text.textContent?.length ?? 0);
+      range.collapse(true);
+      const selection = window.getSelection();
+      selection?.removeAllRanges();
+      selection?.addRange(range);
+      code.dispatchEvent(new InputEvent("input", {
+        bubbles: true,
+        inputType: "insertText",
+        data: "BROKEN",
+      }));
+    });
+    await page.keyboard.press("Meta+s");
+    await page.waitForFunction(() => {
+      const calls = (window as any).__aimd_calls as Array<{ cmd: string; args?: any }>;
+      return calls.some((call) => call.cmd === "save_aimd");
+    });
+    const saved = await page.evaluate(() => {
+      const calls = (window as any).__aimd_calls as Array<{ cmd: string; args?: any }>;
+      return calls.find((call) => call.cmd === "save_aimd")?.args?.markdown as string;
+    });
+    expect(saved).toBe(codeBoundaryMarkdown.replace("const value = 1;", "const value = 1;BROKEN"));
   });
 
   test("real ai-daily AIMD heading edit does not rewrite Markdown style", async ({ page }) => {

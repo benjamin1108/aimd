@@ -7,8 +7,8 @@ async function installMainMock(page: Page) {
     const doc = {
       path: `${root}/Readme.aimd`,
       title: "Selection Boundary Doc",
-      markdown: "# Selection Boundary Doc\n\nReader unique body text.\n\n## Chapter\n\nInline unique body text.",
-      html: "<h1>Selection Boundary Doc</h1><p>Reader unique body text.</p><h2>Chapter</h2><p>Inline unique body text.</p>",
+      markdown: "# Selection Boundary Doc\n\nReader unique body text.\n\n## Chapter\n\nInline unique body text.\n\n```ts\nselectAllCode();\n```",
+      html: "<h1>Selection Boundary Doc</h1><p>Reader unique body text.</p><h2>Chapter</h2><p>Inline unique body text.</p><pre><code>selectAllCode();</code></pre>",
       assets: [],
       dirty: false,
       format: "aimd",
@@ -160,6 +160,38 @@ function expectNoChrome(text: string) {
   expect(text).not.toContain("关闭文档");
 }
 
+async function forceDirtyDoubleClickSelection(page: Page, rootSelector: string, paragraphNeedle: string) {
+  await page.locator(rootSelector).evaluate((root: HTMLElement, needle: string) => {
+    const paragraph = Array.from(root.querySelectorAll("p"))
+      .find((el) => (el.textContent || "").includes(needle));
+    const code = root.querySelector("pre code");
+    const paragraphText = paragraph?.firstChild;
+    const codeText = code?.firstChild;
+    if (!paragraph || !(paragraphText instanceof Text) || !(codeText instanceof Text)) {
+      throw new Error("dirty double-click fixture missing");
+    }
+    const rect = paragraph.getBoundingClientRect();
+    const eventInit = {
+      bubbles: true,
+      cancelable: true,
+      clientX: rect.left + 8,
+      clientY: rect.top + rect.height / 2,
+      detail: 2,
+    };
+    paragraph.dispatchEvent(new MouseEvent("mousedown", eventInit));
+
+    const range = document.createRange();
+    range.setStart(paragraphText, 0);
+    range.setEnd(codeText, Math.min(8, codeText.data.length));
+    const selection = window.getSelection();
+    selection?.removeAllRanges();
+    selection?.addRange(range);
+
+    paragraph.dispatchEvent(new MouseEvent("dblclick", eventInit));
+  }, paragraphNeedle);
+  await page.waitForTimeout(80);
+}
+
 test.describe("selection boundary and select-all shortcuts", () => {
   test("reader mode selects document text after toolbar focus, not app chrome", async ({ page }) => {
     await installMainMock(page);
@@ -202,6 +234,15 @@ test.describe("selection boundary and select-all shortcuts", () => {
     await pressSelectAll(page, "Control");
     let text = await selectedText(page);
     expect(text).toContain("Inline unique body text");
+    expect(text).toContain("selectAllCode();");
+    expectNoChrome(text);
+
+    await clearSelection(page);
+    await page.locator("#inline-editor").click();
+    await pressSelectAll(page, "Meta");
+    text = await selectedText(page);
+    expect(text).toContain("Inline unique body text");
+    expect(text).toContain("selectAllCode();");
     expectNoChrome(text);
 
     await page.locator("#mode-source").click();
@@ -213,6 +254,34 @@ test.describe("selection boundary and select-all shortcuts", () => {
     }));
     expect(sourceSelection.selected).toBe(sourceSelection.value);
     expect(sourceSelection.selected).toContain("Reader unique body text");
+  });
+
+  test("double-click selection is clamped to its starting document block", async ({ page }) => {
+    await installMainMock(page);
+    await page.goto("/");
+    await page.locator("#empty-open").click();
+
+    await forceDirtyDoubleClickSelection(page, "#reader", "Reader unique");
+    let text = await selectedText(page);
+    expect(text).toBeTruthy();
+    expect(text).not.toContain("selectAllCode");
+    expect(text).not.toContain("Inline unique body text");
+
+    await clearSelection(page);
+    await page.locator("#mode-edit").click();
+    await forceDirtyDoubleClickSelection(page, "#inline-editor", "Inline unique");
+    text = await selectedText(page);
+    expect(text).toBeTruthy();
+    expect(text).not.toContain("selectAllCode");
+    expect(text).not.toContain("Reader unique body text");
+
+    await clearSelection(page);
+    await page.locator("#mode-source").click();
+    await forceDirtyDoubleClickSelection(page, "#preview", "Inline unique");
+    text = await selectedText(page);
+    expect(text).toBeTruthy();
+    expect(text).not.toContain("selectAllCode");
+    expect(text).not.toContain("Reader unique body text");
   });
 
   test("workspace, outline, Git panel, and Git diff do not leak chrome into selection", async ({ page }) => {

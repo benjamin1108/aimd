@@ -76,6 +76,30 @@ export function onInlineInput(event?: Event) {
   }, 700);
 }
 
+export function onInlineBeforeInput(event: InputEvent) {
+  if (!state.doc || !isMutatingInput(event)) return;
+  const problem = unsafeVisualInputProblem();
+  if (!problem) return;
+  event.preventDefault();
+  event.stopPropagation();
+  setStatus(problem, "warn");
+}
+
+export function abandonUnsafeInlineDraft(reason: string) {
+  if (state.flushTimer) {
+    window.clearTimeout(state.flushTimer);
+    state.flushTimer = null;
+  }
+  state.inlineDirty = false;
+  state.sourceDirtyRefs.clear();
+  state.sourceStructuralDirty = false;
+  state.paintedVersion.edit = -1;
+  syncActiveTabFromFacade();
+  persistSessionSnapshot();
+  updateChrome();
+  setStatus(`${reason}。已进入 Markdown 模式，正文保持为最后一次安全内容`, "warn");
+}
+
 function ensureSelectionInEditor() {
   const root = inlineEditorEl();
   const sel = window.getSelection();
@@ -94,6 +118,41 @@ function ensureSelectionInEditor() {
   r.collapse(true);
   sel.removeAllRanges();
   sel.addRange(r);
+}
+
+function isMutatingInput(event: InputEvent) {
+  const inputType = event.inputType || "";
+  if (!inputType) return true;
+  return inputType.startsWith("insert")
+    || inputType.startsWith("delete")
+    || inputType.startsWith("format")
+    || inputType === "historyUndo"
+    || inputType === "historyRedo";
+}
+
+function unsafeVisualInputProblem(): string | null {
+  const root = inlineEditorEl();
+  const selection = window.getSelection();
+  if (!selection || selection.rangeCount === 0) return null;
+  for (let i = 0; i < selection.rangeCount; i += 1) {
+    const range = selection.getRangeAt(i);
+    if (!root.contains(range.commonAncestorContainer) && range.commonAncestorContainer !== root) continue;
+    if (!range.collapsed && selectionCrossesSourceBlocks(range)) {
+      return "可视化编辑暂不支持跨块直接替换，请缩小选择范围或切到 Markdown 模式编辑";
+    }
+  }
+  return null;
+}
+
+function selectionCrossesSourceBlocks(range: Range) {
+  const startRef = sourceRefFromNode(range.startContainer);
+  const endRef = sourceRefFromNode(range.endContainer);
+  return Boolean(startRef && endRef && startRef !== endRef);
+}
+
+function sourceRefFromNode(node: Node | null | undefined): string | null {
+  const el = node instanceof HTMLElement ? node : node?.parentElement;
+  return el?.closest<HTMLElement>("[data-md-source-ref]")?.dataset.mdSourceRef || null;
 }
 
 export function normalizeInlineDOM() {

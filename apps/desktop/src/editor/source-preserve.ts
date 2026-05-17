@@ -41,7 +41,17 @@ export function createSourceModel(markdown: string): MarkdownSourceModel {
       while (end < lines.length && !lines[end].text.trim().startsWith(fence)) end += 1;
       if (end < lines.length) end += 1;
       const last = lines[Math.max(i, end - 1)];
-      blocks.push(block(`b${blockIndex++}`, "code", line.start, last.end, line.start, last.end));
+      const closingLine = end > i + 1 && lines[end - 1]?.text.trim().startsWith(fence)
+        ? lines[end - 1]
+        : null;
+      blocks.push(block(
+        `b${blockIndex++}`,
+        "code",
+        line.start,
+        last.end,
+        line.end,
+        closingLine ? closingLine.start : last.end,
+      ));
       i = end;
       continue;
     }
@@ -142,6 +152,10 @@ export function patchDirtySource(root: HTMLElement, model: MarkdownSourceModel, 
     }
     const block = model.blocks.find((candidate) => candidate.id === ref);
     if (!block) return { ok: false, reason: `找不到源块: ${ref}` };
+    if (block.kind === "code") {
+      patches.push(patchCodeBlock(model.markdown, block.contentStart, block.contentEnd, textForCodeBlock(el)));
+      continue;
+    }
     if (!["heading", "paragraph", "list_item", "blockquote"].includes(block.kind)) {
       return { ok: false, reason: `暂不支持直接保存此结构: ${block.kind}` };
     }
@@ -310,6 +324,24 @@ function textForElement(el: HTMLElement) {
   const clone = el.cloneNode(true) as HTMLElement;
   clone.querySelectorAll("ul,ol").forEach((child) => child.remove());
   return (clone.textContent || "").replace(/\u00a0/g, " ").trim();
+}
+
+function textForCodeBlock(el: HTMLElement) {
+  return el.querySelector("code")?.textContent ?? el.textContent ?? "";
+}
+
+function patchCodeBlock(markdown: string, start: number, end: number, nextText: string) {
+  const original = markdown.slice(start, end);
+  const newline = original.includes("\r\n") ? "\r\n" : "\n";
+  const normalized = nextText.replace(/\r\n|\r|\n/g, newline);
+  const value = original.endsWith(newline) || normalized.length > 0
+    ? `${trimOneTrailingNewline(normalized, newline)}${newline}`
+    : normalized;
+  return { start, end, value };
+}
+
+function trimOneTrailingNewline(value: string, newline: string) {
+  return value.endsWith(newline) ? value.slice(0, -newline.length) : value;
 }
 
 function patchForRange(markdown: string, start: number, end: number, nextText: string) {

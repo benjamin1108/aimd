@@ -62,10 +62,7 @@ export function renderDocPanelTabs() {
     "data-inspector",
     state.docPanelCollapsed ? "collapsed" : "expanded",
   );
-  panel?.setAttribute(
-    "data-source-pressure",
-    state.mode === "source" && state.sidebarDocTab === "outline" ? "true" : "false",
-  );
+  panel?.removeAttribute("data-source-pressure");
   docPanelCollapseEl().setAttribute("aria-expanded", String(!state.docPanelCollapsed));
   docPanelCollapseEl().innerHTML = state.docPanelCollapsed ? "‹" : ICONS.sidePanelClose;
   docPanelCollapseEl().title = state.docPanelCollapsed ? "展开检查器" : "折叠检查器";
