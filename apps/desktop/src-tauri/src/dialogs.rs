@@ -168,24 +168,23 @@ pub fn confirm_keep_online_images(message: String) -> bool {
 pub fn reveal_in_finder(path: String) -> Result<(), String> {
     #[cfg(target_os = "macos")]
     {
-        std::process::Command::new("open")
+        return std::process::Command::new("open")
             .args(["-R", &path])
             .spawn()
             .map(|_| ())
-            .map_err(|e| format!("reveal_in_finder: {e}"))?;
+            .map_err(|e| format!("reveal_in_finder: {e}"));
     }
     #[cfg(target_os = "windows")]
     {
-        std::process::Command::new("explorer.exe")
+        return std::process::Command::new("explorer.exe")
             .arg(format!("/select,{}", path))
             .spawn()
             .map(|_| ())
-            .map_err(|e| format!("reveal_in_finder: {e}"))?;
+            .map_err(|e| format!("reveal_in_finder: {e}"));
     }
     #[cfg(not(any(target_os = "macos", target_os = "windows")))]
     {
         let _ = &path;
-        return Err("Reveal in file manager is not supported on this platform yet.".to_string());
+        Err("Reveal in file manager is not supported on this platform yet.".to_string())
     }
-    Ok(())
 }
