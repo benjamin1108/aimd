@@ -7,6 +7,12 @@ on:
       - main
       - master
 
+env:
+  GIT_CONFIG_COUNT: "1"
+  GIT_CONFIG_KEY_0: init.defaultBranch
+  GIT_CONFIG_VALUE_0: main
+  NODE_OPTIONS: --no-deprecation
+
 jobs:
   version:
     name: Version Automation (${{ matrix.os }})
@@ -75,7 +81,7 @@ jobs:
         run: echo "dir=$(npm config get cache)" >> "$GITHUB_OUTPUT"
 
       - name: NPM cache
-        uses: actions/cache@v4
+        uses: actions/cache@v5
         with:
           path: ${{ steps.npm-cache.outputs.dir }}
           key: npm-${{ runner.os }}-${{ runner.arch }}-${{ steps.cache-inputs.outputs.npm_lock_hash }}
