@@ -418,6 +418,9 @@ test.describe("Git workspace panel", () => {
 
     await page.locator(".git-file-row[data-path='docs/draft.md']").locator("[data-git-action='select']").click();
     await expect(page.locator("#git-diff-view")).toBeVisible();
+    await expect(page.locator(".git-diff-block-title")).toHaveText("未暂存差异");
+    await expect(page.locator("#git-diff-view")).toContainText("+new file");
+    await expect(page.locator("#git-diff-view")).not.toContainText("没有 已暂存差异");
     await page.locator(".workspace-row", { hasText: "Readme.aimd" }).click();
     await expect(page.locator("#reader")).toBeVisible();
     await expect(page.locator("#git-diff-view")).toBeHidden();

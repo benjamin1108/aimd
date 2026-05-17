@@ -95,11 +95,7 @@ jobs:
         working-directory: apps/desktop
         run: npm ci --prefer-offline
 
-      - name: Version check
-        run: npm run version:check
-
-      - name: Frontend checks
-        working-directory: apps/desktop
+      - name: Warning-free checks
         run: npm run check
 
       - name: Rust crate tests

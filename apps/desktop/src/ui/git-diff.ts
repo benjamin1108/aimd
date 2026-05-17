@@ -52,8 +52,18 @@ function renderDiffBlock(title: string, text: string): string {
   return `
     <section class="git-diff-block">
       <div class="git-diff-block-title">${escapeHTML(title)}</div>
-      <div class="git-diff-code">${text ? renderLines(text) : `<div class="git-diff-empty">没有 ${escapeHTML(title)}</div>`}</div>
+      <div class="git-diff-code">${renderLines(text)}</div>
     </section>`;
+}
+
+function renderDiffBlocks(diff: GitFileDiff): string {
+  const blocks = [
+    diff.stagedDiff ? renderDiffBlock("已暂存差异", diff.stagedDiff) : "",
+    diff.unstagedDiff ? renderDiffBlock("未暂存差异", diff.unstagedDiff) : "",
+  ].filter(Boolean);
+  return blocks.length
+    ? blocks.join("")
+    : `<div class="git-diff-message">没有可显示的文本 diff</div>`;
 }
 
 function gitDiffTabId(repoRoot: string, path: string): string {
@@ -157,8 +167,7 @@ export function renderGitDiffView() {
       : "";
     body = `
       ${truncated}
-      ${renderDiffBlock("已暂存差异", view.diff.stagedDiff)}
-      ${renderDiffBlock("未暂存差异", view.diff.unstagedDiff)}`;
+      ${renderDiffBlocks(view.diff)}`;
   }
   gitDiffContentEl().innerHTML = `
     <div id="git-diff-scroll" class="git-diff-scroll" data-select-all-scope>${body}</div>

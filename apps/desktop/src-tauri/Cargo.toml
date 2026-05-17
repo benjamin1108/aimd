@@ -6,6 +6,9 @@ authors.workspace = true
 description = "AIMD Desktop"
 default-run = "aimd-desktop"
 
+[lints]
+workspace = true
+
 [lib]
 name = "aimd_desktop_lib"
 crate-type = ["staticlib", "cdylib", "rlib"]

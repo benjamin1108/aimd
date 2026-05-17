@@ -1,7 +1,7 @@
 {
   "private": true,
   "scripts": {
-    "check": "npm --prefix apps/desktop run check && cargo check --workspace && git diff --check",
+    "check": "node scripts/check-no-warnings.mjs",
     "version:sync": "node scripts/sync-version.mjs",
     "version:check": "node scripts/sync-version.mjs --check",
     "updater:plan": "node scripts/updater-manifest.mjs plan",
